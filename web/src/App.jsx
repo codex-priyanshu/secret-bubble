@@ -11,6 +11,9 @@ import LoginPage from './components/LoginPage';
 import { useBiometrics } from './hooks/useBiometrics';
 
 const getBackendUrl = () => {
+  if (import.meta.env?.VITE_BACKEND_URL) {
+    return import.meta.env.VITE_BACKEND_URL;
+  }
   const hostname = window.location.hostname || 'localhost';
   return `http://${hostname}:5000`;
 };
@@ -137,7 +140,6 @@ export default function App() {
     });
 
     s.on('new_message', (msg) => {
-      // Check if message belongs to current open target
       const isForCurrentTarget =
         (selectedTarget.type === 'room' && msg.roomId === selectedTarget.id) ||
         (selectedTarget.type === 'user' &&
@@ -150,7 +152,6 @@ export default function App() {
           return [...prev, msg];
         });
       } else if (msg.senderId !== currentUser.id) {
-        // Increment unread count for that friend
         const fromId = msg.senderId;
         setUnreadCounts(prev => ({
           ...prev,
@@ -189,7 +190,6 @@ export default function App() {
     };
   }, [currentUser, selectedTarget, relockAll, backendUrl]);
 
-  // Auto scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -208,7 +208,6 @@ export default function App() {
     if (socket && connectionStatus === 'connected') {
       socket.emit('send_message', payload);
     } else {
-      // Offline fallback
       const localMsg = {
         ...payload,
         id: 'msg-' + Date.now(),
@@ -240,7 +239,6 @@ export default function App() {
     setSelectedTarget(target);
     setIsSidebarOpen(false);
     relockAll();
-    // Clear unread for this target
     if (target.id) {
       setUnreadCounts(prev => ({ ...prev, [target.id]: 0 }));
     }
@@ -253,7 +251,6 @@ export default function App() {
     if (socket) socket.disconnect();
   };
 
-  // If user is not logged in, render the No-OTP Login Page
   if (!currentUser) {
     return <LoginPage onLoginSuccess={(user) => setCurrentUser(user)} backendUrl={backendUrl} />;
   }
@@ -263,7 +260,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-1 sm:p-4 text-slate-100">
       
-      {/* Top App Header & Network Bar */}
+      {/* Top App Header */}
       <div className="w-full max-w-5xl mb-2 sm:mb-3 flex items-center justify-between px-2">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
@@ -271,7 +268,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-white leading-tight flex items-center gap-2">
-              SecureChat: Biometric Privacy
+              SecureChat: Biometric Shield
               {settings.aiEnabled && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
                   AI Auto-Guard ON
@@ -297,7 +294,7 @@ export default function App() {
       {/* Main Dual-Pane Chat Container */}
       <div className="w-full max-w-5xl bg-slate-900/80 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex h-[85vh] relative backdrop-blur-xl">
         
-        {/* Left Side: Friends / Online Users Sidebar (Responsive drawer on mobile) */}
+        {/* Left Side: Friends Sidebar */}
         <div className={`fixed inset-y-0 left-0 z-30 md:static md:flex md:w-72 bg-slate-900 transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}>
@@ -311,7 +308,7 @@ export default function App() {
           />
         </div>
 
-        {/* Mobile Backdrop for sidebar */}
+        {/* Mobile Backdrop */}
         {isSidebarOpen && (
           <div
             onClick={() => setIsSidebarOpen(false)}
