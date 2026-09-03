@@ -1,0 +1,31 @@
+[
+  {
+    "id": "user-aman",
+    "username": "aman",
+    "name": "Aman",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "avatarColor": "from-blue-600 to-cyan-500"
+  },
+  {
+    "id": "user-rohan",
+    "username": "rohan",
+    "name": "Rohan",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "avatarColor": "from-purple-600 to-pink-500"
+  },
+  {
+    "id": "user-priya",
+    "username": "priya",
+    "name": "Priya",
+    "passwordHash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "avatarColor": "from-rose-600 to-amber-500"
+  },
+  {
+    "id": "user-1788452509095",
+    "username": "shivam",
+    "name": "Shivam",
+    "passwordHash": "89e01536ac207279409d4de1e5253e01f4a1769e696db0d6062ca9b8f56767c8",
+    "avatarColor": "from-purple-600 to-indigo-500",
+    "createdAt": "2026-09-03T16:21:49.095Z"
+  }
+]

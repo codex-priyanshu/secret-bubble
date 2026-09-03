@@ -1,0 +1,165 @@
+[
+  {
+    "id": "msg-1",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "Hey Rahul, kya kal subah 10 baje library mil rahe hain?",
+    "isLocked": false,
+    "timestamp": "2026-08-28T18:07:26.131Z"
+  },
+  {
+    "id": "msg-2",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "Haan sure, notes bhi le aunga!",
+    "isLocked": false,
+    "timestamp": "2026-08-28T18:12:26.132Z"
+  },
+  {
+    "id": "msg-3",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "Waise kal shaam ko tum bohot pyaari lag rahi thi... I feel so lucky to have you in my life ❤️",
+    "isLocked": true,
+    "category": "Personal Feelings",
+    "timestamp": "2026-08-28T18:19:26.132Z"
+  },
+  {
+    "id": "msg-4",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "Aww thank you! Aapse akele me milke kuch important baat karni hai... 🤫💕",
+    "isLocked": true,
+    "category": "Intimate / Private",
+    "timestamp": "2026-08-28T18:27:26.132Z"
+  },
+  {
+    "id": "msg-5",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "Theek hai, kal milte hi decide karte hain.",
+    "isLocked": false,
+    "timestamp": "2026-08-28T18:35:26.132Z"
+  },
+  {
+    "id": "msg-1787942449057-9gsv",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "hii",
+    "isLocked": false,
+    "category": "General",
+    "timestamp": "2026-08-28T18:40:49.057Z"
+  },
+  {
+    "id": "msg-1787942477982-0t1f",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "kaise ho",
+    "isLocked": false,
+    "category": "General",
+    "timestamp": "2026-08-28T18:41:17.982Z"
+  },
+  {
+    "id": "msg-1787942491347-3xz4",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "thik hu",
+    "isLocked": false,
+    "category": "General",
+    "timestamp": "2026-08-28T18:41:31.347Z"
+  },
+  {
+    "id": "msg-1787942505300-ppkd",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "suno na i love you",
+    "isLocked": false,
+    "category": "General",
+    "timestamp": "2026-08-28T18:41:45.300Z"
+  },
+  {
+    "id": "msg-1787942517510-dgtk",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "sex",
+    "isLocked": false,
+    "category": "General",
+    "timestamp": "2026-08-28T18:41:57.510Z"
+  },
+  {
+    "id": "msg-1787942535636-tnp4",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "i love you",
+    "isLocked": true,
+    "category": "Personal Feelings",
+    "timestamp": "2026-08-28T18:42:15.636Z"
+  },
+  {
+    "id": "msg-1787942548857-e2ay",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "aao na",
+    "isLocked": true,
+    "category": "Intimate / Private",
+    "timestamp": "2026-08-28T18:42:28.857Z"
+  },
+  {
+    "id": "msg-1787942566439-cepu",
+    "sender": "Priya",
+    "senderId": "user-priya",
+    "text": "wh wh no",
+    "isLocked": true,
+    "category": "Confidential Secret",
+    "timestamp": "2026-08-28T18:42:46.439Z"
+  },
+  {
+    "id": "msg-1787942578720-7h4o",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "plese wait",
+    "isLocked": true,
+    "category": "Financial / Password",
+    "timestamp": "2026-08-28T18:42:58.720Z"
+  },
+  {
+    "id": "msg-1787942845002-wt4s",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "i love you",
+    "isLocked": true,
+    "category": "Feelings & Romance ❤️",
+    "isAiShielded": true,
+    "timestamp": "2026-08-28T18:47:25.002Z"
+  },
+  {
+    "id": "msg-1787942852760-g952",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "kal mele kya",
+    "isLocked": false,
+    "category": "General",
+    "isAiShielded": false,
+    "timestamp": "2026-08-28T18:47:32.760Z"
+  },
+  {
+    "id": "msg-1787942864784-kjgm",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "mare pass aao na",
+    "isLocked": false,
+    "category": "General",
+    "isAiShielded": false,
+    "timestamp": "2026-08-28T18:47:44.784Z"
+  },
+  {
+    "id": "msg-1787942881965-0mji",
+    "sender": "Rahul",
+    "senderId": "user-rahul",
+    "text": "hii",
+    "isLocked": true,
+    "category": "Physical & Intimacy 🤫",
+    "isAiShielded": false,
+    "timestamp": "2026-08-28T18:48:01.965Z"
+  }
+]
