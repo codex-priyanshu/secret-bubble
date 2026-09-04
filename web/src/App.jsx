@@ -92,7 +92,7 @@ export default function App() {
     } catch (e) {}
   };
 
-  // Fetch Messages for current selected target
+  // Fetch Messages for current selected target (Strict isolation)
   const fetchMessages = async () => {
     if (!currentUser) return;
     try {
@@ -140,18 +140,22 @@ export default function App() {
     });
 
     s.on('new_message', (msg) => {
+      // Strict Check: Ensure direct personal messages ONLY appear in that direct chat
       const isForCurrentTarget =
-        (selectedTarget.type === 'room' && msg.roomId === selectedTarget.id) ||
-        (selectedTarget.type === 'user' &&
-          ((msg.senderId === selectedTarget.id && msg.recipientId === currentUser.id) ||
-           (msg.senderId === currentUser.id && msg.recipientId === selectedTarget.id)));
+        selectedTarget.type === 'room'
+          ? (!msg.recipientId && msg.roomId === selectedTarget.id)
+          : (selectedTarget.type === 'user' &&
+              !msg.roomId &&
+              ((msg.senderId === selectedTarget.id && msg.recipientId === currentUser.id) ||
+               (msg.senderId === currentUser.id && msg.recipientId === selectedTarget.id)));
 
       if (isForCurrentTarget) {
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
-      } else if (msg.senderId !== currentUser.id) {
+      } else if (msg.recipientId === currentUser.id && msg.senderId !== currentUser.id) {
+        // Increment unread count for that friend
         const fromId = msg.senderId;
         setUnreadCounts(prev => ({
           ...prev,
@@ -166,7 +170,7 @@ export default function App() {
       }
     });
 
-    s.on('user_stop_typing', (data) => {
+    s.on('stop_typing', (data) => {
       setTypingUsers(prev => {
         const next = { ...prev };
         delete next[data.senderId];
@@ -197,12 +201,13 @@ export default function App() {
   const handleSendMessage = (msgData) => {
     if (!currentUser) return;
 
+    const isDirect = selectedTarget.type === 'user';
     const payload = {
       ...msgData,
       sender: currentUser.name,
       senderId: currentUser.id,
-      recipientId: selectedTarget.type === 'user' ? selectedTarget.id : null,
-      roomId: selectedTarget.type === 'room' ? selectedTarget.id : null
+      recipientId: isDirect ? selectedTarget.id : null,
+      roomId: isDirect ? null : (selectedTarget.id || 'global')
     };
 
     if (socket && connectionStatus === 'connected') {
@@ -268,14 +273,16 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-white leading-tight flex items-center gap-2">
-              SecureChat: Biometric Shield
+              Secret-Bubble
               {settings.aiEnabled && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                  AI Auto-Guard ON
+                  AI Guard ON
                 </span>
               )}
             </h1>
-            <p className="text-xs text-slate-400">Real-time Remote Chat • No OTP Required</p>
+            <p className="text-xs text-slate-400">
+              {selectedTarget.type === 'room' ? '🌐 Global Group Room' : `🔒 Direct Chat with ${selectedTarget.name}`}
+            </p>
           </div>
         </div>
 
@@ -332,7 +339,9 @@ export default function App() {
           <div className="bg-purple-950/30 border-b border-purple-500/20 px-4 py-1.5 text-[11px] text-purple-300 flex items-center justify-between">
             <span className="flex items-center gap-1.5 truncate">
               <Info className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              Normal chats open hain. Private/Intimate baatein sirf <strong>Biometrics</strong> se khulengi.
+              {selectedTarget.type === 'room'
+                ? 'Ye Global Group Chat hai. Sabhi users messages dekh sakte hain.'
+                : `Ye ${selectedTarget.name} ke sath 1-on-1 Direct Chat hai (Global room me nahi dikhegi).`}
             </span>
             <span className="text-slate-400 hidden sm:inline shrink-0 ml-2">
               Auto-relocks in {settings.autoRelockSeconds}s
@@ -346,9 +355,13 @@ export default function App() {
                 <div className="w-12 h-12 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-400 mb-3">
                   <Globe className="w-6 h-6" />
                 </div>
-                <h4 className="text-sm font-bold text-slate-300">No messages yet with {selectedTarget.name}</h4>
+                <h4 className="text-sm font-bold text-slate-300">
+                  {selectedTarget.type === 'room' ? 'Global Group Chat' : `Direct Chat with ${selectedTarget.name}`}
+                </h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                  Send a message below. Try sending normal text or private/intimate messages to see the Biometric AI Shield in action!
+                  {selectedTarget.type === 'room'
+                    ? 'Global room me bheja gaya message sabhi ko dikhega.'
+                    : `Yahan bheja gaya message sirf aapko aur ${selectedTarget.name} ko dikhega.`}
                 </p>
               </div>
             ) : (

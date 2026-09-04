@@ -67,20 +67,13 @@ function analyzeSensitivity(text) {
   return { isSensitive: false, category: 'General' };
 }
 
-// User & Message Stores
 function loadUsers() {
   try {
     if (fs.existsSync(DB_USERS_FILE)) {
       return JSON.parse(fs.readFileSync(DB_USERS_FILE, 'utf8'));
     }
-  } catch (err) {
-    console.error('Error reading users:', err);
-  }
-  return [
-    { id: 'user-aman', username: 'aman', name: 'Aman', passwordHash: hashPassword('123456'), avatarColor: 'from-blue-600 to-cyan-500' },
-    { id: 'user-rohan', username: 'rohan', name: 'Rohan', passwordHash: hashPassword('123456'), avatarColor: 'from-purple-600 to-pink-500' },
-    { id: 'user-priya', username: 'priya', name: 'Priya', passwordHash: hashPassword('123456'), avatarColor: 'from-rose-600 to-amber-500' }
-  ];
+  } catch (err) {}
+  return [];
 }
 
 function saveUsers(users) {
@@ -111,10 +104,8 @@ function saveMessages(msgs) {
 }
 
 let messages = loadMessages();
-// Map of userId -> Set of socketIds
 const onlineUsers = new Map();
 
-// REST APIs: Authentication without OTP
 app.post('/api/auth/register', (req, res) => {
   const { username, name, password } = req.body;
   if (!username || !password) {
@@ -124,7 +115,7 @@ app.post('/api/auth/register', (req, res) => {
   const cleanUsername = username.trim().toLowerCase();
   const existing = users.find(u => u.username.toLowerCase() === cleanUsername);
   if (existing) {
-    return res.status(400).json({ success: false, message: 'Username already taken. Please choose another or Login.' });
+    return res.status(400).json({ success: false, message: 'Username already taken. Please choose another.' });
   }
 
   const colors = [
@@ -194,16 +185,21 @@ app.get('/api/users', (req, res) => {
   res.json({ success: true, users: safeUsers });
 });
 
+// Message history API with STRICT separation between Direct Chat & Global Room
 app.get('/api/messages', (req, res) => {
   const { userId, targetId, roomId } = req.query;
-  let filtered = messages;
+  let filtered = [];
 
   if (roomId) {
-    filtered = messages.filter(m => m.roomId === roomId);
+    // ONLY fetch messages meant for the room (NOT direct personal messages)
+    filtered = messages.filter(m => m.roomId === roomId && !m.recipientId);
   } else if (userId && targetId) {
+    // ONLY fetch direct 1-to-1 personal messages between these two users
     filtered = messages.filter(m => 
-      (m.senderId === userId && m.recipientId === targetId) ||
-      (m.senderId === targetId && m.recipientId === userId)
+      !m.roomId && (
+        (m.senderId === userId && m.recipientId === targetId) ||
+        (m.senderId === targetId && m.recipientId === userId)
+      )
     );
   }
 
@@ -217,7 +213,6 @@ app.post('/api/messages/reset', (req, res) => {
   res.json({ success: true });
 });
 
-// Socket.io Realtime Events
 io.on('connection', (socket) => {
   let authenticatedUserId = null;
 
@@ -229,8 +224,6 @@ io.on('connection', (socket) => {
       onlineUsers.set(user.id, new Set());
     }
     onlineUsers.get(user.id).add(socket.id);
-
-    // Broadcast updated online users list
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
   });
 
@@ -242,12 +235,14 @@ io.on('connection', (socket) => {
       : (aiAnalysis.isSensitive ? aiAnalysis.category : 'General');
     const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
 
+    const isDirect = Boolean(msgData.recipientId);
+
     const newMsg = {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
       sender: msgData.sender || 'Anonymous',
       senderId: msgData.senderId,
-      recipientId: msgData.recipientId || null,
-      roomId: msgData.roomId || 'global',
+      recipientId: isDirect ? msgData.recipientId : null,
+      roomId: isDirect ? null : (msgData.roomId || 'global'),
       text: msgData.text,
       isLocked: shouldLock,
       category: category,
@@ -258,7 +253,7 @@ io.on('connection', (socket) => {
     messages.push(newMsg);
     saveMessages(messages);
 
-    // If Direct 1-to-1 Message: Send to recipient sockets and sender sockets
+    // Direct 1-to-1: Send ONLY to recipient & sender (NEVER to global room)
     if (newMsg.recipientId) {
       const recipientSockets = onlineUsers.get(newMsg.recipientId);
       if (recipientSockets) {
@@ -310,5 +305,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 SecureChat Real-time Server (with No-OTP Auth & Remote Sync) running on http://0.0.0.0:' + PORT);
+  console.log('🚀 SecureChat Backend running on http://0.0.0.0:' + PORT);
 });
