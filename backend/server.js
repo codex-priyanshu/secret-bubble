@@ -8,13 +8,13 @@ const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST', 'PUT', 'DELETE']
   }
 });
 
@@ -106,8 +106,9 @@ function saveMessages(msgs) {
 let messages = loadMessages();
 const onlineUsers = new Map();
 
+// Authentication Endpoints
 app.post('/api/auth/register', (req, res) => {
-  const { username, name, password } = req.body;
+  const { username, name, password, avatarUrl } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password required' });
   }
@@ -133,6 +134,7 @@ app.post('/api/auth/register', (req, res) => {
     name: name ? name.trim() : cleanUsername,
     passwordHash: hashPassword(password),
     avatarColor,
+    avatarUrl: avatarUrl || null,
     createdAt: new Date().toISOString()
   };
 
@@ -145,7 +147,8 @@ app.post('/api/auth/register', (req, res) => {
       id: newUser.id,
       username: newUser.username,
       name: newUser.name,
-      avatarColor: newUser.avatarColor
+      avatarColor: newUser.avatarColor,
+      avatarUrl: newUser.avatarUrl
     }
   });
 });
@@ -169,7 +172,39 @@ app.post('/api/auth/login', (req, res) => {
       id: user.id,
       username: user.username,
       name: user.name,
-      avatarColor: user.avatarColor
+      avatarColor: user.avatarColor,
+      avatarUrl: user.avatarUrl || null
+    }
+  });
+});
+
+// Update Profile & DP endpoint
+app.post('/api/users/profile', (req, res) => {
+  const { userId, name, avatarUrl } = req.body;
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  if (name) user.name = name.trim();
+  if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+  saveUsers(users);
+
+  io.emit('user_updated', {
+    id: user.id,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+    avatarColor: user.avatarColor
+  });
+
+  res.json({
+    success: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      avatarColor: user.avatarColor,
+      avatarUrl: user.avatarUrl
     }
   });
 });
@@ -180,21 +215,19 @@ app.get('/api/users', (req, res) => {
     username: u.username,
     name: u.name,
     avatarColor: u.avatarColor,
+    avatarUrl: u.avatarUrl || null,
     isOnline: onlineUsers.has(u.id) && onlineUsers.get(u.id).size > 0
   }));
   res.json({ success: true, users: safeUsers });
 });
 
-// Message history API with STRICT separation between Direct Chat & Global Room
 app.get('/api/messages', (req, res) => {
   const { userId, targetId, roomId } = req.query;
   let filtered = [];
 
   if (roomId) {
-    // ONLY fetch messages meant for the room (NOT direct personal messages)
     filtered = messages.filter(m => m.roomId === roomId && !m.recipientId);
   } else if (userId && targetId) {
-    // ONLY fetch direct 1-to-1 personal messages between these two users
     filtered = messages.filter(m => 
       !m.roomId && (
         (m.senderId === userId && m.recipientId === targetId) ||
@@ -206,13 +239,7 @@ app.get('/api/messages', (req, res) => {
   res.json({ success: true, messages: filtered });
 });
 
-app.post('/api/messages/reset', (req, res) => {
-  messages = [];
-  saveMessages(messages);
-  io.emit('chat_reset');
-  res.json({ success: true });
-});
-
+// Socket.io Real-time Event Handling
 io.on('connection', (socket) => {
   let authenticatedUserId = null;
 
@@ -227,6 +254,7 @@ io.on('connection', (socket) => {
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
   });
 
+  // Send Message
   socket.on('send_message', (msgData) => {
     const aiAnalysis = analyzeSensitivity(msgData.text);
     const shouldLock = Boolean(msgData.isLocked || aiAnalysis.isSensitive);
@@ -241,19 +269,21 @@ io.on('connection', (socket) => {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
       sender: msgData.sender || 'Anonymous',
       senderId: msgData.senderId,
+      senderAvatar: msgData.senderAvatar || null,
       recipientId: isDirect ? msgData.recipientId : null,
       roomId: isDirect ? null : (msgData.roomId || 'global'),
       text: msgData.text,
       isLocked: shouldLock,
       category: category,
       isAiShielded: isAiShielded,
+      isEdited: false,
+      viewers: [msgData.senderId], // Initial sender view
       timestamp: new Date().toISOString()
     };
 
     messages.push(newMsg);
     saveMessages(messages);
 
-    // Direct 1-to-1: Send ONLY to recipient & sender (NEVER to global room)
     if (newMsg.recipientId) {
       const recipientSockets = onlineUsers.get(newMsg.recipientId);
       if (recipientSockets) {
@@ -264,9 +294,79 @@ io.on('connection', (socket) => {
         senderSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
       }
     } else {
-      // Global Room Broadcast
       io.emit('new_message', newMsg);
     }
+  });
+
+  // Edit Message
+  socket.on('edit_message', ({ messageId, newText, userId }) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg || msg.senderId !== userId) return;
+
+    msg.text = newText;
+    msg.isEdited = true;
+    
+    // Re-check AI Sensitivity
+    const aiAnalysis = analyzeSensitivity(newText);
+    if (aiAnalysis.isSensitive) {
+      msg.isLocked = true;
+      msg.category = aiAnalysis.category;
+      msg.isAiShielded = true;
+    }
+
+    saveMessages(messages);
+
+    const payload = { messageId, newText, isEdited: true, isLocked: msg.isLocked, category: msg.category };
+    if (msg.recipientId) {
+      const recipientSockets = onlineUsers.get(msg.recipientId);
+      if (recipientSockets) recipientSockets.forEach(sId => io.to(sId).emit('message_edited', payload));
+      const senderSockets = onlineUsers.get(msg.senderId);
+      if (senderSockets) senderSockets.forEach(sId => io.to(sId).emit('message_edited', payload));
+    } else {
+      io.emit('message_edited', payload);
+    }
+  });
+
+  // Delete Message
+  socket.on('delete_message', ({ messageId, userId }) => {
+    const msgIndex = messages.findIndex(m => m.id === messageId);
+    if (msgIndex === -1) return;
+    const msg = messages[msgIndex];
+    if (msg.senderId !== userId) return;
+
+    const recipientId = msg.recipientId;
+    const senderId = msg.senderId;
+    messages.splice(msgIndex, 1);
+    saveMessages(messages);
+
+    if (recipientId) {
+      const recipientSockets = onlineUsers.get(recipientId);
+      if (recipientSockets) recipientSockets.forEach(sId => io.to(sId).emit('message_deleted', { messageId }));
+      const senderSockets = onlineUsers.get(senderId);
+      if (senderSockets) senderSockets.forEach(sId => io.to(sId).emit('message_deleted', { messageId }));
+    } else {
+      io.emit('message_deleted', { messageId });
+    }
+  });
+
+  // Telegram-style Message View Counter
+  socket.on('mark_viewed', ({ messageIds, viewerId }) => {
+    if (!messageIds || !viewerId) return;
+    let changed = false;
+
+    messageIds.forEach(id => {
+      const msg = messages.find(m => m.id === id);
+      if (msg) {
+        if (!msg.viewers) msg.viewers = [];
+        if (!msg.viewers.includes(viewerId)) {
+          msg.viewers.push(viewerId);
+          changed = true;
+          io.emit('views_updated', { messageId: id, viewsCount: msg.viewers.length });
+        }
+      }
+    });
+
+    if (changed) saveMessages(messages);
   });
 
   socket.on('typing', (data) => {

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { io } from 'socket.io-client';
-import { Shield, Lock, Smartphone, Laptop, Info, Settings, Bot, Users, Globe } from 'lucide-react';
+import { Shield, Lock, Globe } from 'lucide-react';
 import ChatHeader from './components/ChatHeader';
 import MessageItem from './components/MessageItem';
 import ChatInput from './components/ChatInput';
 import BiometricModal from './components/BiometricModal';
 import PrivacySettingsModal from './components/PrivacySettingsModal';
+import ProfileModal from './components/ProfileModal';
 import UserSidebar from './components/UserSidebar';
 import LoginPage from './components/LoginPage';
 import { useBiometrics } from './hooks/useBiometrics';
@@ -45,6 +46,7 @@ export default function App() {
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
@@ -65,6 +67,14 @@ export default function App() {
     try {
       localStorage.setItem('secure_chat_settings', JSON.stringify(newSettings));
     } catch {}
+  };
+
+  const handleUpdateProfile = (updatedUser) => {
+    setCurrentUser(updatedUser);
+    try {
+      localStorage.setItem('secure_chat_user', JSON.stringify(updatedUser));
+    } catch {}
+    fetchUsers();
   };
 
   const messagesEndRef = useRef(null);
@@ -92,7 +102,7 @@ export default function App() {
     } catch (e) {}
   };
 
-  // Fetch Messages for current selected target (Strict isolation)
+  // Fetch Messages for current selected target
   const fetchMessages = async () => {
     if (!currentUser) return;
     try {
@@ -106,6 +116,16 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setMessages(data.messages);
+        
+        // Mark viewed
+        if (socket && data.messages.length > 0) {
+          const unviewedIds = data.messages
+            .filter(m => !m.viewers || !m.viewers.includes(currentUser.id))
+            .map(m => m.id);
+          if (unviewedIds.length > 0) {
+            socket.emit('mark_viewed', { messageIds: unviewedIds, viewerId: currentUser.id });
+          }
+        }
       }
     } catch (e) {}
   };
@@ -139,8 +159,11 @@ export default function App() {
       })));
     });
 
+    s.on('user_updated', () => {
+      fetchUsers();
+    });
+
     s.on('new_message', (msg) => {
-      // Strict Check: Ensure direct personal messages ONLY appear in that direct chat
       const isForCurrentTarget =
         selectedTarget.type === 'room'
           ? (!msg.recipientId && msg.roomId === selectedTarget.id)
@@ -154,14 +177,39 @@ export default function App() {
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
+
+        // Auto mark as viewed
+        s.emit('mark_viewed', { messageIds: [msg.id], viewerId: currentUser.id });
       } else if (msg.recipientId === currentUser.id && msg.senderId !== currentUser.id) {
-        // Increment unread count for that friend
         const fromId = msg.senderId;
         setUnreadCounts(prev => ({
           ...prev,
           [fromId]: (prev[fromId] || 0) + 1
         }));
       }
+    });
+
+    s.on('message_edited', ({ messageId, newText, isEdited, isLocked, category }) => {
+      setMessages(prev => prev.map(m => {
+        if (m.id === messageId) {
+          return { ...m, text: newText, isEdited: true, isLocked, category };
+        }
+        return m;
+      }));
+    });
+
+    s.on('message_deleted', ({ messageId }) => {
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+    });
+
+    s.on('views_updated', ({ messageId, viewsCount }) => {
+      setMessages(prev => prev.map(m => {
+        if (m.id === messageId) {
+          const currentViewers = m.viewers || [];
+          return { ...m, viewers: currentViewers.length < viewsCount ? new Array(viewsCount).fill('x') : currentViewers };
+        }
+        return m;
+      }));
     });
 
     s.on('user_typing', (data) => {
@@ -206,6 +254,7 @@ export default function App() {
       ...msgData,
       sender: currentUser.name,
       senderId: currentUser.id,
+      senderAvatar: currentUser.avatarUrl || null,
       recipientId: isDirect ? selectedTarget.id : null,
       roomId: isDirect ? null : (selectedTarget.id || 'global')
     };
@@ -219,6 +268,18 @@ export default function App() {
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, localMsg]);
+    }
+  };
+
+  const handleEditMessage = (messageId, newText) => {
+    if (socket && currentUser) {
+      socket.emit('edit_message', { messageId, newText, userId: currentUser.id });
+    }
+  };
+
+  const handleDeleteMessage = (messageId) => {
+    if (socket && currentUser) {
+      socket.emit('delete_message', { messageId, userId: currentUser.id });
     }
   };
 
@@ -263,45 +324,12 @@ export default function App() {
   const isCurrentTargetTyping = selectedTarget.type === 'user' && Boolean(typingUsers[selectedTarget.id]);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-1 sm:p-4 text-slate-100">
+    <div className="h-screen w-screen bg-slate-950 flex flex-col md:p-3 text-slate-100 overflow-hidden font-sans">
       
-      {/* Top App Header */}
-      <div className="w-full max-w-5xl mb-2 sm:mb-3 flex items-center justify-between px-2">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
-            <Shield className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-white leading-tight flex items-center gap-2">
-              Secret-Bubble
-              {settings.aiEnabled && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                  AI Guard ON
-                </span>
-              )}
-            </h1>
-            <p className="text-xs text-slate-400">
-              {selectedTarget.type === 'room' ? '🌐 Global Group Room' : `🔒 Direct Chat with ${selectedTarget.name}`}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-            connectionStatus === 'connected'
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-              : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-            {connectionStatus === 'connected' ? 'Live Connected' : 'Connecting...'}
-          </span>
-        </div>
-      </div>
-
-      {/* Main Dual-Pane Chat Container */}
-      <div className="w-full max-w-5xl bg-slate-900/80 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex h-[85vh] relative backdrop-blur-xl">
+      {/* Main App Container */}
+      <div className="flex-1 w-full max-w-6xl mx-auto bg-slate-900 border-0 md:border md:border-slate-800 md:rounded-3xl shadow-2xl overflow-hidden flex h-full relative">
         
-        {/* Left Side: Friends Sidebar */}
+        {/* Left Friends Sidebar */}
         <div className={`fixed inset-y-0 left-0 z-30 md:static md:flex md:w-72 bg-slate-900 transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}>
@@ -311,6 +339,7 @@ export default function App() {
             selectedTarget={selectedTarget}
             onSelectTarget={handleSelectTarget}
             onLogout={handleLogout}
+            onOpenProfile={() => setIsProfileOpen(true)}
             unreadCounts={unreadCounts}
           />
         </div>
@@ -323,45 +352,33 @@ export default function App() {
           />
         )}
 
-        {/* Right Side: Active Chat Area */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950/30">
+        {/* Active Chat Area */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950/40">
           
           <ChatHeader
             target={selectedTarget}
             onRelockAll={relockAll}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenProfile={() => setIsProfileOpen(true)}
             aiEnabled={settings.aiEnabled}
             isTyping={isCurrentTargetTyping}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
 
-          {/* Informational Sub-Bar */}
-          <div className="bg-purple-950/30 border-b border-purple-500/20 px-4 py-1.5 text-[11px] text-purple-300 flex items-center justify-between">
-            <span className="flex items-center gap-1.5 truncate">
-              <Info className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-              {selectedTarget.type === 'room'
-                ? 'Ye Global Group Chat hai. Sabhi users messages dekh sakte hain.'
-                : `Ye ${selectedTarget.name} ke sath 1-on-1 Direct Chat hai (Global room me nahi dikhegi).`}
-            </span>
-            <span className="text-slate-400 hidden sm:inline shrink-0 ml-2">
-              Auto-relocks in {settings.autoRelockSeconds}s
-            </span>
-          </div>
-
           {/* Messages Feed */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-2">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-1">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
                 <div className="w-12 h-12 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-400 mb-3">
                   <Globe className="w-6 h-6" />
                 </div>
                 <h4 className="text-sm font-bold text-slate-300">
-                  {selectedTarget.type === 'room' ? 'Global Group Chat' : `Direct Chat with ${selectedTarget.name}`}
+                  {selectedTarget.type === 'room' ? 'Global Group Chat' : `Chat with ${selectedTarget.name}`}
                 </h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs">
                   {selectedTarget.type === 'room'
-                    ? 'Global room me bheja gaya message sabhi ko dikhega.'
-                    : `Yahan bheja gaya message sirf aapko aur ${selectedTarget.name} ko dikhega.`}
+                    ? 'Public group messages with Telegram-style views tracking.'
+                    : `Direct 1-on-1 private chat with ${selectedTarget.name}.`}
                 </p>
               </div>
             ) : (
@@ -374,6 +391,8 @@ export default function App() {
                   remainingSeconds={getRemainingSeconds}
                   onUnlockClick={triggerUnlock}
                   onRelockClick={relockMessage}
+                  onEditMessage={handleEditMessage}
+                  onDeleteMessage={handleDeleteMessage}
                 />
               ))
             )}
@@ -403,6 +422,15 @@ export default function App() {
         />
       )}
 
+      {/* Profile & DP Upload Modal */}
+      <ProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        currentUser={currentUser}
+        onUpdateProfile={handleUpdateProfile}
+        backendUrl={backendUrl}
+      />
+
       {/* Privacy Settings Modal */}
       <PrivacySettingsModal
         isOpen={isSettingsOpen}
@@ -410,13 +438,6 @@ export default function App() {
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
       />
-
-      {/* Footer Notes */}
-      <div className="mt-2 text-center text-xs text-slate-500 flex items-center justify-center gap-4">
-        <span className="flex items-center gap-1"><Smartphone className="w-3.5 h-3.5" /> Mobile & Remote ready</span>
-        <span>•</span>
-        <span className="flex items-center gap-1"><Laptop className="w-3.5 h-3.5" /> WebAuthn & Windows Hello</span>
-      </div>
 
     </div>
   );
