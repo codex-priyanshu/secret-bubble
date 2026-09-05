@@ -1,25 +1,12 @@
-import React, { useState } from 'react';
-import { Shield, Lock, User, UserPlus, LogIn, ArrowRight, Globe, KeyRound, Sparkles } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Shield, Lock, User, UserPlus, LogIn, ArrowRight, Globe, KeyRound, Camera, Eye, EyeOff, Sparkles } from 'lucide-react';
 
-const DEMO_USERS = [
-  {
-    username: 'aman',
-    name: 'Aman',
-    avatarColor: 'from-blue-600 to-cyan-500',
-    desc: 'Demo Account 1'
-  },
-  {
-    username: 'rohan',
-    name: 'Rohan',
-    avatarColor: 'from-purple-600 to-pink-500',
-    desc: 'Demo Account 2'
-  },
-  {
-    username: 'priya',
-    name: 'Priya',
-    avatarColor: 'from-rose-600 to-amber-500',
-    desc: 'Demo Account 3'
-  }
+const PRESET_AVATARS = [
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Felix',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Bella',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Leo',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Mia',
+  'https://api.dicebear.com/7.x/bottts/svg?seed=Sam'
 ];
 
 export default function LoginPage({ onLoginSuccess, backendUrl }) {
@@ -27,8 +14,25 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Photo must be smaller than 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -39,10 +43,15 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
       return;
     }
 
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters long.');
+      return;
+    }
+
     setLoading(true);
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
     const payload = isRegister
-      ? { username: username.trim(), name: name.trim() || username.trim(), password }
+      ? { username: username.trim(), name: name.trim() || username.trim(), password, avatarUrl: avatarUrl || null }
       : { username: username.trim(), password };
 
     try {
@@ -60,98 +69,30 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
       localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
       onLoginSuccess(data.user);
     } catch (err) {
-      // Offline fallback: create guest user if backend is not running
-      if (err.message.includes('Failed to fetch') || err.message.includes('connection error')) {
-        const guestUser = {
-          id: 'user-' + Date.now(),
-          username: username.trim().toLowerCase(),
-          name: isRegister ? (name.trim() || username.trim()) : username.trim(),
-          avatarColor: 'from-purple-600 to-indigo-500',
-          avatarUrl: null
-        };
-        localStorage.setItem('secure_chat_user', JSON.stringify(guestUser));
-        onLoginSuccess(guestUser);
-        return;
-      }
-      setError(err.message || 'Server connection error. Please check your backend.');
+      setError(err.message || 'Server connection error. Please ensure the backend is active.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickDemoLogin = async (demo) => {
-    setError('');
-    setLoading(true);
-    try {
-      const res = await fetch(`${backendUrl}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: demo.username, password: 'password123' })
-      });
-      const data = await res.json();
-      if (data.success) {
-        localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
-        onLoginSuccess(data.user);
-        return;
-      }
-    } catch (err) {}
-
-    // Fallback demo user
-    const demoUser = {
-      id: `user-${demo.username}`,
-      username: demo.username,
-      name: demo.name,
-      avatarColor: demo.avatarColor,
-      avatarUrl: null
-    };
-    localStorage.setItem('secure_chat_user', JSON.stringify(demoUser));
-    onLoginSuccess(demoUser);
-    setLoading(false);
-  };
-
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-950 text-slate-100 relative overflow-hidden font-sans">
       
-      {/* Ambient Lighting */}
-      <div className="absolute top-1/3 left-1/3 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/3 right-1/3 w-80 h-80 bg-cyan-600/15 rounded-full blur-3xl pointer-events-none" />
+      {/* Telegram Ambient Glow Background */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/15 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/15 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="relative w-full max-w-sm bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
         
-        {/* Minimalist Logo & Header */}
+        {/* Brand Icon & Telegram Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 text-white shadow-lg shadow-purple-500/25 mb-3">
-            <Shield className="w-7 h-7" />
+          <div className="inline-flex p-3.5 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 text-white shadow-xl shadow-purple-600/30 mb-3">
+            <Shield className="w-8 h-8" />
           </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">Secret-Bubble</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">Secret-Bubble</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Biometric Masking & AI Privacy Chat
+            Telegram-Grade E2EE & Biometric Privacy Chat
           </p>
-        </div>
-
-        {/* 1-Click Demo Profiles */}
-        <div className="mb-5 p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-2.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>1-Click Demo Profiles</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {DEMO_USERS.map((demo) => (
-              <button
-                key={demo.username}
-                type="button"
-                onClick={() => handleQuickDemoLogin(demo)}
-                disabled={loading}
-                className="p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-purple-500 flex flex-col items-center gap-1 transition group hover:scale-105 active:scale-95"
-              >
-                <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${demo.avatarColor} flex items-center justify-center text-white font-bold text-xs shadow-sm`}>
-                  {demo.name.charAt(0)}
-                </div>
-                <span className="text-xs font-bold text-slate-200 group-hover:text-purple-300">{demo.name}</span>
-                <span className="text-[9px] text-slate-500">Demo</span>
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Tab Switcher: Login / Sign Up */}
@@ -189,24 +130,71 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
           </div>
         )}
 
-        {/* Clean Input Form */}
+        {/* Main Form */}
         <form onSubmit={handleAuth} className="space-y-4">
           
           {isRegister && (
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Full Name</label>
-              <div className="relative">
-                <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <>
+              {/* DP Upload during registration */}
+              <div className="flex flex-col items-center mb-2">
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload profile picture"
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt="DP Preview"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-purple-500 shadow-md"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-dashed border-slate-600 flex flex-col items-center justify-center text-slate-400 group-hover:border-purple-500 group-hover:text-purple-400 transition">
+                      <Camera className="w-5 h-5" />
+                      <span className="text-[9px] mt-0.5 font-semibold">Add DP</span>
+                    </div>
+                  )}
+                </div>
                 <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your Name"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  className="hidden"
                 />
+
+                {/* Preset Avatars */}
+                <div className="flex gap-1.5 mt-2.5">
+                  {PRESET_AVATARS.map((url, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setAvatarUrl(url)}
+                      className={`w-7 h-7 rounded-full overflow-hidden border transition ${
+                        avatarUrl === url ? 'border-purple-400 scale-110' : 'border-slate-700 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={url} alt={`Avatar ${i}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your name (e.g. Rahul Sharma)"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
@@ -218,7 +206,7 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username"
+                placeholder="Unique username (e.g. rahul_99)"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
               />
             </div>
@@ -229,13 +217,20 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
+                placeholder="Enter password (min 4 chars)"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
@@ -248,14 +243,14 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
               <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
               <>
-                <span>{isRegister ? 'Create Account' : 'Sign In'}</span>
+                <span>{isRegister ? 'Register & Join Chat' : 'Sign In to Account'}</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
         </form>
 
-        {/* Security Footer */}
+        {/* Telegram Privacy Footer */}
         <div className="mt-6 pt-4 border-t border-slate-800/80 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
           <Globe className="w-3.5 h-3.5 text-purple-400" />
           <span>Biometric Protection • No Phone Number Required</span>

@@ -21,7 +21,18 @@ const io = new Server(server, {
 const DB_MESSAGES_FILE = path.join(__dirname, 'messages.json');
 const DB_USERS_FILE = path.join(__dirname, 'users.json');
 
-// AI Auto-Sensitivity Detection Engine (Multilingual: English, Hindi, Hinglish)
+// Meta AI Assistant Bot Profile
+const META_AI_BOT = {
+  id: 'user-meta-ai',
+  username: 'meta_ai',
+  name: 'Meta AI Assistant',
+  isBot: true,
+  avatarColor: 'from-blue-600 via-indigo-500 to-cyan-400',
+  avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=MetaAI&backgroundColor=6366f1',
+  bio: '🤖 Intelligent AI Assistant for Secret-Bubble & Telegram Privacy'
+};
+
+// AI Auto-Sensitivity Detection Patterns (English, Hindi, Hinglish)
 const AI_SENSITIVITY_PATTERNS = [
   {
     category: 'Adult & Physical Intimacy 🔞',
@@ -71,42 +82,14 @@ function hashPassword(pass) {
   return crypto.createHash('sha256').update(pass).digest('hex');
 }
 
-// Pre-seeded demo accounts with hash for "123456"
-const DEFAULT_DEMO_USERS = [
-  {
-    id: "user-aman",
-    username: "aman",
-    name: "Aman",
-    passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
-    avatarColor: "from-blue-600 to-cyan-500",
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user-rohan",
-    username: "rohan",
-    name: "Rohan",
-    passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
-    avatarColor: "from-purple-600 to-pink-500",
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "user-priya",
-    username: "priya",
-    name: "Priya",
-    passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
-    avatarColor: "from-rose-600 to-amber-500",
-    createdAt: new Date().toISOString()
-  }
-];
-
 function loadUsers() {
   try {
     if (fs.existsSync(DB_USERS_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(DB_USERS_FILE, 'utf8'));
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (err) {}
-  return DEFAULT_DEMO_USERS;
+  return [];
 }
 
 function saveUsers(usersList) {
@@ -116,12 +99,12 @@ function saveUsers(usersList) {
 }
 
 let users = loadUsers();
-if (!fs.existsSync(DB_USERS_FILE)) saveUsers(users);
 
 function loadMessages() {
   try {
     if (fs.existsSync(DB_MESSAGES_FILE)) {
-      return JSON.parse(fs.readFileSync(DB_MESSAGES_FILE, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(DB_MESSAGES_FILE, 'utf8'));
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch (err) {}
   return [];
@@ -136,14 +119,89 @@ function saveMessages(msgs) {
 let messages = loadMessages();
 const onlineUsers = new Map();
 
-// Authentication Endpoints
+// Periodic cleanup of expired self-destructing messages
+setInterval(() => {
+  const now = Date.now();
+  const initialCount = messages.length;
+  messages = messages.filter(m => {
+    if (!m.expiresAt) return true;
+    return now < m.expiresAt;
+  });
+  if (messages.length !== initialCount) {
+    saveMessages(messages);
+  }
+}, 5000);
+
+// =========================================================================
+// Meta AI Bot Response Generator
+// =========================================================================
+function generateMetaAiResponse(userPrompt, senderName) {
+  const clean = (userPrompt || '').toLowerCase().trim();
+
+  // Security / Privacy questions
+  if (clean.includes('privacy') || clean.includes('security') || clean.includes('biometric') || clean.includes('lock')) {
+    return `🛡️ **Secret-Bubble Privacy Engine:**\nYour messages are protected with granular biometric locks (Fingerprint / Face ID / Passcode). Even if someone holds your unlocked phone, locked messages stay frosted until verified! You can also toggle the Master AI Auto-Shield in Settings.`;
+  }
+
+  // Greetings
+  if (clean.match(/\b(hi|hello|hey|namaste|kese ho|kaise ho|how are you|hii|heyy)\b/)) {
+    return `👋 Hello ${senderName || 'friend'}! I am **Meta AI**, your intelligent assistant inside Secret-Bubble. How can I help you today? You can ask me questions, get translations, write code, or ask for privacy tips!`;
+  }
+
+  // Who are you / About
+  if (clean.includes('who are you') || clean.includes('tum kaun ho') || clean.includes('kya ho') || clean.includes('meta ai')) {
+    return `🤖 I am **Meta AI Assistant**, integrated into Secret-Bubble! I help you with answers, creative writing, productivity, and privacy guidance 24/7.`;
+  }
+
+  // Love / Feelings / Advice
+  if (clean.includes('love') || clean.includes('crush') || clean.includes('pyaar') || clean.includes('advice') || clean.includes('relationship')) {
+    return `❤️ Communication and trust are the foundation of any great relationship. With Secret-Bubble, your intimate and personal feelings are shielded behind your own biometric lock so they remain strictly between you two!`;
+  }
+
+  // Joke / Fun
+  if (clean.includes('joke') || clean.includes('chutkula') || clean.includes('hasi') || clean.includes('funny')) {
+    return `😄 Here is a quick one:\nWhy don't secrets ever get stolen on Secret-Bubble?\nBecause even the phone's hacker needs your exact fingerprint to read the punchline! 🔒✨`;
+  }
+
+  // Time / Date
+  if (clean.includes('time') || clean.includes('date') || clean.includes('kya time')) {
+    return `⏱️ The current time is **${new Date().toLocaleTimeString()}** (${new Date().toLocaleDateString()}).`;
+  }
+
+  // Code / Programming
+  if (clean.includes('code') || clean.includes('javascript') || clean.includes('python') || clean.includes('react') || clean.includes('html')) {
+    return `💻 Here to help with coding! You can ask me to explain algorithms, debug React components, format JSON, or build API backends. What specific code snippet are you working on?`;
+  }
+
+  // Hindi / Hinglish translation or generic response
+  if (clean.match(/\b(kya|kaise|kyu|batao|shukriya|thanks|dhanyawad)\b/)) {
+    return `✨ Bilkul! Aap jo bhi poochhenge, Meta AI aapki poori madad karega. Aap koi sawal, translation, ya ideas share kar sakte hain!`;
+  }
+
+  // Default intelligent assistant fallback
+  return `✨ **Meta AI:** I received your message: "${userPrompt}"\n\nI can assist you with answering questions, writing messages, translating languages, coding, or configuring your Telegram-style biometric privacy settings. Let me know what you need!`;
+}
+
+// =========================================================================
+// Real Authentication Endpoints (No Demo Mock Accounts)
+// =========================================================================
 app.post('/api/auth/register', (req, res) => {
   const { username, name, password, avatarUrl } = req.body;
   if (!username || !password) {
-    return res.status(400).json({ success: false, message: 'Username and password required' });
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
+  }
+
+  if (password.length < 4) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long' });
   }
 
   const cleanUsername = username.trim().toLowerCase();
+
+  // Prevent registering reserved bot username
+  if (cleanUsername === 'meta_ai' || cleanUsername === 'admin' || cleanUsername === 'system') {
+    return res.status(400).json({ success: false, message: 'This username is reserved' });
+  }
+
   const existing = users.find(u => u.username.toLowerCase() === cleanUsername);
   if (existing) {
     return res.status(400).json({ success: false, message: 'Username already taken. Please choose another.' });
@@ -154,17 +212,19 @@ app.post('/api/auth/register', (req, res) => {
     'from-emerald-600 to-teal-500',
     'from-rose-600 to-pink-500',
     'from-amber-600 to-orange-500',
-    'from-cyan-600 to-blue-500'
+    'from-cyan-600 to-blue-500',
+    'from-fuchsia-600 to-pink-600'
   ];
   const avatarColor = colors[Math.floor(Math.random() * colors.length)];
 
   const newUser = {
-    id: 'user-' + Date.now(),
+    id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
     username: cleanUsername,
     name: name ? name.trim() : cleanUsername,
     passwordHash: hashPassword(password),
     avatarColor,
     avatarUrl: avatarUrl || null,
+    bio: 'Hey there! I am using Secret-Bubble.',
     createdAt: new Date().toISOString()
   };
 
@@ -178,7 +238,8 @@ app.post('/api/auth/register', (req, res) => {
       username: newUser.username,
       name: newUser.name,
       avatarColor: newUser.avatarColor,
-      avatarUrl: newUser.avatarUrl
+      avatarUrl: newUser.avatarUrl,
+      bio: newUser.bio
     }
   });
 });
@@ -203,14 +264,15 @@ app.post('/api/auth/login', (req, res) => {
       username: user.username,
       name: user.name,
       avatarColor: user.avatarColor,
-      avatarUrl: user.avatarUrl || null
+      avatarUrl: user.avatarUrl || null,
+      bio: user.bio || ''
     }
   });
 });
 
-// Update Profile & DP endpoint
+// Update Profile endpoint
 app.post('/api/users/profile', (req, res) => {
-  const { userId, name, avatarUrl } = req.body;
+  const { userId, name, avatarUrl, bio } = req.body;
   const user = users.find(u => u.id === userId);
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found' });
@@ -218,13 +280,15 @@ app.post('/api/users/profile', (req, res) => {
 
   if (name) user.name = name.trim();
   if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+  if (bio !== undefined) user.bio = bio.trim();
   saveUsers(users);
 
   io.emit('user_updated', {
     id: user.id,
     name: user.name,
     avatarUrl: user.avatarUrl,
-    avatarColor: user.avatarColor
+    avatarColor: user.avatarColor,
+    bio: user.bio
   });
 
   res.json({
@@ -234,11 +298,13 @@ app.post('/api/users/profile', (req, res) => {
       username: user.username,
       name: user.name,
       avatarColor: user.avatarColor,
-      avatarUrl: user.avatarUrl
+      avatarUrl: user.avatarUrl,
+      bio: user.bio
     }
   });
 });
 
+// List real users + Meta AI Bot
 app.get('/api/users', (req, res) => {
   const safeUsers = users.map(u => ({
     id: u.id,
@@ -246,11 +312,23 @@ app.get('/api/users', (req, res) => {
     name: u.name,
     avatarColor: u.avatarColor,
     avatarUrl: u.avatarUrl || null,
+    bio: u.bio || '',
     isOnline: onlineUsers.has(u.id) && onlineUsers.get(u.id).size > 0
   }));
-  res.json({ success: true, users: safeUsers });
+
+  // Ensure Meta AI Bot is always at the top of bots list
+  const allUsersWithBot = [
+    {
+      ...META_AI_BOT,
+      isOnline: true
+    },
+    ...safeUsers
+  ];
+
+  res.json({ success: true, users: allUsersWithBot });
 });
 
+// Fetch Messages
 app.get('/api/messages', (req, res) => {
   const { userId, targetId, roomId } = req.query;
   let filtered = [];
@@ -269,7 +347,9 @@ app.get('/api/messages', (req, res) => {
   res.json({ success: true, messages: filtered });
 });
 
-// Socket.io Real-time Event Handling
+// =========================================================================
+// Socket.io Real-Time Engine
+// =========================================================================
 io.on('connection', (socket) => {
   let authenticatedUserId = null;
 
@@ -284,7 +364,7 @@ io.on('connection', (socket) => {
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
   });
 
-  // Send Message
+  // Send Message Event
   socket.on('send_message', (msgData) => {
     const aiAnalysis = analyzeSensitivity(msgData.text);
     const shouldLock = Boolean(msgData.isLocked || aiAnalysis.isSensitive);
@@ -294,6 +374,10 @@ io.on('connection', (socket) => {
     const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
 
     const isDirect = Boolean(msgData.recipientId);
+    const isToMetaAi = msgData.recipientId === 'user-meta-ai';
+
+    const selfDestructSecs = msgData.selfDestructSecs ? parseInt(msgData.selfDestructSecs, 10) : 0;
+    const expiresAt = selfDestructSecs > 0 ? Date.now() + (selfDestructSecs * 1000) : null;
 
     const newMsg = {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
@@ -307,13 +391,16 @@ io.on('connection', (socket) => {
       category: category,
       isAiShielded: isAiShielded,
       isEdited: false,
-      viewers: [msgData.senderId], // Initial sender view
+      selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
+      expiresAt: expiresAt,
+      viewers: [msgData.senderId],
       timestamp: new Date().toISOString()
     };
 
     messages.push(newMsg);
     saveMessages(messages);
 
+    // Deliver user message
     if (newMsg.recipientId) {
       const recipientSockets = onlineUsers.get(newMsg.recipientId);
       if (recipientSockets) {
@@ -325,6 +412,41 @@ io.on('connection', (socket) => {
       }
     } else {
       io.emit('new_message', newMsg);
+    }
+
+    // Handle Meta AI Auto-Response
+    if (isToMetaAi) {
+      const senderSockets = onlineUsers.get(msgData.senderId);
+      if (senderSockets) {
+        // Send typing indicator
+        senderSockets.forEach(sId => io.to(sId).emit('user_typing', { senderId: 'user-meta-ai' }));
+
+        setTimeout(() => {
+          senderSockets.forEach(sId => io.to(sId).emit('user_stop_typing', { senderId: 'user-meta-ai' }));
+
+          const aiReplyText = generateMetaAiResponse(msgData.text, msgData.sender);
+          const aiMsg = {
+            id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            sender: META_AI_BOT.name,
+            senderId: META_AI_BOT.id,
+            senderAvatar: META_AI_BOT.avatarUrl,
+            recipientId: msgData.senderId,
+            roomId: null,
+            text: aiReplyText,
+            isLocked: false,
+            category: 'General',
+            isAiShielded: false,
+            isEdited: false,
+            viewers: ['user-meta-ai'],
+            timestamp: new Date().toISOString()
+          };
+
+          messages.push(aiMsg);
+          saveMessages(messages);
+
+          senderSockets.forEach(sId => io.to(sId).emit('new_message', aiMsg));
+        }, 900);
+      }
     }
   });
 
@@ -435,5 +557,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 SecureChat Backend running on http://0.0.0.0:' + PORT);
+  console.log('🚀 Secret-Bubble (Telegram Pro) Backend running on http://0.0.0.0:' + PORT);
 });

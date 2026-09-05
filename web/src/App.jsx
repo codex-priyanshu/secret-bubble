@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { Shield, Lock, Globe } from 'lucide-react';
+import { Shield, Lock, Globe, EyeOff, Bot, Sparkles } from 'lucide-react';
 import ChatHeader from './components/ChatHeader';
 import MessageItem from './components/MessageItem';
 import ChatInput from './components/ChatInput';
@@ -9,6 +9,7 @@ import PrivacySettingsModal from './components/PrivacySettingsModal';
 import ProfileModal from './components/ProfileModal';
 import UserSidebar from './components/UserSidebar';
 import LoginPage from './components/LoginPage';
+import AppLockModal from './components/AppLockModal';
 import { useBiometrics } from './hooks/useBiometrics';
 
 const getBackendUrl = () => {
@@ -22,6 +23,7 @@ const getBackendUrl = () => {
 const DEFAULT_SETTINGS = {
   aiEnabled: true,
   autoRelockSeconds: 15,
+  antiShoulderSurfing: true,
   categories: {
     adult_intimacy: true,
     romance_feelings: true,
@@ -41,13 +43,15 @@ export default function App() {
   });
 
   const [users, setUsers] = useState([]);
-  const [selectedTarget, setSelectedTarget] = useState({ type: 'room', id: 'global', name: 'Global Group Room' });
+  const [selectedTarget, setSelectedTarget] = useState({ type: 'room', id: 'global', name: '🌍 Global Public Chat' });
   const [messages, setMessages] = useState([]);
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isAppLocked, setIsAppLocked] = useState(false);
+  const [isWindowBlurred, setIsWindowBlurred] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
 
@@ -101,6 +105,35 @@ export default function App() {
     getRemainingSeconds
   } = useBiometrics(settings.autoRelockSeconds);
 
+  // Anti-Shoulder Surfing Window Blur Protection
+  useEffect(() => {
+    if (!settings.antiShoulderSurfing) return;
+
+    const handleBlur = () => setIsWindowBlurred(true);
+    const handleFocus = () => setIsWindowBlurred(false);
+
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [settings.antiShoulderSurfing]);
+
+  // Disappearing messages local cleanup
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setMessages(prev => {
+        const remaining = prev.filter(m => !m.expiresAt || now < m.expiresAt);
+        if (remaining.length !== prev.length) return remaining;
+        return prev;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Fetch Users List
   const fetchUsers = useCallback(async () => {
     try {
@@ -110,11 +143,17 @@ export default function App() {
         setUsers(data.users);
       }
     } catch (e) {
-      // Fallback demo users if backend is unreachable
+      // Offline fallback: Meta AI Bot
       setUsers([
-        { id: 'user-aman', username: 'aman', name: 'Aman', avatarColor: 'from-blue-600 to-cyan-500', isOnline: true },
-        { id: 'user-rohan', username: 'rohan', name: 'Rohan', avatarColor: 'from-purple-600 to-pink-500', isOnline: true },
-        { id: 'user-priya', username: 'priya', name: 'Priya', avatarColor: 'from-rose-600 to-amber-500', isOnline: false }
+        {
+          id: 'user-meta-ai',
+          username: 'meta_ai',
+          name: 'Meta AI Assistant',
+          isBot: true,
+          avatarColor: 'from-blue-600 via-indigo-500 to-cyan-400',
+          avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=MetaAI&backgroundColor=6366f1',
+          isOnline: true
+        }
       ]);
     }
   }, [backendUrl]);
@@ -155,7 +194,7 @@ export default function App() {
     }
   }, [currentUser, selectedTarget, fetchUsers, fetchMessages]);
 
-  // Socket.io Connection Setup (ONLY runs on currentUser or backendUrl change, NOT on target change)
+  // Socket.io Connection Setup
   useEffect(() => {
     if (!currentUser) return;
 
@@ -173,7 +212,7 @@ export default function App() {
     s.on('online_users_update', (onlineIds) => {
       setUsers(prev => prev.map(u => ({
         ...u,
-        isOnline: onlineIds.includes(u.id)
+        isOnline: u.isBot ? true : onlineIds.includes(u.id)
       })));
     });
 
@@ -291,6 +330,28 @@ export default function App() {
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, localMsg]);
+
+      // Offline Meta AI response fallback
+      if (payload.recipientId === 'user-meta-ai') {
+        setTimeout(() => {
+          const aiMsg = {
+            id: 'msg-' + (Date.now() + 1),
+            sender: 'Meta AI Assistant',
+            senderId: 'user-meta-ai',
+            senderAvatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=MetaAI&backgroundColor=6366f1',
+            recipientId: currentUser.id,
+            roomId: null,
+            text: `🤖 **Meta AI:** Hello ${currentUser.name}! I am your AI assistant in Secret-Bubble. How can I help you with privacy, messaging, or answers today?`,
+            isLocked: false,
+            category: 'General',
+            isAiShielded: false,
+            isEdited: false,
+            viewers: ['user-meta-ai'],
+            timestamp: new Date().toISOString()
+          };
+          setMessages(prev => [...prev, aiMsg]);
+        }, 800);
+      }
     }
   };
 
@@ -347,13 +408,32 @@ export default function App() {
   const isCurrentTargetTyping = selectedTarget.type === 'user' && Boolean(typingUsers[selectedTarget.id]);
 
   return (
-    <div className="h-screen w-screen bg-slate-950 flex flex-col md:p-3 text-slate-100 overflow-hidden font-sans">
+    <div className="h-screen w-screen bg-slate-950 flex flex-col md:p-3 text-slate-100 overflow-hidden font-sans relative">
       
-      {/* Main App Container */}
+      {/* Anti-Shoulder Surfing Privacy Cover */}
+      {isWindowBlurred && settings.antiShoulderSurfing && !isAppLocked && (
+        <div className="fixed inset-0 z-40 bg-slate-950/90 backdrop-blur-2xl flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200">
+          <div className="w-16 h-16 rounded-2xl bg-purple-600/20 border border-purple-500/40 text-purple-400 flex items-center justify-center mb-4 shadow-xl shadow-purple-600/20">
+            <EyeOff className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-1">Anti-Shoulder Surfing Shield</h3>
+          <p className="text-xs text-slate-400 max-w-sm">
+            Chat preview is hidden because your window lost focus. Click anywhere or return to this tab to reveal.
+          </p>
+          <button
+            onClick={() => setIsWindowBlurred(false)}
+            className="mt-5 px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl text-xs shadow-lg transition"
+          >
+            Resume Chat
+          </button>
+        </div>
+      )}
+
+      {/* Main Telegram App Container */}
       <div className="flex-1 w-full max-w-6xl mx-auto bg-slate-900 border-0 md:border md:border-slate-800 md:rounded-3xl shadow-2xl overflow-hidden flex h-full relative">
         
-        {/* Left Friends Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-30 md:static md:flex md:w-72 bg-slate-900 transform transition-transform duration-300 ease-in-out ${
+        {/* Left Telegram Chat List Sidebar */}
+        <div className={`fixed inset-y-0 left-0 z-30 md:static md:flex md:w-80 bg-slate-900 transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}>
           <UserSidebar
@@ -363,6 +443,8 @@ export default function App() {
             onSelectTarget={handleSelectTarget}
             onLogout={handleLogout}
             onOpenProfile={() => setIsProfileOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onLockApp={() => setIsAppLocked(true)}
             unreadCounts={unreadCounts}
           />
         </div>
@@ -375,14 +457,15 @@ export default function App() {
           />
         )}
 
-        {/* Active Chat Area */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950/40">
+        {/* Active Telegram Chat Area */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950/50 relative">
           
           <ChatHeader
             target={selectedTarget}
             onRelockAll={relockAll}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenProfile={() => setIsProfileOpen(true)}
+            onLockApp={() => setIsAppLocked(true)}
             aiEnabled={settings.aiEnabled}
             isTyping={isCurrentTargetTyping}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -392,16 +475,26 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-1">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
-                <div className="w-12 h-12 rounded-2xl bg-slate-800/80 flex items-center justify-center text-slate-400 mb-3">
-                  <Globe className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600/20 to-indigo-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-3 shadow-lg">
+                  {selectedTarget.id === 'user-meta-ai' ? (
+                    <Bot className="w-7 h-7 text-cyan-400 animate-bounce" />
+                  ) : (
+                    <Globe className="w-7 h-7" />
+                  )}
                 </div>
-                <h4 className="text-sm font-bold text-slate-300">
-                  {selectedTarget.type === 'room' ? 'Global Group Chat' : `Chat with ${selectedTarget.name}`}
+                <h4 className="text-sm font-bold text-slate-200">
+                  {selectedTarget.id === 'user-meta-ai'
+                    ? 'Chat with Meta AI Assistant'
+                    : selectedTarget.type === 'room'
+                    ? 'Global Public Channel'
+                    : `Direct Chat with ${selectedTarget.name}`}
                 </h4>
-                <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                  {selectedTarget.type === 'room'
-                    ? 'Public group messages with Telegram-style views tracking.'
-                    : `Direct 1-on-1 private chat with ${selectedTarget.name}.`}
+                <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                  {selectedTarget.id === 'user-meta-ai'
+                    ? 'Ask questions, get advice, translations, coding help, or privacy assistance!'
+                    : selectedTarget.type === 'room'
+                    ? 'Public community messages with Telegram view counts.'
+                    : `Encrypted 1-on-1 private chat with ${selectedTarget.name}.`}
                 </p>
               </div>
             ) : (
@@ -444,6 +537,12 @@ export default function App() {
           onCancel={cancelUnlock}
         />
       )}
+
+      {/* Passcode Lock Screen Modal */}
+      <AppLockModal
+        isLocked={isAppLocked}
+        onUnlock={() => setIsAppLocked(false)}
+      />
 
       {/* Profile & DP Upload Modal */}
       <ProfileModal
