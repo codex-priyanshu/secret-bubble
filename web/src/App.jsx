@@ -10,6 +10,7 @@ import ProfileModal from './components/ProfileModal';
 import UserSidebar from './components/UserSidebar';
 import LoginPage from './components/LoginPage';
 import AppLockModal from './components/AppLockModal';
+import AiTrainingModal from './components/AiTrainingModal';
 import { useBiometrics } from './hooks/useBiometrics';
 
 const getBackendUrl = () => {
@@ -49,6 +50,7 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAiTrainingOpen, setIsAiTrainingOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
@@ -444,6 +446,7 @@ export default function App() {
             onLogout={handleLogout}
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             unreadCounts={unreadCounts}
           />
@@ -465,6 +468,7 @@ export default function App() {
             onRelockAll={relockAll}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenProfile={() => setIsProfileOpen(true)}
+            onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             aiEnabled={settings.aiEnabled}
             isTyping={isCurrentTargetTyping}
@@ -559,6 +563,14 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+      />
+
+      {/* AI Training & Knowledge Studio Modal */}
+      <AiTrainingModal
+        isOpen={isAiTrainingOpen}
+        onClose={() => setIsAiTrainingOpen(false)}
+        backendUrl={backendUrl}
+        currentUser={currentUser}
       />
 
     </div>

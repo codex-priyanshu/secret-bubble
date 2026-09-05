@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Users, User, Search, MessageSquare, Globe, Shield, LogOut, Camera, 
-  Pin, Bot, CheckCheck, Menu, Moon, Lock, Settings as SettingsIcon, Sparkles, Plus 
+  Pin, Bot, CheckCheck, Menu, Moon, Lock, Settings as SettingsIcon, Sparkles, Plus, Brain 
 } from 'lucide-react';
 
 export default function UserSidebar({
@@ -13,6 +13,7 @@ export default function UserSidebar({
   onOpenProfile,
   onOpenSettings,
   onLockApp,
+  onOpenAiTraining,
   unreadCounts = {}
 }) {
   const [search, setSearch] = useState('');
@@ -74,6 +75,14 @@ export default function UserSidebar({
                 >
                   <Lock className="w-4 h-4 text-amber-400" />
                   <span>Passcode Lock Screen</span>
+                </button>
+
+                <button
+                  onClick={() => { setIsMenuOpen(false); onOpenAiTraining && onOpenAiTraining(); }}
+                  className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2.5 transition"
+                >
+                  <Brain className="w-4 h-4 text-cyan-400" />
+                  <span className="font-semibold text-cyan-300">Train AI Bot Studio</span>
                 </button>
 
                 <button

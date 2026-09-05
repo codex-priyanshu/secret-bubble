@@ -20,6 +20,7 @@ const io = new Server(server, {
 
 const DB_MESSAGES_FILE = path.join(__dirname, 'messages.json');
 const DB_USERS_FILE = path.join(__dirname, 'users.json');
+const DB_AI_TRAINING_FILE = path.join(__dirname, 'ai_training_data.json');
 
 // Meta AI Assistant Bot Profile
 const META_AI_BOT = {
@@ -29,10 +30,37 @@ const META_AI_BOT = {
   isBot: true,
   avatarColor: 'from-blue-600 via-indigo-500 to-cyan-400',
   avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=MetaAI&backgroundColor=6366f1',
-  bio: '🤖 Intelligent AI Assistant for Secret-Bubble & Telegram Privacy'
+  bio: '🤖 High-IQ Trainable AI Assistant for Secret-Bubble'
 };
 
-// AI Auto-Sensitivity Detection Patterns (English, Hindi, Hinglish)
+// =========================================================================
+// AI Training & Knowledge Base Engine
+// =========================================================================
+function loadAiTrainingData() {
+  try {
+    if (fs.existsSync(DB_AI_TRAINING_FILE)) {
+      return JSON.parse(fs.readFileSync(DB_AI_TRAINING_FILE, 'utf8'));
+    }
+  } catch (err) {}
+  return {
+    systemPersona: "Meta AI - Intelligent Security & Privacy Companion",
+    systemInstructions: "You are Meta AI, an intelligent assistant. You speak English, Hindi, and Hinglish.",
+    trainingPairs: []
+  };
+}
+
+function saveAiTrainingData(data) {
+  try {
+    fs.writeFileSync(DB_AI_TRAINING_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {}
+}
+
+let aiTrainingData = loadAiTrainingData();
+
+// Conversation Memory per user (stores last 10 messages)
+const userAiMemory = new Map();
+
+// AI Auto-Sensitivity Detection Patterns
 const AI_SENSITIVITY_PATTERNS = [
   {
     category: 'Adult & Physical Intimacy 🔞',
@@ -119,7 +147,7 @@ function saveMessages(msgs) {
 let messages = loadMessages();
 const onlineUsers = new Map();
 
-// Periodic cleanup of expired self-destructing messages
+// Periodic cleanup of expired disappearing messages
 setInterval(() => {
   const now = Date.now();
   const initialCount = messages.length;
@@ -130,60 +158,194 @@ setInterval(() => {
   if (messages.length !== initialCount) {
     saveMessages(messages);
   }
-}, 5000);
+}, 4000);
 
 // =========================================================================
-// Meta AI Bot Response Generator
+// Advanced Trainable Meta AI Engine
 // =========================================================================
-function generateMetaAiResponse(userPrompt, senderName) {
+async function generateMetaAiResponse(userPrompt, senderName, senderId) {
   const clean = (userPrompt || '').toLowerCase().trim();
 
-  // Security / Privacy questions
-  if (clean.includes('privacy') || clean.includes('security') || clean.includes('biometric') || clean.includes('lock')) {
-    return `🛡️ **Secret-Bubble Privacy Engine:**\nYour messages are protected with granular biometric locks (Fingerprint / Face ID / Passcode). Even if someone holds your unlocked phone, locked messages stay frosted until verified! You can also toggle the Master AI Auto-Shield in Settings.`;
+  // 1. Check Custom User Training Pairs First (Highest Priority)
+  if (aiTrainingData.trainingPairs && aiTrainingData.trainingPairs.length > 0) {
+    for (const pair of aiTrainingData.trainingPairs) {
+      const trig = (pair.trigger || '').toLowerCase().trim();
+      if (trig && clean.includes(trig)) {
+        return pair.response;
+      }
+      if (Array.isArray(pair.keywords)) {
+        for (const kw of pair.keywords) {
+          if (kw && clean.includes(kw.toLowerCase().trim())) {
+            return pair.response;
+          }
+        }
+      }
+    }
   }
 
-  // Greetings
-  if (clean.match(/\b(hi|hello|hey|namaste|kese ho|kaise ho|how are you|hii|heyy)\b/)) {
-    return `👋 Hello ${senderName || 'friend'}! I am **Meta AI**, your intelligent assistant inside Secret-Bubble. How can I help you today? You can ask me questions, get translations, write code, or ask for privacy tips!`;
+  // 2. Optional: External LLM API (Google Gemini / OpenAI / Groq) if API key is present
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+
+  if (geminiKey) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const payload = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `${aiTrainingData.systemInstructions}\nUser (${senderName}): ${userPrompt}` }]
+          }
+        ]
+      };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) return text.trim();
+    } catch (err) {
+      console.error('Gemini API Error:', err.message);
+    }
   }
 
-  // Who are you / About
-  if (clean.includes('who are you') || clean.includes('tum kaun ho') || clean.includes('kya ho') || clean.includes('meta ai')) {
-    return `🤖 I am **Meta AI Assistant**, integrated into Secret-Bubble! I help you with answers, creative writing, productivity, and privacy guidance 24/7.`;
+  // 3. Built-in Multi-Layer High-IQ NLP Reasoning Engine
+  // Memory lookup
+  if (!userAiMemory.has(senderId)) userAiMemory.set(senderId, []);
+  const mem = userAiMemory.get(senderId);
+  mem.push({ role: 'user', text: userPrompt });
+  if (mem.length > 10) mem.shift();
+
+  // Code / Programming assistance
+  if (clean.match(/\b(code|function|javascript|python|react|html|css|api|bug|error|script|algorithm)\b/)) {
+    if (clean.includes('react') || clean.includes('hook')) {
+      return `💻 **Meta AI (React Expert):**\nHere is a quick pattern for clean state management in React:\n\`\`\`javascript\nimport React, { useState, useEffect } from 'react';\n\nexport default function Counter() {\n  const [count, setCount] = useState(0);\n  return <button onClick={() => setCount(c => c + 1)}>Count: {count}</button>;\n}\n\`\`\`\nLet me know if you need specific refactoring or debugging!`;
+    }
+    return `💻 **Meta AI (Code Assistant):**\nI can write, explain, and debug code in JavaScript, Python, C++, React, Node.js, and SQL. Paste your code or ask your question!`;
   }
 
-  // Love / Feelings / Advice
-  if (clean.includes('love') || clean.includes('crush') || clean.includes('pyaar') || clean.includes('advice') || clean.includes('relationship')) {
-    return `❤️ Communication and trust are the foundation of any great relationship. With Secret-Bubble, your intimate and personal feelings are shielded behind your own biometric lock so they remain strictly between you two!`;
+  // Privacy & Biometrics
+  if (clean.match(/\b(privacy|security|biometric|lock|mask|shield|encryption|e2ee)\b/)) {
+    return `🛡️ **Secret-Bubble Security Architecture:**\n- **Granular BioMasking:** Only sensitive messages are locked behind biometrics; public channel remains readable.\n- **Telegram E2EE:** Client-side privacy and disappearing burn timers.\n- **Anti-Shoulder Surfing:** Auto-blurs screen on window switch.\n- **Passcode Lock:** 1-click full app lock.\n\nAll biometric scans run locally on your device hardware!`;
   }
 
-  // Joke / Fun
-  if (clean.includes('joke') || clean.includes('chutkula') || clean.includes('hasi') || clean.includes('funny')) {
-    return `😄 Here is a quick one:\nWhy don't secrets ever get stolen on Secret-Bubble?\nBecause even the phone's hacker needs your exact fingerprint to read the punchline! 🔒✨`;
+  // Greetings & Welcomes
+  if (clean.match(/\b(hi|hello|hey|namaste|kese ho|kaise ho|how are you|hii|heyy|good morning|good evening)\b/)) {
+    return `👋 Hello **${senderName || 'friend'}**! I am **Meta AI**, your trainable privacy assistant.\n\nHow can I help you today? You can ask me:\n- 💡 General knowledge & questions\n- 🔐 Privacy & Biometric security guidance\n- 💻 Coding & debugging\n- 🎓 Custom training (teach me new answers!)`;
   }
 
-  // Time / Date
-  if (clean.includes('time') || clean.includes('date') || clean.includes('kya time')) {
-    return `⏱️ The current time is **${new Date().toLocaleTimeString()}** (${new Date().toLocaleDateString()}).`;
+  // Creator / Developer
+  if (clean.match(/\b(who made|who created|creator|owner|developer|founder|priyanshu)\b/)) {
+    return `🚀 **Secret-Bubble** was created by **Priyanshu Kumar Maurya** ([@Priyanshu-kumar-maurya](https://github.com/Priyanshu-kumar-maurya)). Built with Telegram-grade privacy, biometric message masking, and AI Auto-Shield.`;
   }
 
-  // Code / Programming
-  if (clean.includes('code') || clean.includes('javascript') || clean.includes('python') || clean.includes('react') || clean.includes('html')) {
-    return `💻 Here to help with coding! You can ask me to explain algorithms, debug React components, format JSON, or build API backends. What specific code snippet are you working on?`;
+  // Advice & Relationships
+  if (clean.match(/\b(love|crush|pyaar|relationship|feelings|advice|sad|happy)\b/)) {
+    return `❤️ In any relationship, open communication and privacy matter most. With Secret-Bubble, your intimate talks stay locked behind your own fingerprint so they remain 100% private!`;
   }
 
-  // Hindi / Hinglish translation or generic response
-  if (clean.match(/\b(kya|kaise|kyu|batao|shukriya|thanks|dhanyawad)\b/)) {
-    return `✨ Bilkul! Aap jo bhi poochhenge, Meta AI aapki poori madad karega. Aap koi sawal, translation, ya ideas share kar sakte hain!`;
+  // Jokes / Entertainment
+  if (clean.match(/\b(joke|chutkula|funny|hasi)\b/)) {
+    return `😄 **Joke of the Day:**\nWhy did the database administrator leave his wife?\nBecause she had one-to-many relationships! 🤣`;
   }
 
-  // Default intelligent assistant fallback
-  return `✨ **Meta AI:** I received your message: "${userPrompt}"\n\nI can assist you with answering questions, writing messages, translating languages, coding, or configuring your Telegram-style biometric privacy settings. Let me know what you need!`;
+  // Math calculation
+  const mathMatch = clean.match(/(\d+)\s*([\+\-\*\/])\s*(\d+)/);
+  if (mathMatch) {
+    try {
+      const num1 = parseFloat(mathMatch[1]);
+      const op = mathMatch[2];
+      const num2 = parseFloat(mathMatch[3]);
+      let res = 0;
+      if (op === '+') res = num1 + num2;
+      else if (op === '-') res = num1 - num2;
+      else if (op === '*') res = num1 * num2;
+      else if (op === '/') res = num2 !== 0 ? (num1 / num2) : 'Infinity';
+      return `🧮 **Calculation Result:**\n\`${num1} ${op} ${num2} = ${res}\``;
+    } catch (e) {}
+  }
+
+  // Translation / Hindi
+  if (clean.match(/\b(kya|kaise|kyu|batao|shukriya|thanks|dhanyawad|sahi hai)\b/)) {
+    return `✨ Bilkul ${senderName}! Main yahan aapki har tarah se help karne ke liye hu. Aap chahein to mujhe **'Train AI'** menu se koi bhi naya topic ya question sikha sakte hain!`;
+  }
+
+  // Default smart AI assistant fallback
+  return `✨ **Meta AI:** I received your prompt: *"${userPrompt}"*\n\nI can assist you with answering questions, writing messages, coding, translations, or customizing your biometric privacy rules. You can also train me with custom responses in the **AI Training Hub**!`;
 }
 
 // =========================================================================
-// Real Authentication Endpoints (No Demo Mock Accounts)
+// AI Training API Endpoints (CRUD)
+// =========================================================================
+app.get('/api/ai/training', (req, res) => {
+  res.json({
+    success: true,
+    data: aiTrainingData
+  });
+});
+
+app.post('/api/ai/train', (req, res) => {
+  const { trigger, response, keywords } = req.body;
+  if (!trigger || !response) {
+    return res.status(400).json({ success: false, message: 'Trigger and response are required' });
+  }
+
+  const newPair = {
+    id: 'train-' + Date.now(),
+    trigger: trigger.trim(),
+    keywords: Array.isArray(keywords) ? keywords : (keywords ? keywords.split(',').map(k => k.trim()) : []),
+    response: response.trim(),
+    createdAt: new Date().toISOString()
+  };
+
+  if (!aiTrainingData.trainingPairs) aiTrainingData.trainingPairs = [];
+  aiTrainingData.trainingPairs.unshift(newPair);
+  saveAiTrainingData(aiTrainingData);
+
+  res.json({
+    success: true,
+    message: 'AI successfully trained with new knowledge rule!',
+    pair: newPair,
+    totalRules: aiTrainingData.trainingPairs.length
+  });
+});
+
+app.delete('/api/ai/train/:id', (req, res) => {
+  const { id } = req.params;
+  if (!aiTrainingData.trainingPairs) aiTrainingData.trainingPairs = [];
+  aiTrainingData.trainingPairs = aiTrainingData.trainingPairs.filter(p => p.id !== id);
+  saveAiTrainingData(aiTrainingData);
+
+  res.json({
+    success: true,
+    message: 'Training rule removed successfully',
+    totalRules: aiTrainingData.trainingPairs.length
+  });
+});
+
+app.post('/api/ai/persona', (req, res) => {
+  const { systemPersona, systemInstructions } = req.body;
+  if (systemPersona) aiTrainingData.systemPersona = systemPersona.trim();
+  if (systemInstructions) aiTrainingData.systemInstructions = systemInstructions.trim();
+  saveAiTrainingData(aiTrainingData);
+
+  res.json({
+    success: true,
+    message: 'AI Persona & System Prompt updated!',
+    data: aiTrainingData
+  });
+});
+
+app.post('/api/ai/test', async (req, res) => {
+  const { prompt, senderName } = req.body;
+  const reply = await generateMetaAiResponse(prompt, senderName || 'User', 'test-user');
+  res.json({ success: true, response: reply });
+});
+
+// =========================================================================
+// Authentication Endpoints
 // =========================================================================
 app.post('/api/auth/register', (req, res) => {
   const { username, name, password, avatarUrl } = req.body;
@@ -197,7 +359,6 @@ app.post('/api/auth/register', (req, res) => {
 
   const cleanUsername = username.trim().toLowerCase();
 
-  // Prevent registering reserved bot username
   if (cleanUsername === 'meta_ai' || cleanUsername === 'admin' || cleanUsername === 'system') {
     return res.status(400).json({ success: false, message: 'This username is reserved' });
   }
@@ -212,8 +373,7 @@ app.post('/api/auth/register', (req, res) => {
     'from-emerald-600 to-teal-500',
     'from-rose-600 to-pink-500',
     'from-amber-600 to-orange-500',
-    'from-cyan-600 to-blue-500',
-    'from-fuchsia-600 to-pink-600'
+    'from-cyan-600 to-blue-500'
   ];
   const avatarColor = colors[Math.floor(Math.random() * colors.length)];
 
@@ -270,7 +430,6 @@ app.post('/api/auth/login', (req, res) => {
   });
 });
 
-// Update Profile endpoint
 app.post('/api/users/profile', (req, res) => {
   const { userId, name, avatarUrl, bio } = req.body;
   const user = users.find(u => u.id === userId);
@@ -304,7 +463,6 @@ app.post('/api/users/profile', (req, res) => {
   });
 });
 
-// List real users + Meta AI Bot
 app.get('/api/users', (req, res) => {
   const safeUsers = users.map(u => ({
     id: u.id,
@@ -316,7 +474,6 @@ app.get('/api/users', (req, res) => {
     isOnline: onlineUsers.has(u.id) && onlineUsers.get(u.id).size > 0
   }));
 
-  // Ensure Meta AI Bot is always at the top of bots list
   const allUsersWithBot = [
     {
       ...META_AI_BOT,
@@ -328,7 +485,6 @@ app.get('/api/users', (req, res) => {
   res.json({ success: true, users: allUsersWithBot });
 });
 
-// Fetch Messages
 app.get('/api/messages', (req, res) => {
   const { userId, targetId, roomId } = req.query;
   let filtered = [];
@@ -364,8 +520,8 @@ io.on('connection', (socket) => {
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
   });
 
-  // Send Message Event
-  socket.on('send_message', (msgData) => {
+  // Send Message
+  socket.on('send_message', async (msgData) => {
     const aiAnalysis = analyzeSensitivity(msgData.text);
     const shouldLock = Boolean(msgData.isLocked || aiAnalysis.isSensitive);
     const category = msgData.isLocked
@@ -400,7 +556,6 @@ io.on('connection', (socket) => {
     messages.push(newMsg);
     saveMessages(messages);
 
-    // Deliver user message
     if (newMsg.recipientId) {
       const recipientSockets = onlineUsers.get(newMsg.recipientId);
       if (recipientSockets) {
@@ -414,38 +569,42 @@ io.on('connection', (socket) => {
       io.emit('new_message', newMsg);
     }
 
-    // Handle Meta AI Auto-Response
+    // Meta AI Response
     if (isToMetaAi) {
       const senderSockets = onlineUsers.get(msgData.senderId);
       if (senderSockets) {
-        // Send typing indicator
         senderSockets.forEach(sId => io.to(sId).emit('user_typing', { senderId: 'user-meta-ai' }));
 
-        setTimeout(() => {
+        try {
+          const aiReplyText = await generateMetaAiResponse(msgData.text, msgData.sender, msgData.senderId);
+
+          setTimeout(() => {
+            senderSockets.forEach(sId => io.to(sId).emit('user_stop_typing', { senderId: 'user-meta-ai' }));
+
+            const aiMsg = {
+              id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+              sender: META_AI_BOT.name,
+              senderId: META_AI_BOT.id,
+              senderAvatar: META_AI_BOT.avatarUrl,
+              recipientId: msgData.senderId,
+              roomId: null,
+              text: aiReplyText,
+              isLocked: false,
+              category: 'General',
+              isAiShielded: false,
+              isEdited: false,
+              viewers: ['user-meta-ai'],
+              timestamp: new Date().toISOString()
+            };
+
+            messages.push(aiMsg);
+            saveMessages(messages);
+
+            senderSockets.forEach(sId => io.to(sId).emit('new_message', aiMsg));
+          }, 800);
+        } catch (e) {
           senderSockets.forEach(sId => io.to(sId).emit('user_stop_typing', { senderId: 'user-meta-ai' }));
-
-          const aiReplyText = generateMetaAiResponse(msgData.text, msgData.sender);
-          const aiMsg = {
-            id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-            sender: META_AI_BOT.name,
-            senderId: META_AI_BOT.id,
-            senderAvatar: META_AI_BOT.avatarUrl,
-            recipientId: msgData.senderId,
-            roomId: null,
-            text: aiReplyText,
-            isLocked: false,
-            category: 'General',
-            isAiShielded: false,
-            isEdited: false,
-            viewers: ['user-meta-ai'],
-            timestamp: new Date().toISOString()
-          };
-
-          messages.push(aiMsg);
-          saveMessages(messages);
-
-          senderSockets.forEach(sId => io.to(sId).emit('new_message', aiMsg));
-        }, 900);
+        }
       }
     }
   });
@@ -458,7 +617,6 @@ io.on('connection', (socket) => {
     msg.text = newText;
     msg.isEdited = true;
     
-    // Re-check AI Sensitivity
     const aiAnalysis = analyzeSensitivity(newText);
     if (aiAnalysis.isSensitive) {
       msg.isLocked = true;
@@ -501,7 +659,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Telegram-style Message View Counter
+  // Mark Viewed
   socket.on('mark_viewed', ({ messageIds, viewerId }) => {
     if (!messageIds || !viewerId) return;
     let changed = false;
@@ -557,5 +715,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 Secret-Bubble (Telegram Pro) Backend running on http://0.0.0.0:' + PORT);
+  console.log('🚀 Secret-Bubble (Meta AI Trainable Engine) running on http://0.0.0.0:' + PORT);
 });

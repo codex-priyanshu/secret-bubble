@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame } from 'lucide-react';
+import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain } from 'lucide-react';
 
 export default function ChatHeader({
   target,
@@ -7,6 +7,7 @@ export default function ChatHeader({
   onOpenSettings,
   onOpenProfile,
   onLockApp,
+  onOpenAiTraining,
   aiEnabled,
   isTyping,
   onToggleSidebar,
@@ -95,6 +96,18 @@ export default function ChatHeader({
       {/* Action Buttons */}
       <div className="flex items-center gap-1.5 shrink-0">
         
+        {/* Train AI Studio Button (Highlighted when in Meta AI chat) */}
+        {isMetaAi && (
+          <button
+            onClick={onOpenAiTraining}
+            className="px-2.5 py-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/30 transition animate-in fade-in"
+            title="Open AI Training & Custom Knowledge Studio"
+          >
+            <Brain className="w-3.5 h-3.5 text-cyan-200" />
+            <span className="hidden sm:inline">Train AI</span>
+          </button>
+        )}
+
         {/* Disappearing timer badge if active */}
         {disappearingTimer > 0 && (
           <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded-xl text-xs font-semibold" title={`Disappearing timer: ${disappearingTimer}s`}>
