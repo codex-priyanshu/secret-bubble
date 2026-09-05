@@ -21,7 +21,7 @@ const io = new Server(server, {
 const DB_MESSAGES_FILE = path.join(__dirname, 'messages.json');
 const DB_USERS_FILE = path.join(__dirname, 'users.json');
 
-// AI Auto-Sensitivity Detection Engine
+// AI Auto-Sensitivity Detection Engine (Multilingual: English, Hindi, Hinglish)
 const AI_SENSITIVITY_PATTERNS = [
   {
     category: 'Adult & Physical Intimacy 🔞',
@@ -55,7 +55,7 @@ const AI_SENSITIVITY_PATTERNS = [
 ];
 
 function analyzeSensitivity(text) {
-  if (!text) return { isSensitive: false, category: 'General' };
+  if (!text || typeof text !== 'string') return { isSensitive: false, category: 'General' };
   const clean = text.toLowerCase();
   for (const rule of AI_SENSITIVITY_PATTERNS) {
     for (const p of rule.patterns) {
@@ -67,26 +67,56 @@ function analyzeSensitivity(text) {
   return { isSensitive: false, category: 'General' };
 }
 
-function loadUsers() {
-  try {
-    if (fs.existsSync(DB_USERS_FILE)) {
-      return JSON.parse(fs.readFileSync(DB_USERS_FILE, 'utf8'));
-    }
-  } catch (err) {}
-  return [];
-}
-
-function saveUsers(users) {
-  try {
-    fs.writeFileSync(DB_USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
-  } catch (err) {}
-}
-
 function hashPassword(pass) {
   return crypto.createHash('sha256').update(pass).digest('hex');
 }
 
+// Pre-seeded demo accounts with hash for "123456"
+const DEFAULT_DEMO_USERS = [
+  {
+    id: "user-aman",
+    username: "aman",
+    name: "Aman",
+    passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    avatarColor: "from-blue-600 to-cyan-500",
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user-rohan",
+    username: "rohan",
+    name: "Rohan",
+    passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    avatarColor: "from-purple-600 to-pink-500",
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: "user-priya",
+    username: "priya",
+    name: "Priya",
+    passwordHash: "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    avatarColor: "from-rose-600 to-amber-500",
+    createdAt: new Date().toISOString()
+  }
+];
+
+function loadUsers() {
+  try {
+    if (fs.existsSync(DB_USERS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DB_USERS_FILE, 'utf8'));
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {}
+  return DEFAULT_DEMO_USERS;
+}
+
+function saveUsers(usersList) {
+  try {
+    fs.writeFileSync(DB_USERS_FILE, JSON.stringify(usersList, null, 2), 'utf8');
+  } catch (err) {}
+}
+
 let users = loadUsers();
+if (!fs.existsSync(DB_USERS_FILE)) saveUsers(users);
 
 function loadMessages() {
   try {
@@ -361,7 +391,7 @@ io.on('connection', (socket) => {
         if (!msg.viewers.includes(viewerId)) {
           msg.viewers.push(viewerId);
           changed = true;
-          io.emit('views_updated', { messageId: id, viewsCount: msg.viewers.length });
+          io.emit('views_updated', { messageId: id, viewers: msg.viewers, viewsCount: msg.viewers.length });
         }
       }
     });

@@ -4,9 +4,9 @@ import { analyzeMessageSensitivity } from '../utils/aiPrivacyDetector';
 
 const DEFAULT_CATEGORIES = [
   { id: 'Adult & Physical Intimacy 🔞', label: 'Intimacy 🔞' },
-  { id: 'Personal Feelings', label: 'Feelings ❤️' },
-  { id: 'Confidential Secret', label: 'Secret 🔒' },
-  { id: 'Financial / Password', label: 'Sensitive 🔑' }
+  { id: 'Romance & Feelings ❤️', label: 'Feelings ❤️' },
+  { id: 'Secrets & Confidential 🔒', label: 'Secret 🔒' },
+  { id: 'Financial & Credentials 🔑', label: 'Sensitive 🔑' }
 ];
 
 export default function ChatInput({

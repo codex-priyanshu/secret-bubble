@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { Shield, Lock, Globe } from 'lucide-react';
 import ChatHeader from './components/ChatHeader';
@@ -51,6 +51,16 @@ export default function App() {
   const [typingUsers, setTypingUsers] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
 
+  const selectedTargetRef = useRef(selectedTarget);
+  useEffect(() => {
+    selectedTargetRef.current = selectedTarget;
+  }, [selectedTarget]);
+
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
   const backendUrl = useMemo(() => getBackendUrl(), []);
 
   const [settings, setSettings] = useState(() => {
@@ -92,25 +102,33 @@ export default function App() {
   } = useBiometrics(settings.autoRelockSeconds);
 
   // Fetch Users List
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch(`${backendUrl}/api/users`);
       const data = await res.json();
       if (data.success) {
         setUsers(data.users);
       }
-    } catch (e) {}
-  };
+    } catch (e) {
+      // Fallback demo users if backend is unreachable
+      setUsers([
+        { id: 'user-aman', username: 'aman', name: 'Aman', avatarColor: 'from-blue-600 to-cyan-500', isOnline: true },
+        { id: 'user-rohan', username: 'rohan', name: 'Rohan', avatarColor: 'from-purple-600 to-pink-500', isOnline: true },
+        { id: 'user-priya', username: 'priya', name: 'Priya', avatarColor: 'from-rose-600 to-amber-500', isOnline: false }
+      ]);
+    }
+  }, [backendUrl]);
 
   // Fetch Messages for current selected target
-  const fetchMessages = async () => {
-    if (!currentUser) return;
+  const fetchMessages = useCallback(async () => {
+    if (!currentUserRef.current) return;
     try {
+      const currentTarget = selectedTargetRef.current;
       let url = `${backendUrl}/api/messages`;
-      if (selectedTarget.type === 'room') {
-        url += `?roomId=${selectedTarget.id}`;
+      if (currentTarget.type === 'room') {
+        url += `?roomId=${currentTarget.id}`;
       } else {
-        url += `?userId=${currentUser.id}&targetId=${selectedTarget.id}`;
+        url += `?userId=${currentUserRef.current.id}&targetId=${currentTarget.id}`;
       }
       const res = await fetch(url);
       const data = await res.json();
@@ -120,24 +138,24 @@ export default function App() {
         // Mark viewed
         if (socket && data.messages.length > 0) {
           const unviewedIds = data.messages
-            .filter(m => !m.viewers || !m.viewers.includes(currentUser.id))
+            .filter(m => !m.viewers || !m.viewers.includes(currentUserRef.current.id))
             .map(m => m.id);
           if (unviewedIds.length > 0) {
-            socket.emit('mark_viewed', { messageIds: unviewedIds, viewerId: currentUser.id });
+            socket.emit('mark_viewed', { messageIds: unviewedIds, viewerId: currentUserRef.current.id });
           }
         }
       }
     } catch (e) {}
-  };
+  }, [backendUrl, socket]);
 
   useEffect(() => {
     if (currentUser) {
       fetchUsers();
       fetchMessages();
     }
-  }, [currentUser, selectedTarget]);
+  }, [currentUser, selectedTarget, fetchUsers, fetchMessages]);
 
-  // Socket.io Connection Setup
+  // Socket.io Connection Setup (ONLY runs on currentUser or backendUrl change, NOT on target change)
   useEffect(() => {
     if (!currentUser) return;
 
@@ -164,13 +182,17 @@ export default function App() {
     });
 
     s.on('new_message', (msg) => {
+      const currentTarget = selectedTargetRef.current;
+      const user = currentUserRef.current;
+      if (!user) return;
+
       const isForCurrentTarget =
-        selectedTarget.type === 'room'
-          ? (!msg.recipientId && msg.roomId === selectedTarget.id)
-          : (selectedTarget.type === 'user' &&
+        currentTarget.type === 'room'
+          ? (!msg.recipientId && msg.roomId === currentTarget.id)
+          : (currentTarget.type === 'user' &&
               !msg.roomId &&
-              ((msg.senderId === selectedTarget.id && msg.recipientId === currentUser.id) ||
-               (msg.senderId === currentUser.id && msg.recipientId === selectedTarget.id)));
+              ((msg.senderId === currentTarget.id && msg.recipientId === user.id) ||
+               (msg.senderId === user.id && msg.recipientId === currentTarget.id)));
 
       if (isForCurrentTarget) {
         setMessages(prev => {
@@ -179,8 +201,8 @@ export default function App() {
         });
 
         // Auto mark as viewed
-        s.emit('mark_viewed', { messageIds: [msg.id], viewerId: currentUser.id });
-      } else if (msg.recipientId === currentUser.id && msg.senderId !== currentUser.id) {
+        s.emit('mark_viewed', { messageIds: [msg.id], viewerId: user.id });
+      } else if (msg.recipientId === user.id && msg.senderId !== user.id) {
         const fromId = msg.senderId;
         setUnreadCounts(prev => ({
           ...prev,
@@ -202,18 +224,18 @@ export default function App() {
       setMessages(prev => prev.filter(m => m.id !== messageId));
     });
 
-    s.on('views_updated', ({ messageId, viewsCount }) => {
+    s.on('views_updated', ({ messageId, viewers, viewsCount }) => {
       setMessages(prev => prev.map(m => {
         if (m.id === messageId) {
-          const currentViewers = m.viewers || [];
-          return { ...m, viewers: currentViewers.length < viewsCount ? new Array(viewsCount).fill('x') : currentViewers };
+          return { ...m, viewers: viewers || (m.viewers ? [...m.viewers] : []) };
         }
         return m;
       }));
     });
 
     s.on('user_typing', (data) => {
-      if (data.senderId !== currentUser.id) {
+      const user = currentUserRef.current;
+      if (user && data.senderId !== user.id) {
         setTypingUsers(prev => ({ ...prev, [data.senderId]: true }));
       }
     });
@@ -240,7 +262,7 @@ export default function App() {
     return () => {
       s.disconnect();
     };
-  }, [currentUser, selectedTarget, relockAll, backendUrl]);
+  }, [currentUser?.id, backendUrl, fetchUsers, relockAll]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -265,6 +287,7 @@ export default function App() {
       const localMsg = {
         ...payload,
         id: 'msg-' + Date.now(),
+        viewers: [currentUser.id],
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, localMsg]);

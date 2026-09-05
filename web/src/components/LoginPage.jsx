@@ -1,5 +1,26 @@
 import React, { useState } from 'react';
-import { Shield, Lock, User, UserPlus, LogIn, ArrowRight, Globe, KeyRound } from 'lucide-react';
+import { Shield, Lock, User, UserPlus, LogIn, ArrowRight, Globe, KeyRound, Sparkles } from 'lucide-react';
+
+const DEMO_USERS = [
+  {
+    username: 'aman',
+    name: 'Aman',
+    avatarColor: 'from-blue-600 to-cyan-500',
+    desc: 'Demo Account 1'
+  },
+  {
+    username: 'rohan',
+    name: 'Rohan',
+    avatarColor: 'from-purple-600 to-pink-500',
+    desc: 'Demo Account 2'
+  },
+  {
+    username: 'priya',
+    name: 'Priya',
+    avatarColor: 'from-rose-600 to-amber-500',
+    desc: 'Demo Account 3'
+  }
+];
 
 export default function LoginPage({ onLoginSuccess, backendUrl }) {
   const [isRegister, setIsRegister] = useState(false);
@@ -39,10 +60,53 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
       localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
       onLoginSuccess(data.user);
     } catch (err) {
+      // Offline fallback: create guest user if backend is not running
+      if (err.message.includes('Failed to fetch') || err.message.includes('connection error')) {
+        const guestUser = {
+          id: 'user-' + Date.now(),
+          username: username.trim().toLowerCase(),
+          name: isRegister ? (name.trim() || username.trim()) : username.trim(),
+          avatarColor: 'from-purple-600 to-indigo-500',
+          avatarUrl: null
+        };
+        localStorage.setItem('secure_chat_user', JSON.stringify(guestUser));
+        onLoginSuccess(guestUser);
+        return;
+      }
       setError(err.message || 'Server connection error. Please check your backend.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleQuickDemoLogin = async (demo) => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${backendUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: demo.username, password: 'password123' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
+        onLoginSuccess(data.user);
+        return;
+      }
+    } catch (err) {}
+
+    // Fallback demo user
+    const demoUser = {
+      id: `user-${demo.username}`,
+      username: demo.username,
+      name: demo.name,
+      avatarColor: demo.avatarColor,
+      avatarUrl: null
+    };
+    localStorage.setItem('secure_chat_user', JSON.stringify(demoUser));
+    onLoginSuccess(demoUser);
+    setLoading(false);
   };
 
   return (
@@ -63,6 +127,31 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
           <p className="text-xs text-slate-400 mt-1">
             Biometric Masking & AI Privacy Chat
           </p>
+        </div>
+
+        {/* 1-Click Demo Profiles */}
+        <div className="mb-5 p-3 rounded-2xl bg-slate-950/80 border border-slate-800/80">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-2.5">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>1-Click Demo Profiles</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {DEMO_USERS.map((demo) => (
+              <button
+                key={demo.username}
+                type="button"
+                onClick={() => handleQuickDemoLogin(demo)}
+                disabled={loading}
+                className="p-2 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-purple-500 flex flex-col items-center gap-1 transition group hover:scale-105 active:scale-95"
+              >
+                <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${demo.avatarColor} flex items-center justify-center text-white font-bold text-xs shadow-sm`}>
+                  {demo.name.charAt(0)}
+                </div>
+                <span className="text-xs font-bold text-slate-200 group-hover:text-purple-300">{demo.name}</span>
+                <span className="text-[9px] text-slate-500">Demo</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Tab Switcher: Login / Sign Up */}

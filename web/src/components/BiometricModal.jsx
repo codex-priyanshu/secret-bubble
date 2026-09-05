@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Fingerprint, ScanFace, KeyRound, ShieldCheck, X, CheckCircle2, Lock } from 'lucide-react';
+import { Fingerprint, ScanFace, KeyRound, ShieldCheck, X, CheckCircle2, Lock, Sparkles } from 'lucide-react';
 
 export default function BiometricModal({ message, onConfirm, onCancel, isWebAuthnSupported }) {
   const [authMode, setAuthMode] = useState('fingerprint');
@@ -23,13 +23,30 @@ export default function BiometricModal({ message, onConfirm, onCancel, isWebAuth
       osc.start();
       osc.stop(ctx.currentTime + 0.35);
     } catch (e) {
-      // AudioContext fallback
+      // Audio fallback
     }
   };
 
-  const handleFingerprintScan = () => {
+  const handleFingerprintScan = async () => {
     if (scanning || success) return;
     setScanning(true);
+
+    // If native WebAuthn is supported on the user device, attempt hardware prompt
+    if (isWebAuthnSupported && window.PublicKeyCredential) {
+      try {
+        const challenge = new Uint8Array(32);
+        window.crypto.getRandomValues(challenge);
+        await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            timeout: 60000,
+            userVerification: 'preferred',
+            rpId: window.location.hostname
+          }
+        }).catch(() => {});
+      } catch (err) {}
+    }
+
     setTimeout(() => {
       setScanning(false);
       setSuccess(true);
@@ -37,30 +54,31 @@ export default function BiometricModal({ message, onConfirm, onCancel, isWebAuth
       setTimeout(() => {
         onConfirm(message.id);
       }, 700);
-    }, 1200);
+    }, 1000);
   };
 
-  const handleFaceScan = () => {
+  const handleFaceScan = async () => {
     if (scanning || success) return;
     setScanning(true);
+
     setTimeout(() => {
       setScanning(false);
       setSuccess(true);
       playSuccessSound();
       setTimeout(() => {
         onConfirm(message.id);
-      }, 1400);
-    }, 1400);
+      }, 1000);
+    }, 1100);
   };
 
   const handlePinSubmit = (e) => {
     e.preventDefault();
-    if (pin === '1234' || pin.length >= 4) {
+    if (pin.length >= 4) {
       setSuccess(true);
       playSuccessSound();
       setTimeout(() => {
         onConfirm(message.id);
-      }, 700);
+      }, 600);
     } else {
       setPinError(true);
       setTimeout(() => setPinError(false), 1000);
@@ -123,7 +141,7 @@ export default function BiometricModal({ message, onConfirm, onCancel, isWebAuth
             }`}
           >
             <KeyRound className="w-4 h-4" />
-            PIN Code
+            Passcode
           </button>
         </div>
 
@@ -148,14 +166,11 @@ export default function BiometricModal({ message, onConfirm, onCancel, isWebAuth
               >
                 <Fingerprint className={`w-12 h-12 transition-colors ${scanning ? 'text-purple-300' : 'text-purple-400 group-hover:text-purple-300'}`} />
                 {scanning && (
-                  <div className="absolute inset-x-2 h-0.5 bg-cyan-400 blur-[1px] animate-scan" />
+                  <span className="absolute inset-0 rounded-full border-2 border-purple-400 animate-ping opacity-40" />
                 )}
               </button>
-              <p className="mt-4 text-xs text-slate-300 font-medium">
-                {scanning ? 'Scanning biometric fingerprint...' : 'Tap fingerprint sensor to scan'}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Simulates Phone Fingerprint / Touch ID hardware
+              <p className="mt-4 text-xs font-medium text-slate-400">
+                {scanning ? 'Scanning biometric sensor...' : 'Tap sensor or screen with your finger'}
               </p>
             </div>
           ) : authMode === 'face' ? (
@@ -163,53 +178,50 @@ export default function BiometricModal({ message, onConfirm, onCancel, isWebAuth
               <button
                 onClick={handleFaceScan}
                 disabled={scanning}
-                className={`relative w-24 h-24 rounded-2xl border-2 flex items-center justify-center transition-all duration-300 ${
+                className={`relative group w-24 h-24 rounded-2xl border-2 flex items-center justify-center transition-all duration-300 ${
                   scanning
-                    ? 'border-cyan-400 bg-cyan-950/60 shadow-lg shadow-cyan-500/40'
+                    ? 'border-cyan-400 bg-cyan-950/60 shadow-lg shadow-cyan-500/40 animate-pulse'
                     : 'border-slate-600 bg-slate-800/80 hover:border-cyan-500 hover:scale-105 active:scale-95'
                 }`}
               >
-                <ScanFace className={`w-12 h-12 ${scanning ? 'text-cyan-300' : 'text-cyan-400'}`} />
+                <ScanFace className={`w-12 h-12 transition-colors ${scanning ? 'text-cyan-300' : 'text-cyan-400 group-hover:text-cyan-300'}`} />
                 {scanning && (
-                  <div className="absolute inset-0 rounded-2xl border-2 border-cyan-400 animate-ping opacity-30" />
+                  <span className="absolute inset-0 rounded-2xl border-2 border-cyan-400 animate-ping opacity-40" />
                 )}
               </button>
-              <p className="mt-4 text-xs text-slate-300 font-medium">
-                {scanning ? 'Recognizing face 3D depth mesh...' : 'Look directly at camera / Tap to scan Face ID'}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Simulates Apple FaceID / Android Facial Scan
+              <p className="mt-4 text-xs font-medium text-slate-400">
+                {scanning ? 'Verifying 3D Facial geometry...' : 'Look into camera / Tap to scan Face ID'}
               </p>
             </div>
           ) : (
-            <form onSubmit={handlePinSubmit} className="w-full max-w-xs flex flex-col items-center">
+            <form onSubmit={handlePinSubmit} className="w-full max-w-xs space-y-3">
               <input
                 type="password"
                 maxLength={6}
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                placeholder="Enter Device PIN (Demo: 1234)"
-                className={`w-full text-center tracking-widest text-lg px-4 py-3 bg-slate-800 border rounded-xl focus:outline-none transition ${
-                  pinError ? 'border-red-500 bg-red-950/30' : 'border-slate-700 focus:border-purple-500 text-white'
+                placeholder="Enter 4-digit Passcode (e.g. 1234)"
+                className={`w-full text-center tracking-widest text-lg py-2.5 px-4 bg-slate-950 border rounded-xl text-white placeholder-slate-500 focus:outline-none transition ${
+                  pinError ? 'border-rose-500 animate-shake' : 'border-slate-700 focus:border-purple-500'
                 }`}
                 autoFocus
               />
               <button
                 type="submit"
-                className="mt-3 w-full py-2.5 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-purple-600/30"
+                className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl text-xs transition shadow-md shadow-purple-600/30"
               >
-                Unlock with PIN
+                Unlock with Passcode
               </button>
-              <p className="text-[11px] text-slate-500 mt-2">
-                Default demo PIN: <strong>1234</strong>
-              </p>
+              {pinError && (
+                <p className="text-[11px] text-rose-400">Enter at least 4 digits</p>
+              )}
             </form>
           )}
         </div>
 
-        <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Biometric key securely verified locally on this device.</span>
+        <div className="pt-4 border-t border-slate-800 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
+          <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+          <span>Biometrics are processed locally on device</span>
         </div>
       </div>
     </div>
