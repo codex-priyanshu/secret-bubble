@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   aiEnabled: true,
   autoRelockSeconds: 15,
   antiShoulderSurfing: true,
+  idleLockMinutes: 5,
   categories: {
     adult_intimacy: true,
     romance_feelings: true,
@@ -41,6 +42,10 @@ export default function App() {
     } catch {
       return null;
     }
+  });
+
+  const [authToken, setAuthToken] = useState(() => {
+    return localStorage.getItem('secure_chat_token') || null;
   });
 
   const [users, setUsers] = useState([]);
@@ -123,6 +128,32 @@ export default function App() {
     };
   }, [settings.antiShoulderSurfing]);
 
+  // Automatic Idle Inactivity Lock Timer
+  useEffect(() => {
+    if (!settings.idleLockMinutes || settings.idleLockMinutes <= 0 || isAppLocked || !currentUser) {
+      return;
+    }
+
+    let idleTimeoutId;
+    const timeoutMs = settings.idleLockMinutes * 60 * 1000;
+
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimeoutId);
+      idleTimeoutId = setTimeout(() => {
+        setIsAppLocked(true);
+      }, timeoutMs);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(ev => window.addEventListener(ev, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimeoutId);
+      events.forEach(ev => window.removeEventListener(ev, resetIdleTimer));
+    };
+  }, [settings.idleLockMinutes, isAppLocked, currentUser]);
+
   // Disappearing messages local cleanup
   useEffect(() => {
     const timer = setInterval(() => {
@@ -196,13 +227,16 @@ export default function App() {
     }
   }, [currentUser, selectedTarget, fetchUsers, fetchMessages]);
 
-  // Socket.io Connection Setup
+  // Socket.io Connection Setup with Cryptographic Token
   useEffect(() => {
     if (!currentUser) return;
 
     const s = io(backendUrl, {
       reconnectionAttempts: 10,
-      timeout: 5000
+      timeout: 5000,
+      auth: {
+        token: authToken
+      }
     });
 
     s.on('connect', () => {
@@ -398,13 +432,23 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('secure_chat_user');
+    localStorage.removeItem('secure_chat_token');
+    setAuthToken(null);
     setCurrentUser(null);
     setMessages([]);
     if (socket) socket.disconnect();
   };
 
   if (!currentUser) {
-    return <LoginPage onLoginSuccess={(user) => setCurrentUser(user)} backendUrl={backendUrl} />;
+    return (
+      <LoginPage
+        onLoginSuccess={(user, token) => {
+          setCurrentUser(user);
+          if (token) setAuthToken(token);
+        }}
+        backendUrl={backendUrl}
+      />
+    );
   }
 
   const isCurrentTargetTyping = selectedTarget.type === 'user' && Boolean(typingUsers[selectedTarget.id]);

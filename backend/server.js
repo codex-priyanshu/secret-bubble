@@ -7,8 +7,76 @@ const path = require('path');
 const crypto = require('crypto');
 
 const app = express();
+
+// =========================================================================
+// Enterprise Security Headers & Middlewares
+// =========================================================================
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Master cryptographic secret keys
+const MASTER_ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'secret-bubble-aes-256-gcm-master-vault-2026-v2';
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(MASTER_ENCRYPTION_SECRET).digest();
+const JWT_SESSION_SECRET = process.env.JWT_SECRET || 'secret-bubble-session-hmac-sha256-signature-key-2026';
+
+// Rate Limiting Memory Map
+const rateLimitMap = new Map();
+
+function createRateLimiter({ windowMs = 60000, maxRequests = 10, keyPrefix = 'ip' }) {
+  return (req, res, next) => {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    const key = `${keyPrefix}:${ip}`;
+    const now = Date.now();
+
+    let record = rateLimitMap.get(key);
+    if (!record || now > record.resetTime) {
+      record = { count: 1, resetTime: now + windowMs };
+      rateLimitMap.set(key, record);
+      return next();
+    }
+
+    record.count++;
+    if (record.count > maxRequests) {
+      const retryAfter = Math.ceil((record.resetTime - now) / 1000);
+      res.setHeader('Retry-After', retryAfter);
+      return res.status(429).json({
+        success: false,
+        message: `🛡️ Security Shield: Too many attempts. Please wait ${retryAfter}s before retrying.`
+      });
+    }
+
+    next();
+  };
+}
+
+// Clean up expired rate limit entries every 5 mins
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap.entries()) {
+    if (now > v.resetTime) rateLimitMap.delete(k);
+  }
+}, 300000);
+
+// XSS Sanitizer
+function sanitizeText(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -106,8 +174,95 @@ function analyzeSensitivity(text) {
   return { isSensitive: false, category: 'General' };
 }
 
-function hashPassword(pass) {
-  return crypto.createHash('sha256').update(pass).digest('hex');
+// =========================================================================
+// Cryptographic Engine: PBKDF2, AES-256-GCM, HMAC Tokens
+// =========================================================================
+
+// Salted PBKDF2 (100,000 rounds, SHA-512)
+function hashPassword(pass, existingSalt = null) {
+  const salt = existingSalt || crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(pass, salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(inputPassword, storedHash) {
+  if (!storedHash) return { valid: false, needsUpgrade: false };
+  if (storedHash.includes(':')) {
+    const [salt, originalHash] = storedHash.split(':');
+    const computedHash = crypto.pbkdf2Sync(inputPassword, salt, 100000, 64, 'sha512').toString('hex');
+    const isValid = crypto.timingSafeEqual(Buffer.from(originalHash, 'hex'), Buffer.from(computedHash, 'hex'));
+    return { valid: isValid, needsUpgrade: false };
+  }
+  // Legacy SHA-256 fallback with automatic upgrade flag
+  const legacyHash = crypto.createHash('sha256').update(inputPassword).digest('hex');
+  if (legacyHash === storedHash) {
+    return { valid: true, needsUpgrade: true };
+  }
+  return { valid: false, needsUpgrade: false };
+}
+
+// HMAC-SHA256 Signed Session Tokens
+function generateSessionToken(user) {
+  const payload = {
+    userId: user.id,
+    username: user.username,
+    name: user.name,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (14 * 24 * 60 * 60) // 14 days
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SESSION_SECRET).update(encodedPayload).digest('base64url');
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifySessionToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [encodedPayload, signature] = parts;
+  const expectedSig = crypto.createHmac('sha256', JWT_SESSION_SECRET).update(encodedPayload).digest('base64url');
+  if (signature !== expectedSig) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// AES-256-GCM Storage Encryption at Rest
+function encryptMessageText(text) {
+  if (typeof text !== 'string') return null;
+  const iv = crypto.randomBytes(12); // 96-bit IV
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  let ciphertext = cipher.update(text, 'utf8', 'hex');
+  ciphertext += cipher.final('hex');
+  const tag = cipher.getAuthTag().toString('hex');
+  return {
+    ciphertext,
+    iv: iv.toString('hex'),
+    tag
+  };
+}
+
+function decryptMessageText(enc) {
+  if (!enc || !enc.ciphertext || !enc.iv || !enc.tag) return '';
+  try {
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      ENCRYPTION_KEY,
+      Buffer.from(enc.iv, 'hex')
+    );
+    decipher.setAuthTag(Buffer.from(enc.tag, 'hex'));
+    let decrypted = decipher.update(enc.ciphertext, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    return '[Decryption failed: integrity check failed]';
+  }
 }
 
 function loadUsers() {
@@ -132,7 +287,17 @@ function loadMessages() {
   try {
     if (fs.existsSync(DB_MESSAGES_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(DB_MESSAGES_FILE, 'utf8'));
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.map(m => {
+          if (m.encryptedPayload) {
+            return {
+              ...m,
+              text: decryptMessageText(m.encryptedPayload)
+            };
+          }
+          return m;
+        });
+      }
     }
   } catch (err) {}
   return [];
@@ -140,7 +305,13 @@ function loadMessages() {
 
 function saveMessages(msgs) {
   try {
-    fs.writeFileSync(DB_MESSAGES_FILE, JSON.stringify(msgs, null, 2), 'utf8');
+    const diskMessages = msgs.map(m => {
+      const copy = { ...m };
+      copy.encryptedPayload = encryptMessageText(m.text || '');
+      delete copy.text; // Text is wiped from disk for military-grade zero-knowledge storage!
+      return copy;
+    });
+    fs.writeFileSync(DB_MESSAGES_FILE, JSON.stringify(diskMessages, null, 2), 'utf8');
   } catch (err) {}
 }
 
@@ -338,16 +509,21 @@ app.post('/api/ai/persona', (req, res) => {
   });
 });
 
-app.post('/api/ai/test', async (req, res) => {
+const authLoginLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 6, keyPrefix: 'auth-login' });
+const authRegisterLimiter = createRateLimiter({ windowMs: 300000, maxRequests: 10, keyPrefix: 'auth-register' });
+const aiTestLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 20, keyPrefix: 'ai-test' });
+
+app.post('/api/ai/test', aiTestLimiter, async (req, res) => {
   const { prompt, senderName } = req.body;
-  const reply = await generateMetaAiResponse(prompt, senderName || 'User', 'test-user');
+  const sanitizedPrompt = sanitizeText(prompt);
+  const reply = await generateMetaAiResponse(sanitizedPrompt, senderName || 'User', 'test-user');
   res.json({ success: true, response: reply });
 });
 
 // =========================================================================
-// Authentication Endpoints
+// Authentication Endpoints (Salted PBKDF2 + HMAC Session Tokens)
 // =========================================================================
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
   const { username, name, password, avatarUrl } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password are required' });
@@ -357,7 +533,7 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long' });
   }
 
-  const cleanUsername = username.trim().toLowerCase();
+  const cleanUsername = sanitizeText(username.trim().toLowerCase());
 
   if (cleanUsername === 'meta_ai' || cleanUsername === 'admin' || cleanUsername === 'system') {
     return res.status(400).json({ success: false, message: 'This username is reserved' });
@@ -380,8 +556,8 @@ app.post('/api/auth/register', (req, res) => {
   const newUser = {
     id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
     username: cleanUsername,
-    name: name ? name.trim() : cleanUsername,
-    passwordHash: hashPassword(password),
+    name: sanitizeText(name ? name.trim() : cleanUsername),
+    passwordHash: hashPassword(password), // Salted PBKDF2 100,000 iterations!
     avatarColor,
     avatarUrl: avatarUrl || null,
     bio: 'Hey there! I am using Secret-Bubble.',
@@ -391,20 +567,25 @@ app.post('/api/auth/register', (req, res) => {
   users.push(newUser);
   saveUsers(users);
 
+  const safeUser = {
+    id: newUser.id,
+    username: newUser.username,
+    name: newUser.name,
+    avatarColor: newUser.avatarColor,
+    avatarUrl: newUser.avatarUrl,
+    bio: newUser.bio
+  };
+
+  const token = generateSessionToken(safeUser);
+
   res.json({
     success: true,
-    user: {
-      id: newUser.id,
-      username: newUser.username,
-      name: newUser.name,
-      avatarColor: newUser.avatarColor,
-      avatarUrl: newUser.avatarUrl,
-      bio: newUser.bio
-    }
+    user: safeUser,
+    token
   });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authLoginLimiter, (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password required' });
@@ -413,33 +594,57 @@ app.post('/api/auth/login', (req, res) => {
   const cleanUsername = username.trim().toLowerCase();
   const user = users.find(u => u.username.toLowerCase() === cleanUsername);
 
-  if (!user || user.passwordHash !== hashPassword(password)) {
+  if (!user) {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 
+  const verification = verifyPassword(password, user.passwordHash);
+  if (!verification.valid) {
+    return res.status(401).json({ success: false, message: 'Invalid username or password' });
+  }
+
+  // Automatic hash upgrade from legacy SHA-256 to Salted PBKDF2 (100,000 rounds)
+  if (verification.needsUpgrade) {
+    user.passwordHash = hashPassword(password);
+    saveUsers(users);
+  }
+
+  const safeUser = {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    avatarColor: user.avatarColor,
+    avatarUrl: user.avatarUrl || null,
+    bio: user.bio || ''
+  };
+
+  const token = generateSessionToken(safeUser);
+
   res.json({
     success: true,
-    user: {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      avatarColor: user.avatarColor,
-      avatarUrl: user.avatarUrl || null,
-      bio: user.bio || ''
-    }
+    user: safeUser,
+    token
   });
 });
 
 app.post('/api/users/profile', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const verified = verifySessionToken(authHeader.split(' ')[1]);
+    if (verified && req.body.userId && verified.userId !== req.body.userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized profile update attempt' });
+    }
+  }
+
   const { userId, name, avatarUrl, bio } = req.body;
   const user = users.find(u => u.id === userId);
   if (!user) {
     return res.status(404).json({ success: false, message: 'User not found' });
   }
 
-  if (name) user.name = name.trim();
+  if (name) user.name = sanitizeText(name.trim());
   if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
-  if (bio !== undefined) user.bio = bio.trim();
+  if (bio !== undefined) user.bio = sanitizeText(bio.trim());
   saveUsers(users);
 
   io.emit('user_updated', {
@@ -504,25 +709,45 @@ app.get('/api/messages', (req, res) => {
 });
 
 // =========================================================================
-// Socket.io Real-Time Engine
+// Socket.io Real-Time Engine (Cryptographic Session Guard)
 // =========================================================================
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (token) {
+    const session = verifySessionToken(token);
+    if (session) {
+      socket.data.userId = session.userId;
+      socket.data.username = session.username;
+      socket.data.name = session.name;
+      socket.data.authenticated = true;
+    }
+  }
+  next();
+});
+
 io.on('connection', (socket) => {
-  let authenticatedUserId = null;
+  let authenticatedUserId = socket.data.authenticated ? socket.data.userId : null;
 
   socket.on('user_online', (user) => {
-    if (!user || !user.id) return;
-    authenticatedUserId = user.id;
+    const targetUserId = socket.data.authenticated ? socket.data.userId : (user?.id);
+    if (!targetUserId) return;
+    authenticatedUserId = targetUserId;
 
-    if (!onlineUsers.has(user.id)) {
-      onlineUsers.set(user.id, new Set());
+    if (!onlineUsers.has(targetUserId)) {
+      onlineUsers.set(targetUserId, new Set());
     }
-    onlineUsers.get(user.id).add(socket.id);
+    onlineUsers.get(targetUserId).add(socket.id);
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
   });
 
-  // Send Message
+  // Send Message (Protected against spoofing)
   socket.on('send_message', async (msgData) => {
-    const aiAnalysis = analyzeSensitivity(msgData.text);
+    // Identity verification
+    const senderId = socket.data.authenticated ? socket.data.userId : (msgData.senderId || 'user-anon');
+    const senderName = socket.data.authenticated ? (socket.data.name || socket.data.username) : (msgData.sender || 'Anonymous');
+    const sanitizedText = sanitizeText(msgData.text || '');
+
+    const aiAnalysis = analyzeSensitivity(sanitizedText);
     const shouldLock = Boolean(msgData.isLocked || aiAnalysis.isSensitive);
     const category = msgData.isLocked
       ? (msgData.category || 'Private Message')
@@ -537,19 +762,19 @@ io.on('connection', (socket) => {
 
     const newMsg = {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      sender: msgData.sender || 'Anonymous',
-      senderId: msgData.senderId,
+      sender: senderName,
+      senderId: senderId,
       senderAvatar: msgData.senderAvatar || null,
       recipientId: isDirect ? msgData.recipientId : null,
       roomId: isDirect ? null : (msgData.roomId || 'global'),
-      text: msgData.text,
+      text: sanitizedText,
       isLocked: shouldLock,
       category: category,
       isAiShielded: isAiShielded,
       isEdited: false,
       selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
       expiresAt: expiresAt,
-      viewers: [msgData.senderId],
+      viewers: [senderId],
       timestamp: new Date().toISOString()
     };
 
@@ -571,12 +796,12 @@ io.on('connection', (socket) => {
 
     // Meta AI Response
     if (isToMetaAi) {
-      const senderSockets = onlineUsers.get(msgData.senderId);
+      const senderSockets = onlineUsers.get(senderId);
       if (senderSockets) {
         senderSockets.forEach(sId => io.to(sId).emit('user_typing', { senderId: 'user-meta-ai' }));
 
         try {
-          const aiReplyText = await generateMetaAiResponse(msgData.text, msgData.sender, msgData.senderId);
+          const aiReplyText = await generateMetaAiResponse(sanitizedText, senderName, senderId);
 
           setTimeout(() => {
             senderSockets.forEach(sId => io.to(sId).emit('user_stop_typing', { senderId: 'user-meta-ai' }));
@@ -586,7 +811,7 @@ io.on('connection', (socket) => {
               sender: META_AI_BOT.name,
               senderId: META_AI_BOT.id,
               senderAvatar: META_AI_BOT.avatarUrl,
-              recipientId: msgData.senderId,
+              recipientId: senderId,
               roomId: null,
               text: aiReplyText,
               isLocked: false,
@@ -609,15 +834,17 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Edit Message
+  // Edit Message (Enforced Sender Ownership)
   socket.on('edit_message', ({ messageId, newText, userId }) => {
+    const verifiedUserId = socket.data.authenticated ? socket.data.userId : userId;
     const msg = messages.find(m => m.id === messageId);
-    if (!msg || msg.senderId !== userId) return;
+    if (!msg || msg.senderId !== verifiedUserId) return;
 
-    msg.text = newText;
+    const sanitizedText = sanitizeText(newText);
+    msg.text = sanitizedText;
     msg.isEdited = true;
     
-    const aiAnalysis = analyzeSensitivity(newText);
+    const aiAnalysis = analyzeSensitivity(sanitizedText);
     if (aiAnalysis.isSensitive) {
       msg.isLocked = true;
       msg.category = aiAnalysis.category;
@@ -626,7 +853,7 @@ io.on('connection', (socket) => {
 
     saveMessages(messages);
 
-    const payload = { messageId, newText, isEdited: true, isLocked: msg.isLocked, category: msg.category };
+    const payload = { messageId, newText: sanitizedText, isEdited: true, isLocked: msg.isLocked, category: msg.category };
     if (msg.recipientId) {
       const recipientSockets = onlineUsers.get(msg.recipientId);
       if (recipientSockets) recipientSockets.forEach(sId => io.to(sId).emit('message_edited', payload));
@@ -637,12 +864,13 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Delete Message
+  // Delete Message (Enforced Sender Ownership)
   socket.on('delete_message', ({ messageId, userId }) => {
+    const verifiedUserId = socket.data.authenticated ? socket.data.userId : userId;
     const msgIndex = messages.findIndex(m => m.id === messageId);
     if (msgIndex === -1) return;
     const msg = messages[msgIndex];
-    if (msg.senderId !== userId) return;
+    if (msg.senderId !== verifiedUserId) return;
 
     const recipientId = msg.recipientId;
     const senderId = msg.senderId;

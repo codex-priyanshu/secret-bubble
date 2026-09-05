@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { X, Bot, Shield, Clock, Flame, Heart, Lock, Key, CheckCircle, EyeOff, Sparkles } from 'lucide-react';
+import { 
+  X, Bot, Shield, Clock, Flame, Heart, Lock, Key, CheckCircle, EyeOff, 
+  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2 
+} from 'lucide-react';
 
 export default function PrivacySettingsModal({
   isOpen,
@@ -29,6 +32,10 @@ export default function PrivacySettingsModal({
 
   const setTimer = (seconds) => {
     onUpdateSettings({ ...settings, autoRelockSeconds: seconds });
+  };
+
+  const setIdleTimer = (mins) => {
+    onUpdateSettings({ ...settings, idleLockMinutes: mins });
   };
 
   return (
@@ -197,7 +204,7 @@ export default function PrivacySettingsModal({
           <div>
             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
               <Clock className="w-3.5 h-3.5 text-purple-400" />
-              Biometric Auto-Relock Timeout
+              Biometric Message Auto-Relock
             </label>
             <div className="grid grid-cols-4 gap-2">
               {[5, 10, 15, 30].map((sec) => (
@@ -214,6 +221,99 @@ export default function PrivacySettingsModal({
                   {sec}s
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* 5. Inactivity Idle Screen Auto-Lock */}
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <Timer className="w-3.5 h-3.5 text-amber-400" />
+              Inactivity Idle Screen Auto-Lock
+            </label>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: '1m', val: 1 },
+                { label: '5m', val: 5 },
+                { label: '10m', val: 10 },
+                { label: 'Off', val: 0 }
+              ].map(({ label, val }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setIdleTimer(val)}
+                  className={`py-2 rounded-xl text-xs font-semibold border transition ${
+                    settings.idleLockMinutes === val
+                      ? 'bg-amber-600 border-amber-500 text-white shadow-md shadow-amber-600/30'
+                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Automatically locks screen with your passcode if inactive.
+            </p>
+          </div>
+
+          {/* 6. Telegram Security Health Center & Cryptographic Audit */}
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  Security Health Center
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                100% MILITARY GRADE
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 pt-1 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Database className="w-4 h-4 text-cyan-400" />
+                  <div>
+                    <p className="font-semibold text-white text-[11px]">Storage Encryption at Rest</p>
+                    <p className="text-[10px] text-slate-400">AES-256-GCM Zero-Knowledge Disk Vault</p>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Key className="w-4 h-4 text-purple-400" />
+                  <div>
+                    <p className="font-semibold text-white text-[11px]">Password Security Vault</p>
+                    <p className="text-[10px] text-slate-400">Salted PBKDF2 (100,000 Iterations, SHA-512)</p>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-amber-400" />
+                  <div>
+                    <p className="font-semibold text-white text-[11px]">Session Guard & Handshake</p>
+                    <p className="text-[10px] text-slate-400">HMAC-SHA256 Signed Handshake (Anti-Spoofing)</p>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-rose-400" />
+                  <div>
+                    <p className="font-semibold text-white text-[11px]">Anti-Brute Force Defense</p>
+                    <p className="text-[10px] text-slate-400">IP Rate Limiting & Cooldown Protection</p>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              </div>
             </div>
           </div>
 

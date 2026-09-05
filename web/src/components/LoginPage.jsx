@@ -66,8 +66,11 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
         throw new Error(data.message || 'Authentication failed');
       }
 
+      if (data.token) {
+        localStorage.setItem('secure_chat_token', data.token);
+      }
       localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
-      onLoginSuccess(data.user);
+      onLoginSuccess(data.user, data.token);
     } catch (err) {
       setError(err.message || 'Server connection error. Please ensure the backend is active.');
     } finally {
