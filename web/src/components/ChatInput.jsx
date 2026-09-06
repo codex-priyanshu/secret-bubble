@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Lock, Unlock, Bot, Flame, Smile, Mic, Paperclip, X } from 'lucide-react';
+import { Send, Lock, Unlock, Bot, Flame, Smile, Mic, Paperclip, X, KeyRound, Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react';
 import { analyzeMessageSensitivity } from '../utils/aiPrivacyDetector';
 
 const DEFAULT_CATEGORIES = [
@@ -29,6 +29,10 @@ export default function ChatInput({
   const [text, setText] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('Adult & Physical Intimacy 🔞');
+  const [enablePasscodeLock, setEnablePasscodeLock] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [passcodeHint, setPasscodeHint] = useState('');
+  const [showPasscodeText, setShowPasscodeText] = useState(false);
   const [selfDestructSecs, setSelfDestructSecs] = useState(0);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showEmojiBar, setShowEmojiBar] = useState(false);
@@ -83,16 +87,27 @@ export default function ChatInput({
       }
     }
 
+    const hasCustomPasscode = enablePasscodeLock && passcode.trim().length > 0;
+    if (hasCustomPasscode) {
+      finalLocked = true;
+    }
+
     onSendMessage({
       text: text.trim(),
       isLocked: finalLocked,
       category: finalLocked ? finalCategory : 'General',
       isAiShielded: autoShielded || aiDetection.isSensitive,
-      selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null
+      selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
+      passcode: hasCustomPasscode ? passcode.trim() : null,
+      passcodeHint: hasCustomPasscode && passcodeHint.trim() ? passcodeHint.trim() : null
     });
 
     setText('');
     setIsLocked(false);
+    setEnablePasscodeLock(false);
+    setPasscode('');
+    setPasscodeHint('');
+    setShowPasscodeText(false);
     setAiDetection({ isSensitive: false });
   };
 
@@ -138,27 +153,89 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Category selector when Lock is Active */}
+      {/* Lock Options & Custom Secret Passcode Panel */}
       {isLocked && (
-        <div className="flex items-center gap-2 mb-2.5 overflow-x-auto pb-1 animate-in slide-in-from-bottom-2 duration-200">
-          <span className="text-xs text-purple-400 font-semibold flex items-center gap-1 shrink-0">
-            <Lock className="w-3 h-3" />
-            Lock Tag:
-          </span>
-          {DEFAULT_CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition shrink-0 ${
-                selectedCategory === cat.id
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+        <div className="p-2.5 mb-2.5 bg-slate-950/80 border border-purple-500/30 rounded-2xl space-y-2 animate-in slide-in-from-bottom-2 duration-200 shadow-lg">
+          
+          {/* Category Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+            <span className="text-xs text-purple-400 font-semibold flex items-center gap-1 shrink-0">
+              <Lock className="w-3 h-3" />
+              Tag:
+            </span>
+            {DEFAULT_CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition shrink-0 ${
+                  selectedCategory === cat.id
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                    : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Secret Password Toggle */}
+          <div className="pt-1.5 border-t border-slate-800/80">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setEnablePasscodeLock(!enablePasscodeLock)}
+                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-xl transition ${
+                  enablePasscodeLock
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Set Secret Password on Message</span>
+                {enablePasscodeLock && <span className="text-[10px] bg-amber-500 text-slate-950 font-bold px-1.5 py-0.2 rounded-md">ACTIVE</span>}
+              </button>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">
+                {enablePasscodeLock ? 'Only readers with password can unlock' : 'Default: Device biometric lock'}
+              </span>
+            </div>
+
+            {/* Password Input Fields */}
+            {enablePasscodeLock && (
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 animate-in fade-in zoom-in-95 duration-150">
+                <div className="relative flex items-center">
+                  <KeyRound className="w-3.5 h-3.5 text-amber-400 absolute left-2.5 pointer-events-none" />
+                  <input
+                    type={showPasscodeText ? "text" : "password"}
+                    value={passcode}
+                    onChange={(e) => setPasscode(e.target.value)}
+                    placeholder="Enter password (e.g. 1234 or love77)..."
+                    className="w-full pl-8 pr-8 py-1.5 bg-slate-900 border border-amber-500/40 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasscodeText(!showPasscodeText)}
+                    className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5"
+                    title={showPasscodeText ? "Hide password" : "Show password"}
+                  >
+                    {showPasscodeText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={passcodeHint}
+                    onChange={(e) => setPasscodeHint(e.target.value)}
+                    placeholder="Password hint (optional, e.g. College name)..."
+                    className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 focus:border-purple-500 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 

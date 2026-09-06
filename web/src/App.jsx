@@ -64,6 +64,7 @@ export default function App() {
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [unlockedPasscodeTexts, setUnlockedPasscodeTexts] = useState({});
 
   const selectedTargetRef = useRef(selectedTarget);
   useEffect(() => {
@@ -478,12 +479,42 @@ export default function App() {
     });
   };
 
+  const handleUnlockPasscodeMessage = useCallback(async (messageId, passcode) => {
+    try {
+      const res = await fetch(`${backendUrl}/api/messages/unlock-passcode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId, passcode })
+      });
+      const data = await res.json();
+      if (data.success && data.text) {
+        setUnlockedPasscodeTexts(prev => ({
+          ...prev,
+          [messageId]: data.text
+        }));
+        return { success: true, text: data.text };
+      }
+      return { success: false, message: data.message || 'Incorrect passcode' };
+    } catch (err) {
+      return { success: false, message: 'Server connection error' };
+    }
+  }, [backendUrl]);
+
+  const handleRelockPasscodeMessage = useCallback((messageId) => {
+    setUnlockedPasscodeTexts(prev => {
+      const next = { ...prev };
+      delete next[messageId];
+      return next;
+    });
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('secure_chat_user');
     localStorage.removeItem('secure_chat_token');
     setAuthToken(null);
     setCurrentUser(null);
     setMessages([]);
+    setUnlockedPasscodeTexts({});
     if (socket) socket.disconnect();
   };
 
@@ -607,6 +638,9 @@ export default function App() {
                   onRelockClick={relockMessage}
                   onEditMessage={handleEditMessage}
                   onDeleteMessage={handleDeleteMessage}
+                  unlockedPasscodeTexts={unlockedPasscodeTexts}
+                  onUnlockPasscode={handleUnlockPasscodeMessage}
+                  onRelockPasscode={handleRelockPasscodeMessage}
                 />
               ))
             )}

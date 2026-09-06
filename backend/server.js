@@ -774,7 +774,41 @@ app.get('/api/messages', (req, res) => {
     );
   }
 
-  res.json({ success: true, messages: filtered });
+  // Mask passcode-protected messages for non-senders
+  const safeMessages = filtered.map(m => {
+    if (m.hasPasscode && m.senderId !== userId) {
+      return {
+        ...m,
+        text: '[🔒 Passcode Protected Secret Message]'
+      };
+    }
+    return m;
+  });
+
+  res.json({ success: true, messages: safeMessages });
+});
+
+app.post('/api/messages/unlock-passcode', (req, res) => {
+  const { messageId, passcode } = req.body;
+  if (!messageId || !passcode) {
+    return res.status(400).json({ success: false, message: 'Message ID and passcode required' });
+  }
+
+  const msg = messages.find(m => m.id === messageId);
+  if (!msg) {
+    return res.status(404).json({ success: false, message: 'Message not found or expired' });
+  }
+
+  if (!msg.hasPasscode || !msg.passcodeHash) {
+    return res.json({ success: true, text: msg.text });
+  }
+
+  const inputHash = crypto.createHash('sha256').update(passcode.trim()).digest('hex');
+  if (inputHash === msg.passcodeHash) {
+    return res.json({ success: true, text: msg.text });
+  } else {
+    return res.status(401).json({ success: false, message: 'Incorrect passcode. Access denied.' });
+  }
 });
 
 // =========================================================================
@@ -886,10 +920,20 @@ io.on('connection', (socket) => {
     const senderName = socket.data.authenticated ? (socket.data.name || socket.data.username) : (msgData.sender || 'Anonymous');
     const sanitizedText = sanitizeText(msgData.text || '');
 
+    const passcode = (msgData.passcode || '').trim();
+    const hasPasscode = Boolean(passcode.length > 0);
+    let passcodeHash = null;
+    let passcodeHint = null;
+
+    if (hasPasscode) {
+      passcodeHash = crypto.createHash('sha256').update(passcode).digest('hex');
+      passcodeHint = sanitizeText(msgData.passcodeHint ? msgData.passcodeHint.trim() : '');
+    }
+
     const aiAnalysis = analyzeSensitivity(sanitizedText);
-    const shouldLock = Boolean(msgData.isLocked || aiAnalysis.isSensitive);
-    const category = msgData.isLocked
-      ? (msgData.category || 'Private Message')
+    const shouldLock = Boolean(msgData.isLocked || hasPasscode || aiAnalysis.isSensitive);
+    const category = (msgData.isLocked || hasPasscode)
+      ? (msgData.category || (hasPasscode ? 'Secret 🔒' : 'Private Message'))
       : (aiAnalysis.isSensitive ? aiAnalysis.category : 'General');
     const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
 
@@ -909,6 +953,9 @@ io.on('connection', (socket) => {
       text: sanitizedText,
       isLocked: shouldLock,
       category: category,
+      hasPasscode: hasPasscode,
+      passcodeHash: passcodeHash,
+      passcodeHint: passcodeHint,
       isAiShielded: isAiShielded,
       isEdited: false,
       selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
@@ -920,18 +967,62 @@ io.on('connection', (socket) => {
     messages.push(newMsg);
     saveMessages(messages);
 
-    if (newMsg.recipientId) {
-      const recipientSockets = onlineUsers.get(newMsg.recipientId);
-      if (recipientSockets) {
-        recipientSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
-      }
-      const senderSockets = onlineUsers.get(newMsg.senderId);
-      if (senderSockets) {
-        senderSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
+    if (newMsg.hasPasscode) {
+      const maskedMsg = {
+        ...newMsg,
+        text: '[🔒 Passcode Protected Secret Message]'
+      };
+
+      if (newMsg.recipientId) {
+        const recipientSockets = onlineUsers.get(newMsg.recipientId);
+        if (recipientSockets) {
+          recipientSockets.forEach(sId => io.to(sId).emit('new_message', maskedMsg));
+        }
+        const senderSockets = onlineUsers.get(newMsg.senderId);
+        if (senderSockets) {
+          senderSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
+        }
+      } else {
+        const senderSockets = onlineUsers.get(newMsg.senderId) || new Set();
+        io.sockets.sockets.forEach((s) => {
+          if (senderSockets.has(s.id)) {
+            s.emit('new_message', newMsg);
+          } else {
+            s.emit('new_message', maskedMsg);
+          }
+        });
       }
     } else {
-      io.emit('new_message', newMsg);
+      if (newMsg.recipientId) {
+        const recipientSockets = onlineUsers.get(newMsg.recipientId);
+        if (recipientSockets) {
+          recipientSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
+        }
+        const senderSockets = onlineUsers.get(newMsg.senderId);
+        if (senderSockets) {
+          senderSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
+        }
+      } else {
+        io.emit('new_message', newMsg);
+      }
     }
+
+  // Socket Unlock Passcode verification
+  socket.on('unlock_passcode', ({ messageId, passcode }, callback) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) {
+      return callback && callback({ success: false, message: 'Message not found or expired' });
+    }
+    if (!msg.hasPasscode || !msg.passcodeHash) {
+      return callback && callback({ success: true, text: msg.text });
+    }
+    const inputHash = crypto.createHash('sha256').update((passcode || '').trim()).digest('hex');
+    if (inputHash === msg.passcodeHash) {
+      return callback && callback({ success: true, text: msg.text });
+    } else {
+      return callback && callback({ success: false, message: 'Incorrect passcode. Access denied.' });
+    }
+  });
 
     // Meta AI Response
     if (isToMetaAi) {
