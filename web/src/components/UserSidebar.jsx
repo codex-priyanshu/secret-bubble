@@ -7,6 +7,7 @@ import {
 export default function UserSidebar({
   currentUser,
   users,
+  groups = [],
   selectedTarget,
   onSelectTarget,
   onLogout,
@@ -14,6 +15,7 @@ export default function UserSidebar({
   onOpenSettings,
   onLockApp,
   onOpenAiTraining,
+  onOpenCreateGroup,
   unreadCounts = {}
 }) {
   const [search, setSearch] = useState('');
@@ -27,6 +29,12 @@ export default function UserSidebar({
   const filteredUsers = realUsers.filter(u => 
     u.name.toLowerCase().includes(search.toLowerCase()) || 
     u.username.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const customGroups = groups.filter(g => g.id !== 'global');
+  const filteredGroups = customGroups.filter(g => 
+    g.name?.toLowerCase().includes(search.toLowerCase()) || 
+    g.description?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -60,6 +68,14 @@ export default function UserSidebar({
                     <p className="text-[10px] text-slate-400 font-mono">@{currentUser.username}</p>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => { setIsMenuOpen(false); onOpenCreateGroup && onOpenCreateGroup(); }}
+                  className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-slate-300 hover:text-white flex items-center gap-2.5 transition"
+                >
+                  <Plus className="w-4 h-4 text-purple-400" />
+                  <span className="font-semibold text-purple-300">Create New Group</span>
+                </button>
 
                 <button
                   onClick={() => { setIsMenuOpen(false); onOpenProfile(); }}
@@ -152,14 +168,15 @@ export default function UserSidebar({
           Direct ({realUsers.length})
         </button>
         <button
-          onClick={() => setActiveFilter('channels')}
-          className={`px-3 py-1 rounded-full transition shrink-0 ${
-            activeFilter === 'channels'
+          onClick={() => setActiveFilter('groups')}
+          className={`px-3 py-1 rounded-full transition shrink-0 flex items-center gap-1 ${
+            activeFilter === 'groups'
               ? 'bg-purple-600 text-white shadow-sm'
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
           }`}
         >
-          Public Channel
+          <span>Groups</span>
+          <span className="text-[10px] opacity-80">({groups.length || 1})</span>
         </button>
         <button
           onClick={() => setActiveFilter('bots')}
@@ -176,9 +193,20 @@ export default function UserSidebar({
       {/* Chat List Feed */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         
-        {/* PINNED SECTION */}
-        {(activeFilter === 'all' || activeFilter === 'channels') && (
+        {/* GROUPS / CHANNELS SECTION */}
+        {(activeFilter === 'all' || activeFilter === 'groups') && (
           <>
+            {/* Direct Create Group Button */}
+            {activeFilter === 'groups' && (
+              <button
+                onClick={onOpenCreateGroup}
+                className="w-full py-2.5 px-3 mb-2 rounded-2xl bg-gradient-to-r from-purple-600/30 to-indigo-600/30 hover:from-purple-600/40 hover:to-indigo-600/40 border border-purple-500/50 text-purple-200 text-xs font-bold flex items-center justify-center gap-2 shadow-md transition"
+              >
+                <Plus className="w-4 h-4 text-purple-400" />
+                <span>Create New Group</span>
+              </button>
+            )}
+
             {/* 1. Global Public Chat Channel (Pinned Top) */}
             <button
               onClick={() => onSelectTarget({ type: 'room', id: 'global', name: '🌍 Global Public Chat' })}
@@ -207,6 +235,50 @@ export default function UserSidebar({
                 <span className="text-[10px] text-slate-500 mt-1 font-mono">Live</span>
               </div>
             </button>
+
+            {/* Custom User Groups List */}
+            {filteredGroups.map((group) => {
+              const isSelected = selectedTarget?.type === 'room' && selectedTarget?.id === group.id;
+              return (
+                <button
+                  key={group.id}
+                  onClick={() => onSelectTarget({ type: 'room', id: group.id, name: group.name, isGroup: true, ...group })}
+                  className={`w-full p-2.5 rounded-2xl flex items-center justify-between transition group relative ${
+                    isSelected
+                      ? 'bg-purple-600/20 border border-purple-500/60 text-purple-100 shadow-md'
+                      : 'hover:bg-slate-800/60 text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${group.avatarColor || 'from-purple-600 to-indigo-500'} flex items-center justify-center text-white shadow-md shrink-0`}>
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-bold text-white truncate">{group.name}</p>
+                        {group.isPrivate ? (
+                          <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-400 text-[9px] font-bold flex items-center gap-0.5 shrink-0">
+                            <Lock className="w-2.5 h-2.5" /> Private
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-400 text-[9px] font-bold shrink-0">
+                            Group
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {group.description || `${group.memberCount || 1} members`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end shrink-0 ml-2">
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {group.memberCount || 1} {group.memberCount === 1 ? 'member' : 'members'}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </>
         )}
 

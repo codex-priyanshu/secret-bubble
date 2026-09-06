@@ -11,6 +11,7 @@ import UserSidebar from './components/UserSidebar';
 import LoginPage from './components/LoginPage';
 import AppLockModal from './components/AppLockModal';
 import AiTrainingModal from './components/AiTrainingModal';
+import CreateGroupModal from './components/CreateGroupModal';
 import { useBiometrics } from './hooks/useBiometrics';
 
 const getBackendUrl = () => {
@@ -49,6 +50,7 @@ export default function App() {
   });
 
   const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [selectedTarget, setSelectedTarget] = useState({ type: 'room', id: 'global', name: '🌍 Global Public Chat' });
   const [messages, setMessages] = useState([]);
   const [socket, setSocket] = useState(null);
@@ -56,6 +58,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAiTrainingOpen, setIsAiTrainingOpen] = useState(false);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
@@ -191,6 +194,18 @@ export default function App() {
     }
   }, [backendUrl]);
 
+  // Fetch Groups List
+  const fetchGroups = useCallback(async () => {
+    if (!currentUserRef.current) return;
+    try {
+      const res = await fetch(`${backendUrl}/api/groups?userId=${currentUserRef.current.id}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.groups)) {
+        setGroups(data.groups);
+      }
+    } catch (e) {}
+  }, [backendUrl]);
+
   // Fetch Messages for current selected target
   const fetchMessages = useCallback(async () => {
     if (!currentUserRef.current) return;
@@ -223,9 +238,10 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       fetchUsers();
+      fetchGroups();
       fetchMessages();
     }
-  }, [currentUser, selectedTarget, fetchUsers, fetchMessages]);
+  }, [currentUser, selectedTarget, fetchUsers, fetchGroups, fetchMessages]);
 
   // Socket.io Connection Setup with Cryptographic Token
   useEffect(() => {
@@ -243,6 +259,7 @@ export default function App() {
       setConnectionStatus('connected');
       s.emit('user_online', currentUser);
       fetchUsers();
+      fetchGroups();
     });
 
     s.on('online_users_update', (onlineIds) => {
@@ -254,6 +271,13 @@ export default function App() {
 
     s.on('user_updated', () => {
       fetchUsers();
+    });
+
+    s.on('group_created', (newGroup) => {
+      setGroups(prev => {
+        if (prev.some(g => g.id === newGroup.id)) return prev;
+        return [newGroup, ...prev];
+      });
     });
 
     s.on('new_message', (msg) => {
@@ -430,6 +454,17 @@ export default function App() {
     }
   };
 
+  const handleGroupCreated = (newGroup) => {
+    setGroups(prev => [newGroup, ...prev.filter(g => g.id !== newGroup.id)]);
+    handleSelectTarget({
+      type: 'room',
+      id: newGroup.id,
+      name: newGroup.name,
+      isGroup: true,
+      ...newGroup
+    });
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('secure_chat_user');
     localStorage.removeItem('secure_chat_token');
@@ -485,12 +520,14 @@ export default function App() {
           <UserSidebar
             currentUser={currentUser}
             users={users}
+            groups={groups}
             selectedTarget={selectedTarget}
             onSelectTarget={handleSelectTarget}
             onLogout={handleLogout}
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
+            onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             unreadCounts={unreadCounts}
           />
@@ -615,6 +652,16 @@ export default function App() {
         onClose={() => setIsAiTrainingOpen(false)}
         backendUrl={backendUrl}
         currentUser={currentUser}
+      />
+
+      {/* Create New Telegram Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        currentUser={currentUser}
+        users={users}
+        backendUrl={backendUrl}
+        onGroupCreated={handleGroupCreated}
       />
 
     </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain } from 'lucide-react';
+import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users } from 'lucide-react';
 
 export default function ChatHeader({
   target,
@@ -29,7 +29,11 @@ export default function ChatHeader({
         </button>
 
         <div className="relative shrink-0">
-          {target?.type === 'room' ? (
+          {target?.isGroup ? (
+            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${target.avatarColor || 'from-purple-600 to-indigo-600'} flex items-center justify-center text-white shadow-md shadow-purple-600/20`}>
+              <Users className="w-5 h-5" />
+            </div>
+          ) : target?.type === 'room' ? (
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-cyan-600/20">
               <Globe className="w-5 h-5" />
             </div>
@@ -63,6 +67,12 @@ export default function ChatHeader({
               <span className="px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-400 text-[9px] font-bold shrink-0">
                 AI BOT
               </span>
+            ) : target?.isGroup ? (
+              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold shrink-0 ${
+                target.isPrivate ? 'bg-amber-500/20 text-amber-400' : 'bg-purple-500/20 text-purple-300'
+              }`}>
+                {target.isPrivate ? 'PRIVATE' : 'GROUP'}
+              </span>
             ) : target?.type === 'room' ? (
               <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-400 text-[9px] font-bold shrink-0">
                 PUBLIC
@@ -81,6 +91,10 @@ export default function ChatHeader({
               </span>
             ) : isMetaAi ? (
               <span className="text-cyan-300 font-medium">Meta AI Intelligence Engine • 24/7 Active</span>
+            ) : target?.isGroup ? (
+              <span className="text-slate-300 truncate">
+                👥 {target.memberCount || target.members?.length || 1} members • {target.description || 'Community Group Chat'}
+              </span>
             ) : target?.type === 'room' ? (
               <span className="text-slate-400">Public Channel • All members can view</span>
             ) : (

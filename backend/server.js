@@ -89,6 +89,7 @@ const io = new Server(server, {
 const DB_MESSAGES_FILE = path.join(__dirname, 'messages.json');
 const DB_USERS_FILE = path.join(__dirname, 'users.json');
 const DB_AI_TRAINING_FILE = path.join(__dirname, 'ai_training_data.json');
+const DB_GROUPS_FILE = path.join(__dirname, 'groups.json');
 
 // Meta AI Assistant Bot Profile
 const META_AI_BOT = {
@@ -317,6 +318,38 @@ function saveMessages(msgs) {
 
 let messages = loadMessages();
 const onlineUsers = new Map();
+
+// =========================================================================
+// Group Channels Storage & Management
+// =========================================================================
+const DEFAULT_GLOBAL_GROUP = {
+  id: 'global',
+  name: '🌍 Global Public Chat',
+  description: 'Public channel for all Secret-Bubble members',
+  isPrivate: false,
+  avatarColor: 'from-cyan-600 via-blue-600 to-indigo-600',
+  createdBy: 'system',
+  memberIds: [],
+  createdAt: '2026-08-01T00:00:00.000Z'
+};
+
+function loadGroups() {
+  try {
+    if (fs.existsSync(DB_GROUPS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DB_GROUPS_FILE, 'utf8'));
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {}
+  return [DEFAULT_GLOBAL_GROUP];
+}
+
+function saveGroups(groupsList) {
+  try {
+    fs.writeFileSync(DB_GROUPS_FILE, JSON.stringify(groupsList, null, 2), 'utf8');
+  } catch (err) {}
+}
+
+let groups = loadGroups();
 
 // Periodic cleanup of expired disappearing messages
 setInterval(() => {
@@ -706,6 +739,76 @@ app.get('/api/messages', (req, res) => {
   }
 
   res.json({ success: true, messages: filtered });
+});
+
+// =========================================================================
+// Custom Group Endpoints (Public & Private Channels)
+// =========================================================================
+const groupCreateLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 15, keyPrefix: 'group-create' });
+
+app.get('/api/groups', (req, res) => {
+  const { userId } = req.query;
+  const accessibleGroups = groups.filter(g => {
+    if (!g.isPrivate) return true; // Public groups are open
+    if (!userId) return false;
+    return Array.isArray(g.memberIds) && g.memberIds.includes(userId);
+  }).map(g => ({
+    ...g,
+    memberCount: (g.id === 'global') ? (users.length + 1) : (g.memberIds?.length || 1)
+  }));
+
+  res.json({ success: true, groups: accessibleGroups });
+});
+
+app.post('/api/groups/create', groupCreateLimiter, (req, res) => {
+  const { name, description, isPrivate, memberIds, avatarColor, createdBy } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ success: false, message: 'Group name is required' });
+  }
+
+  const cleanName = sanitizeText(name.trim());
+  const cleanDesc = sanitizeText((description || '').trim());
+
+  const colors = [
+    'from-purple-600 via-indigo-600 to-cyan-500',
+    'from-emerald-600 via-teal-600 to-cyan-500',
+    'from-rose-600 via-pink-600 to-amber-500',
+    'from-amber-600 via-orange-600 to-rose-500',
+    'from-blue-600 via-indigo-600 to-purple-600'
+  ];
+  const chosenColor = avatarColor || colors[Math.floor(Math.random() * colors.length)];
+
+  const initialMembers = Array.isArray(memberIds) ? [...new Set(memberIds)] : [];
+  if (createdBy && !initialMembers.includes(createdBy)) {
+    initialMembers.push(createdBy);
+  }
+
+  const newGroup = {
+    id: 'group-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+    name: cleanName,
+    description: cleanDesc || 'A private secure bubble group',
+    isPrivate: Boolean(isPrivate),
+    avatarColor: chosenColor,
+    createdBy: createdBy || 'anonymous',
+    memberIds: initialMembers,
+    createdAt: new Date().toISOString()
+  };
+
+  groups.unshift(newGroup);
+  saveGroups(groups);
+
+  const groupResponse = {
+    ...newGroup,
+    memberCount: initialMembers.length
+  };
+
+  io.emit('group_created', groupResponse);
+
+  res.json({
+    success: true,
+    message: 'Group created successfully!',
+    group: groupResponse
+  });
 });
 
 // =========================================================================
