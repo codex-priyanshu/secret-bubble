@@ -759,6 +759,27 @@ app.get('/api/users', (req, res) => {
   res.json({ success: true, users: allUsersWithBot });
 });
 
+app.get('/api/users/search', (req, res) => {
+  const q = (req.query.q || '').trim().toLowerCase().replace(/^@+/, '');
+  users = loadUsers();
+  if (!q) {
+    return res.json({ success: true, users: [] });
+  }
+  const matched = users.filter(u => 
+    (u.username || '').toLowerCase().replace(/^@+/, '').includes(q) ||
+    (u.name || '').toLowerCase().includes(q)
+  ).map(u => ({
+    id: u.id,
+    username: u.username,
+    name: u.name,
+    avatarColor: u.avatarColor,
+    avatarUrl: u.avatarUrl || null,
+    bio: u.bio || '',
+    isOnline: onlineUsers.has(u.id) && onlineUsers.get(u.id).size > 0
+  }));
+  res.json({ success: true, users: matched });
+});
+
 app.get('/api/messages', (req, res) => {
   const { userId, targetId, roomId } = req.query;
   let filtered = [];

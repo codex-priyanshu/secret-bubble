@@ -158,7 +158,7 @@ export default function ChatInput({
         <div className="p-2.5 mb-2.5 bg-slate-950/80 border border-purple-500/30 rounded-2xl space-y-2 animate-in slide-in-from-bottom-2 duration-200 shadow-lg">
           
           {/* Category Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <span className="text-xs text-purple-400 font-semibold flex items-center gap-1 shrink-0">
               <Lock className="w-3 h-3" />
               Tag:

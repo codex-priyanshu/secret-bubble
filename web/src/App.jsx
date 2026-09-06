@@ -573,6 +573,7 @@ export default function App() {
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
+            onRefreshUsers={fetchUsers}
             unreadCounts={unreadCounts}
           />
         </div>
