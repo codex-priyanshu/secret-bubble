@@ -49,10 +49,11 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
     }
 
     setLoading(true);
+    const cleanUser = username.trim().toLowerCase().replace(/^@+/, '');
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
     const payload = isRegister
-      ? { username: username.trim(), name: name.trim() || username.trim(), password, avatarUrl: avatarUrl || null }
-      : { username: username.trim(), password };
+      ? { username: cleanUser, name: name.trim() || cleanUser, password, avatarUrl: avatarUrl || null }
+      : { username: cleanUser, password };
 
     try {
       const res = await fetch(`${backendUrl}${endpoint}`, {

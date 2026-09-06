@@ -263,10 +263,23 @@ export default function App() {
     });
 
     s.on('online_users_update', (onlineIds) => {
-      setUsers(prev => prev.map(u => ({
-        ...u,
-        isOnline: u.isBot ? true : onlineIds.includes(u.id)
-      })));
+      setUsers(prev => {
+        const hasMissingUser = Array.isArray(onlineIds) && onlineIds.some(id => id !== 'user-meta-ai' && !prev.some(u => u.id === id));
+        if (hasMissingUser) {
+          fetchUsers();
+        }
+        return prev.map(u => ({
+          ...u,
+          isOnline: u.isBot ? true : onlineIds.includes(u.id)
+        }));
+      });
+    });
+
+    s.on('user_registered', (newUser) => {
+      setUsers(prev => {
+        if (prev.some(u => u.id === newUser.id)) return prev;
+        return [...prev, newUser];
+      });
     });
 
     s.on('user_updated', () => {

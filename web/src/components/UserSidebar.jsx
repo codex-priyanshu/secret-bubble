@@ -26,16 +26,22 @@ export default function UserSidebar({
   const metaAiBot = users.find(u => u.id === 'user-meta-ai' || u.isBot);
   const realUsers = users.filter(u => u.id !== currentUser.id && u.id !== 'user-meta-ai' && !u.isBot);
 
-  const filteredUsers = realUsers.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) || 
-    u.username.toLowerCase().includes(search.toLowerCase())
-  );
+  const cleanSearch = search.trim().toLowerCase().replace(/^@+/, '');
+  const rawSearch = search.trim().toLowerCase();
+
+  const filteredUsers = realUsers.filter(u => {
+    if (!cleanSearch) return true;
+    const nameMatch = (u.name || '').toLowerCase().includes(rawSearch) || (u.name || '').toLowerCase().includes(cleanSearch);
+    const usernameMatch = (u.username || '').toLowerCase().replace(/^@+/, '').includes(cleanSearch);
+    return nameMatch || usernameMatch;
+  });
 
   const customGroups = groups.filter(g => g.id !== 'global');
-  const filteredGroups = customGroups.filter(g => 
-    g.name?.toLowerCase().includes(search.toLowerCase()) || 
-    g.description?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredGroups = customGroups.filter(g => {
+    if (!cleanSearch) return true;
+    return (g.name || '').toLowerCase().includes(cleanSearch) || 
+           (g.description || '').toLowerCase().includes(cleanSearch);
+  });
 
   return (
     <div className="w-full md:w-80 bg-slate-900 border-r border-slate-800/90 flex flex-col h-full select-none relative font-sans">

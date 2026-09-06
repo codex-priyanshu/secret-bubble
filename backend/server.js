@@ -187,19 +187,32 @@ function hashPassword(pass, existingSalt = null) {
 }
 
 function verifyPassword(inputPassword, storedHash) {
-  if (!storedHash) return { valid: false, needsUpgrade: false };
-  if (storedHash.includes(':')) {
-    const [salt, originalHash] = storedHash.split(':');
-    const computedHash = crypto.pbkdf2Sync(inputPassword, salt, 100000, 64, 'sha512').toString('hex');
-    const isValid = crypto.timingSafeEqual(Buffer.from(originalHash, 'hex'), Buffer.from(computedHash, 'hex'));
-    return { valid: isValid, needsUpgrade: false };
+  if (!storedHash || typeof inputPassword !== 'string') return { valid: false, needsUpgrade: false };
+  try {
+    if (storedHash.includes(':')) {
+      const [salt, originalHash] = storedHash.split(':');
+      if (!salt || !originalHash) return { valid: false, needsUpgrade: false };
+      const computedHash = crypto.pbkdf2Sync(inputPassword, salt, 100000, 64, 'sha512').toString('hex');
+      const bufA = Buffer.from(originalHash, 'hex');
+      const bufB = Buffer.from(computedHash, 'hex');
+      if (bufA.length !== bufB.length) {
+        return { valid: false, needsUpgrade: false };
+      }
+      const isValid = crypto.timingSafeEqual(bufA, bufB);
+      return { valid: isValid, needsUpgrade: false };
+    }
+    // Legacy SHA-256 fallback with automatic upgrade flag
+    const legacyHash = crypto.createHash('sha256').update(inputPassword).digest('hex');
+    const bufA = Buffer.from(legacyHash, 'hex');
+    const bufB = Buffer.from(storedHash, 'hex');
+    if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+      return { valid: true, needsUpgrade: true };
+    }
+    return { valid: false, needsUpgrade: false };
+  } catch (err) {
+    console.error('Password verification error:', err);
+    return { valid: false, needsUpgrade: false };
   }
-  // Legacy SHA-256 fallback with automatic upgrade flag
-  const legacyHash = crypto.createHash('sha256').update(inputPassword).digest('hex');
-  if (legacyHash === storedHash) {
-    return { valid: true, needsUpgrade: true };
-  }
-  return { valid: false, needsUpgrade: false };
 }
 
 // HMAC-SHA256 Signed Session Tokens
@@ -269,17 +282,24 @@ function decryptMessageText(enc) {
 function loadUsers() {
   try {
     if (fs.existsSync(DB_USERS_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(DB_USERS_FILE, 'utf8'));
-      if (Array.isArray(parsed)) return parsed;
+      const raw = fs.readFileSync(DB_USERS_FILE, 'utf8');
+      if (raw && raw.trim()) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error('Error loading users from disk:', err);
+  }
   return [];
 }
 
 function saveUsers(usersList) {
   try {
     fs.writeFileSync(DB_USERS_FILE, JSON.stringify(usersList, null, 2), 'utf8');
-  } catch (err) {}
+  } catch (err) {
+    console.error('Error saving users to disk:', err);
+  }
 }
 
 let users = loadUsers();
@@ -542,8 +562,8 @@ app.post('/api/ai/persona', (req, res) => {
   });
 });
 
-const authLoginLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 6, keyPrefix: 'auth-login' });
-const authRegisterLimiter = createRateLimiter({ windowMs: 300000, maxRequests: 10, keyPrefix: 'auth-register' });
+const authLoginLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 30, keyPrefix: 'auth-login' });
+const authRegisterLimiter = createRateLimiter({ windowMs: 300000, maxRequests: 25, keyPrefix: 'auth-register' });
 const aiTestLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 20, keyPrefix: 'ai-test' });
 
 app.post('/api/ai/test', aiTestLimiter, async (req, res) => {
@@ -566,13 +586,21 @@ app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
     return res.status(400).json({ success: false, message: 'Password must be at least 4 characters long' });
   }
 
-  const cleanUsername = sanitizeText(username.trim().toLowerCase());
+  // Ensure fresh users list from disk
+  users = loadUsers();
+
+  const rawUsername = (username || '').trim().toLowerCase().replace(/^@+/, '');
+  const cleanUsername = sanitizeText(rawUsername);
+
+  if (!cleanUsername) {
+    return res.status(400).json({ success: false, message: 'Valid username is required' });
+  }
 
   if (cleanUsername === 'meta_ai' || cleanUsername === 'admin' || cleanUsername === 'system') {
     return res.status(400).json({ success: false, message: 'This username is reserved' });
   }
 
-  const existing = users.find(u => u.username.toLowerCase() === cleanUsername);
+  const existing = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
   if (existing) {
     return res.status(400).json({ success: false, message: 'Username already taken. Please choose another.' });
   }
@@ -606,8 +634,12 @@ app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
     name: newUser.name,
     avatarColor: newUser.avatarColor,
     avatarUrl: newUser.avatarUrl,
-    bio: newUser.bio
+    bio: newUser.bio,
+    isOnline: false
   };
+
+  // Broadcast new registered user to all active clients immediately
+  io.emit('user_registered', safeUser);
 
   const token = generateSessionToken(safeUser);
 
@@ -624,8 +656,11 @@ app.post('/api/auth/login', authLoginLimiter, (req, res) => {
     return res.status(400).json({ success: false, message: 'Username and password required' });
   }
 
-  const cleanUsername = username.trim().toLowerCase();
-  const user = users.find(u => u.username.toLowerCase() === cleanUsername);
+  // Ensure fresh users list from disk
+  users = loadUsers();
+
+  const cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '');
+  const user = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
 
   if (!user) {
     return res.status(401).json({ success: false, message: 'Invalid username or password' });
@@ -702,6 +737,7 @@ app.post('/api/users/profile', (req, res) => {
 });
 
 app.get('/api/users', (req, res) => {
+  users = loadUsers();
   const safeUsers = users.map(u => ({
     id: u.id,
     username: u.username,
