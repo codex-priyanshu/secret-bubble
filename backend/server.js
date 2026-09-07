@@ -307,20 +307,34 @@ let users = loadUsers();
 function loadMessages() {
   try {
     if (fs.existsSync(DB_MESSAGES_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(DB_MESSAGES_FILE, 'utf8'));
-      if (Array.isArray(parsed)) {
-        return parsed.map(m => {
-          if (m.encryptedPayload) {
+      const raw = fs.readFileSync(DB_MESSAGES_FILE, 'utf8');
+      if (raw && raw.trim()) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map(m => {
+            let text = m.text;
+            if (m.encryptedPayload) {
+              const decrypted = decryptMessageText(m.encryptedPayload);
+              if (decrypted && !decrypted.startsWith('[Decryption failed')) {
+                text = decrypted;
+              } else if (!text) {
+                text = decrypted;
+              }
+            }
+            // Backward compatibility: If no roomId and no recipientId, default to 'global'
+            const roomId = (!m.recipientId && !m.roomId) ? 'global' : (m.roomId || null);
             return {
               ...m,
-              text: decryptMessageText(m.encryptedPayload)
+              text: text || m.text || '',
+              roomId: roomId
             };
-          }
-          return m;
-        });
+          });
+        }
       }
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error('Error loading messages from disk:', err);
+  }
   return [];
 }
 
@@ -328,12 +342,20 @@ function saveMessages(msgs) {
   try {
     const diskMessages = msgs.map(m => {
       const copy = { ...m };
-      copy.encryptedPayload = encryptMessageText(m.text || '');
-      delete copy.text; // Text is wiped from disk for military-grade zero-knowledge storage!
+      if (!copy.recipientId && !copy.roomId) {
+        copy.roomId = 'global';
+      }
+      try {
+        copy.encryptedPayload = encryptMessageText(m.text || '');
+      } catch (e) {}
+      // Keep text for resilience against secret/key loss or disk migration
+      copy.text = m.text || '';
       return copy;
     });
     fs.writeFileSync(DB_MESSAGES_FILE, JSON.stringify(diskMessages, null, 2), 'utf8');
-  } catch (err) {}
+  } catch (err) {
+    console.error('Error saving messages to disk:', err);
+  }
 }
 
 let messages = loadMessages();
@@ -371,12 +393,12 @@ function saveGroups(groupsList) {
 
 let groups = loadGroups();
 
-// Periodic cleanup of expired disappearing messages
+// Periodic cleanup of expired disappearing messages (only strictly valid positive future timestamps)
 setInterval(() => {
   const now = Date.now();
   const initialCount = messages.length;
   messages = messages.filter(m => {
-    if (!m.expiresAt) return true;
+    if (!m.expiresAt || typeof m.expiresAt !== 'number' || m.expiresAt <= 0) return true;
     return now < m.expiresAt;
   });
   if (messages.length !== initialCount) {
@@ -781,11 +803,17 @@ app.get('/api/users/search', (req, res) => {
 });
 
 app.get('/api/messages', (req, res) => {
+  // Always reload fresh messages from disk so no messages are lost across restarts/instances
+  messages = loadMessages();
+
   const { userId, targetId, roomId } = req.query;
   let filtered = [];
 
   if (roomId) {
-    filtered = messages.filter(m => m.roomId === roomId && !m.recipientId);
+    filtered = messages.filter(m => {
+      if (m.recipientId) return false;
+      return m.roomId === roomId || (!m.roomId && roomId === 'global');
+    });
   } else if (userId && targetId) {
     filtered = messages.filter(m => 
       !m.roomId && (
@@ -793,6 +821,9 @@ app.get('/api/messages', (req, res) => {
         (m.senderId === targetId && m.recipientId === userId)
       )
     );
+  } else {
+    // If no filter specified, return global messages by default
+    filtered = messages.filter(m => !m.recipientId && (m.roomId === 'global' || !m.roomId));
   }
 
   // Mask passcode-protected messages for non-senders
@@ -809,12 +840,76 @@ app.get('/api/messages', (req, res) => {
   res.json({ success: true, messages: safeMessages });
 });
 
+// HTTP REST message send fallback (ensures persistence even if socket is disconnected/reconnecting)
+app.post('/api/messages/send', (req, res) => {
+  const msgData = req.body;
+  if (!msgData || (!msgData.text && !msgData.hasPasscode)) {
+    return res.status(400).json({ success: false, message: 'Message text required' });
+  }
+
+  const senderId = msgData.senderId || 'user-unknown';
+  const senderName = sanitizeText(msgData.sender || 'User');
+  const sanitizedText = sanitizeText(msgData.text || '');
+
+  let passcodeHash = null;
+  let passcodeHint = '';
+  const hasPasscode = Boolean(msgData.hasPasscode && msgData.passcode);
+  if (hasPasscode) {
+    passcodeHash = crypto.createHash('sha256').update(msgData.passcode.trim()).digest('hex');
+    passcodeHint = sanitizeText(msgData.passcodeHint ? msgData.passcodeHint.trim() : '');
+  }
+
+  const aiAnalysis = analyzeSensitivity(sanitizedText);
+  const shouldLock = Boolean(msgData.isLocked || hasPasscode || aiAnalysis.isSensitive);
+  const category = (msgData.isLocked || hasPasscode)
+    ? (msgData.category || (hasPasscode ? 'Secret 🔒' : 'Private Message'))
+    : (aiAnalysis.isSensitive ? aiAnalysis.category : 'General');
+  const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
+
+  const isDirect = Boolean(msgData.recipientId);
+  const selfDestructSecs = msgData.selfDestructSecs ? parseInt(msgData.selfDestructSecs, 10) : 0;
+  const expiresAt = selfDestructSecs > 0 ? Date.now() + (selfDestructSecs * 1000) : null;
+
+  const newMsg = {
+    id: msgData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4)),
+    sender: senderName,
+    senderId: senderId,
+    senderAvatar: msgData.senderAvatar || null,
+    recipientId: isDirect ? msgData.recipientId : null,
+    roomId: isDirect ? null : (msgData.roomId || 'global'),
+    text: sanitizedText,
+    isLocked: shouldLock,
+    category: category,
+    hasPasscode: hasPasscode,
+    passcodeHash: passcodeHash,
+    passcodeHint: passcodeHint,
+    isAiShielded: isAiShielded,
+    isEdited: false,
+    selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
+    expiresAt: expiresAt,
+    viewers: [senderId],
+    timestamp: msgData.timestamp || new Date().toISOString()
+  };
+
+  messages = loadMessages();
+  if (!messages.some(m => m.id === newMsg.id)) {
+    messages.push(newMsg);
+    saveMessages(messages);
+  }
+
+  // Broadcast via socket if available
+  io.emit('new_message', newMsg);
+
+  res.json({ success: true, message: newMsg });
+});
+
 app.post('/api/messages/unlock-passcode', (req, res) => {
   const { messageId, passcode } = req.body;
   if (!messageId || !passcode) {
     return res.status(400).json({ success: false, message: 'Message ID and passcode required' });
   }
 
+  messages = loadMessages();
   const msg = messages.find(m => m.id === messageId);
   if (!msg) {
     return res.status(404).json({ success: false, message: 'Message not found or expired' });

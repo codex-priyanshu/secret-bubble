@@ -52,7 +52,14 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedTarget, setSelectedTarget] = useState({ type: 'room', id: 'global', name: '🌍 Global Public Chat' });
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const cached = localStorage.getItem('secure_chat_cache_room_global');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [socket, setSocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -207,6 +214,20 @@ export default function App() {
     } catch (e) {}
   }, [backendUrl]);
 
+  // Load cached messages immediately when target switches
+  useEffect(() => {
+    try {
+      const key = `secure_chat_cache_${selectedTarget.type}_${selectedTarget.id}`;
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setMessages(parsed);
+        }
+      }
+    } catch {}
+  }, [selectedTarget.type, selectedTarget.id]);
+
   // Fetch Messages for current selected target
   const fetchMessages = useCallback(async () => {
     if (!currentUserRef.current) return;
@@ -214,14 +235,18 @@ export default function App() {
       const currentTarget = selectedTargetRef.current;
       let url = `${backendUrl}/api/messages`;
       if (currentTarget.type === 'room') {
-        url += `?roomId=${currentTarget.id}`;
+        url += `?roomId=${currentTarget.id}&userId=${currentUserRef.current.id}`;
       } else {
         url += `?userId=${currentUserRef.current.id}&targetId=${currentTarget.id}`;
       }
       const res = await fetch(url);
       const data = await res.json();
-      if (data.success) {
+      if (data.success && Array.isArray(data.messages)) {
         setMessages(data.messages);
+        try {
+          const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
+          localStorage.setItem(key, JSON.stringify(data.messages.slice(-100)));
+        } catch {}
         
         // Mark viewed
         if (socket && data.messages.length > 0) {
@@ -310,7 +335,12 @@ export default function App() {
       if (isForCurrentTarget) {
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
-          return [...prev, msg];
+          const updated = [...prev, msg];
+          try {
+            const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
+            localStorage.setItem(key, JSON.stringify(updated.slice(-100)));
+          } catch {}
+          return updated;
         });
 
         // Auto mark as viewed
@@ -381,29 +411,45 @@ export default function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (msgData) => {
+  const handleSendMessage = async (msgData) => {
     if (!currentUser) return;
 
     const isDirect = selectedTarget.type === 'user';
     const payload = {
       ...msgData,
+      id: msgData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4)),
       sender: currentUser.name,
       senderId: currentUser.id,
       senderAvatar: currentUser.avatarUrl || null,
       recipientId: isDirect ? selectedTarget.id : null,
-      roomId: isDirect ? null : (selectedTarget.id || 'global')
+      roomId: isDirect ? null : (selectedTarget.id || 'global'),
+      timestamp: new Date().toISOString()
     };
+
+    // Optimistically update UI and update local storage cache immediately
+    setMessages(prev => {
+      if (prev.some(m => m.id === payload.id)) return prev;
+      const updated = [...prev, payload];
+      try {
+        const key = `secure_chat_cache_${selectedTarget.type}_${selectedTarget.id}`;
+        localStorage.setItem(key, JSON.stringify(updated.slice(-100)));
+      } catch {}
+      return updated;
+    });
 
     if (socket && connectionStatus === 'connected') {
       socket.emit('send_message', payload);
     } else {
-      const localMsg = {
-        ...payload,
-        id: 'msg-' + Date.now(),
-        viewers: [currentUser.id],
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, localMsg]);
+      // Fallback: POST via HTTP REST API to guarantee disk persistence
+      try {
+        await fetch(`${backendUrl}/api/messages/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        console.warn('HTTP fallback message save error:', err);
+      }
 
       // Offline Meta AI response fallback
       if (payload.recipientId === 'user-meta-ai') {
@@ -423,7 +469,14 @@ export default function App() {
             viewers: ['user-meta-ai'],
             timestamp: new Date().toISOString()
           };
-          setMessages(prev => [...prev, aiMsg]);
+          setMessages(prev => {
+            const updated = [...prev, aiMsg];
+            try {
+              const key = `secure_chat_cache_${selectedTarget.type}_${selectedTarget.id}`;
+              localStorage.setItem(key, JSON.stringify(updated.slice(-100)));
+            } catch {}
+            return updated;
+          });
         }, 800);
       }
     }

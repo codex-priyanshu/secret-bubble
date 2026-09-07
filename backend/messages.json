@@ -5,7 +5,9 @@
     "senderId": "user-priya",
     "text": "Hey Rahul, kya kal subah 10 baje library mil rahe hain?",
     "isLocked": false,
-    "timestamp": "2026-08-28T18:07:26.131Z"
+    "timestamp": "2026-08-28T18:07:26.131Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-2",
@@ -13,7 +15,9 @@
     "senderId": "user-rahul",
     "text": "Haan sure, notes bhi le aunga!",
     "isLocked": false,
-    "timestamp": "2026-08-28T18:12:26.132Z"
+    "timestamp": "2026-08-28T18:12:26.132Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-3",
@@ -22,7 +26,9 @@
     "text": "Waise kal shaam ko tum bohot pyaari lag rahi thi... I feel so lucky to have you in my life ❤️",
     "isLocked": true,
     "category": "Personal Feelings",
-    "timestamp": "2026-08-28T18:19:26.132Z"
+    "timestamp": "2026-08-28T18:19:26.132Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-4",
@@ -31,7 +37,9 @@
     "text": "Aww thank you! Aapse akele me milke kuch important baat karni hai... 🤫💕",
     "isLocked": true,
     "category": "Intimate / Private",
-    "timestamp": "2026-08-28T18:27:26.132Z"
+    "timestamp": "2026-08-28T18:27:26.132Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-5",
@@ -39,7 +47,9 @@
     "senderId": "user-rahul",
     "text": "Theek hai, kal milte hi decide karte hain.",
     "isLocked": false,
-    "timestamp": "2026-08-28T18:35:26.132Z"
+    "timestamp": "2026-08-28T18:35:26.132Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942449057-9gsv",
@@ -48,7 +58,9 @@
     "text": "hii",
     "isLocked": false,
     "category": "General",
-    "timestamp": "2026-08-28T18:40:49.057Z"
+    "timestamp": "2026-08-28T18:40:49.057Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942477982-0t1f",
@@ -57,7 +69,9 @@
     "text": "kaise ho",
     "isLocked": false,
     "category": "General",
-    "timestamp": "2026-08-28T18:41:17.982Z"
+    "timestamp": "2026-08-28T18:41:17.982Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942491347-3xz4",
@@ -66,7 +80,9 @@
     "text": "thik hu",
     "isLocked": false,
     "category": "General",
-    "timestamp": "2026-08-28T18:41:31.347Z"
+    "timestamp": "2026-08-28T18:41:31.347Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942505300-ppkd",
@@ -75,7 +91,9 @@
     "text": "suno na i love you",
     "isLocked": false,
     "category": "General",
-    "timestamp": "2026-08-28T18:41:45.300Z"
+    "timestamp": "2026-08-28T18:41:45.300Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942517510-dgtk",
@@ -84,7 +102,9 @@
     "text": "sex",
     "isLocked": false,
     "category": "General",
-    "timestamp": "2026-08-28T18:41:57.510Z"
+    "timestamp": "2026-08-28T18:41:57.510Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942535636-tnp4",
@@ -93,7 +113,9 @@
     "text": "i love you",
     "isLocked": true,
     "category": "Personal Feelings",
-    "timestamp": "2026-08-28T18:42:15.636Z"
+    "timestamp": "2026-08-28T18:42:15.636Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942548857-e2ay",
@@ -102,7 +124,9 @@
     "text": "aao na",
     "isLocked": true,
     "category": "Intimate / Private",
-    "timestamp": "2026-08-28T18:42:28.857Z"
+    "timestamp": "2026-08-28T18:42:28.857Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942566439-cepu",
@@ -111,7 +135,9 @@
     "text": "wh wh no",
     "isLocked": true,
     "category": "Confidential Secret",
-    "timestamp": "2026-08-28T18:42:46.439Z"
+    "timestamp": "2026-08-28T18:42:46.439Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942578720-7h4o",
@@ -120,7 +146,9 @@
     "text": "plese wait",
     "isLocked": true,
     "category": "Financial / Password",
-    "timestamp": "2026-08-28T18:42:58.720Z"
+    "timestamp": "2026-08-28T18:42:58.720Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942845002-wt4s",
@@ -130,7 +158,9 @@
     "isLocked": true,
     "category": "Feelings & Romance ❤️",
     "isAiShielded": true,
-    "timestamp": "2026-08-28T18:47:25.002Z"
+    "timestamp": "2026-08-28T18:47:25.002Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942852760-g952",
@@ -140,7 +170,9 @@
     "isLocked": false,
     "category": "General",
     "isAiShielded": false,
-    "timestamp": "2026-08-28T18:47:32.760Z"
+    "timestamp": "2026-08-28T18:47:32.760Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942864784-kjgm",
@@ -150,7 +182,9 @@
     "isLocked": false,
     "category": "General",
     "isAiShielded": false,
-    "timestamp": "2026-08-28T18:47:44.784Z"
+    "timestamp": "2026-08-28T18:47:44.784Z",
+    "roomId": "global",
+    "recipientId": null
   },
   {
     "id": "msg-1787942881965-0mji",
@@ -160,6 +194,8 @@
     "isLocked": true,
     "category": "Physical & Intimacy 🤫",
     "isAiShielded": false,
-    "timestamp": "2026-08-28T18:48:01.965Z"
+    "timestamp": "2026-08-28T18:48:01.965Z",
+    "roomId": "global",
+    "recipientId": null
   }
 ]
