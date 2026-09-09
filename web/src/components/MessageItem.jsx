@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  Lock, Fingerprint, Unlock, Timer, EyeOff, Bot, Edit2, Trash2, 
-  Check, X, Eye, CheckCheck, Flame, Sparkles, Smile, KeyRound, AlertCircle, Loader2 
+  Lock, Unlock, EyeOff, Bot, Edit2, Trash2, 
+  Check, X, Eye, CheckCheck, Flame, Smile, KeyRound, AlertCircle, Loader2 
 } from 'lucide-react';
+import { analyzeMessageSensitivity } from '../utils/aiPrivacyDetector';
 
 const EMOJI_REACTIONS = ['❤️', '👍', '🔥', '😂', '👏', '😮'];
 
@@ -21,18 +22,31 @@ export default function MessageItem({
 }) {
   const isMe = message.senderId === currentUser.id;
   const isMetaAi = message.senderId === 'user-meta-ai';
-  const isLockedMsg = Boolean(message.isLocked);
-  const unlocked = isUnlocked(message.id);
-  const secondsLeft = remainingSeconds(message.id);
 
-  const hasPasscode = Boolean(message.hasPasscode);
-  const isPasscodeUnlocked = Boolean(unlockedPasscodeTexts && unlockedPasscodeTexts[message.id]);
-  const displayPasscodeText = isPasscodeUnlocked ? unlockedPasscodeTexts[message.id] : message.text;
+  // AI Sensitivity scanning fallback: Ensures sensitive words (sex, love, intimate, etc.) are always locked
+  const sensitivity = analyzeMessageSensitivity(message.text);
+  const isSensitive = sensitivity.isSensitive;
+  const isLockedMsg = Boolean(message.isLocked || message.hasPasscode || isSensitive);
 
+  const [senderRevealed, setSenderRevealed] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [inputPasscode, setInputPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
   const [passcodeLoading, setPasscodeLoading] = useState(false);
   const [showPasscodeText, setShowPasscodeText] = useState(false);
+
+  // Check if message is currently unlocked/revealed
+  const isPasscodeUnlocked = Boolean(unlockedPasscodeTexts && unlockedPasscodeTexts[message.id]);
+  const isBioUnlocked = isUnlocked ? isUnlocked(message.id) : false;
+  const isRevealed = Boolean(
+    (isMe && senderRevealed) ||
+    isPasscodeUnlocked ||
+    isBioUnlocked
+  );
+
+  const displayText = isPasscodeUnlocked
+    ? unlockedPasscodeTexts[message.id]
+    : message.text;
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(message.text);
@@ -55,12 +69,15 @@ export default function MessageItem({
     try {
       if (onUnlockPasscode) {
         const res = await onUnlockPasscode(message.id, inputPasscode.trim());
-        if (!res.success) {
-          setPasscodeError(res.message || 'Incorrect password. Access denied.');
+        if (res && res.success) {
+          setShowPasswordModal(false);
+          setInputPasscode('');
+        } else {
+          setPasscodeError(res?.message || 'Incorrect password. Access denied.');
         }
       }
     } catch (err) {
-      setPasscodeError('Verification failed.');
+      setPasscodeError('Verification failed. Please try again.');
     } finally {
       setPasscodeLoading(false);
     }
@@ -212,238 +229,131 @@ export default function MessageItem({
               </>
             )}
           </div>
-        ) : hasPasscode ? (
-          /* Case 2: Message Protected with Custom Secret Passcode */
-          isMe ? (
-            /* Sub-case 2A: Sender view of passcode-protected message */
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white rounded-br-sm shadow-md border border-purple-500/40 max-w-sm">
-              <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-purple-400/30 text-[10px]">
-                <span className="flex items-center gap-1 text-amber-300 font-bold">
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>Password Protected Message</span>
+        ) : isRevealed ? (
+          /* ======================================================== */
+          /* CASE 2: Message Unlocked with Password (Unblurred) */
+          /* ======================================================== */
+          <div
+            className={`px-4 py-2.5 rounded-2xl shadow-md text-sm relative border animate-in zoom-in-95 duration-150 ${
+              isMe
+                ? 'bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 text-white rounded-br-sm border-purple-500/50'
+                : 'bg-slate-900 border-emerald-500/50 text-slate-100 rounded-bl-sm'
+            }`}
+          >
+            {/* Unlocked status chip with re-lock button */}
+            <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-white/10 text-[10px]">
+              <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                <Unlock className="w-3 h-3" />
+                <span>Password Unlocked • {message.category || sensitivity.category || 'Secret'}</span>
+              </span>
+              <button
+                onClick={() => {
+                  if (isMe) setSenderRevealed(false);
+                  if (onRelockPasscode) onRelockPasscode(message.id);
+                  if (onRelockClick) onRelockClick(message.id);
+                }}
+                title="Blur & Lock message again"
+                className="px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1 text-[9px]"
+              >
+                <EyeOff className="w-3 h-3" />
+                <span>Blur again</span>
+              </button>
+            </div>
+
+            <p className="leading-relaxed whitespace-pre-wrap font-medium">{displayText}</p>
+
+            {/* Footer */}
+            <div className={`text-[10px] mt-1.5 flex items-center justify-between select-none ${
+              isMe ? 'text-purple-200/80' : 'text-slate-400'
+            }`}>
+              <span className="text-[9px] opacity-70">
+                {message.passcodeHint ? `💡 Hint: ${message.passcodeHint}` : '🔒 Password Protected'}
+              </span>
+              <div className="flex items-center gap-2">
+                {message.selfDestructSecs && (
+                  <span className="flex items-center gap-0.5 text-amber-400 font-bold">
+                    <Flame className="w-3 h-3" />
+                    <span>{message.selfDestructSecs}s</span>
+                  </span>
+                )}
+                <span>{formattedTime}</span>
+                <span className="flex items-center gap-0.5 opacity-80">
+                  <Eye className="w-3 h-3" />
+                  <span>{viewsCount}</span>
                 </span>
-                {message.passcodeHint && (
-                  <span className="text-amber-200/90 font-mono text-[9px] truncate max-w-[140px]">
-                    💡 Hint: {message.passcodeHint}
+                {isMe && <CheckCheck className="w-3.5 h-3.5 text-cyan-300" />}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ======================================================== */
+          /* CASE 3: Message Locked & Blurred (Telegram Privacy Spoiler) */
+          /* Sleek, normal bubble size, blurred text with Tap to Unlock */
+          /* ======================================================== */
+          <div
+            className={`relative px-4 py-2.5 rounded-2xl shadow-md text-sm border overflow-hidden transition-all duration-200 ${
+              isMe
+                ? 'bg-purple-950/70 border-purple-500/40 text-purple-200 rounded-br-sm'
+                : 'bg-slate-900/90 border-slate-700/80 hover:border-amber-500/50 text-slate-200 rounded-bl-sm'
+            }`}
+          >
+            {/* Blurred message text body */}
+            <div className="filter blur-[6px] select-none pointer-events-none opacity-40 py-1 leading-relaxed">
+              <p className="whitespace-pre-wrap">
+                {isMe 
+                  ? message.text 
+                  : (message.text && !message.text.startsWith('[🔒') 
+                      ? message.text 
+                      : 'Yeh message password se protected hai padhne ke liye tap karke unlock kare')}
+              </p>
+            </div>
+
+            {/* Center Tap to Unlock Overlay */}
+            <div 
+              onClick={() => {
+                setShowPasswordModal(true);
+                setInputPasscode('');
+                setPasscodeError('');
+              }}
+              className="absolute inset-0 flex flex-col items-center justify-center p-2 bg-slate-950/40 backdrop-blur-[2px] hover:bg-slate-950/20 cursor-pointer transition select-none"
+            >
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-amber-500/50 text-amber-300 text-xs font-semibold shadow-xl hover:scale-105 active:scale-95 transition">
+                <KeyRound className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span>Tap to unlock with password</span>
+                {message.category && (
+                  <span className="text-[10px] text-amber-300/70 font-normal">
+                    ({message.category})
                   </span>
                 )}
               </div>
-              <p className="leading-relaxed whitespace-pre-wrap text-sm text-white font-medium">
-                {message.text}
-              </p>
-              <div className="flex items-center justify-between text-[10px] mt-2 text-purple-200/80">
-                <span className="italic">🏷️ {message.category || 'Secret'} • 🔒 Passcode Set</span>
+              {message.passcodeHint && (
+                <span className="text-[10px] text-amber-200/90 mt-1 font-mono">
+                  💡 Hint: {message.passcodeHint}
+                </span>
+              )}
+            </div>
+
+            {/* Sender Quick View & Footer */}
+            {isMe ? (
+              <div className="relative z-10 flex items-center justify-between text-[10px] mt-1 pt-1 border-t border-purple-500/20 text-purple-300">
+                <button
+                  type="button"
+                  onClick={() => setSenderRevealed(true)}
+                  className="flex items-center gap-1 text-[10px] text-purple-200 hover:text-white underline cursor-pointer"
+                >
+                  <Eye className="w-3 h-3" />
+                  <span>Quick View (You sent this)</span>
+                </button>
                 <div className="flex items-center gap-2">
                   <span>{formattedTime}</span>
-                  <span className="flex items-center gap-0.5 opacity-80">
-                    <Eye className="w-3 h-3" />
-                    <span>{viewsCount}</span>
-                  </span>
                   <CheckCheck className="w-3.5 h-3.5 text-cyan-300" />
                 </div>
               </div>
-            </div>
-          ) : isPasscodeUnlocked ? (
-            /* Sub-case 2B: Recipient Unlocked with Passcode */
-            <div className="p-3.5 rounded-2xl bg-slate-900 border border-emerald-500/60 text-slate-100 rounded-bl-sm shadow-xl max-w-sm animate-in zoom-in-95 duration-200">
-              <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-emerald-500/30 text-[11px] text-emerald-400 font-bold">
-                <span className="flex items-center gap-1.5">
-                  <Unlock className="w-3.5 h-3.5" />
-                  <span>Secret Message Unlocked</span>
-                </span>
-                <button
-                  onClick={() => onRelockPasscode && onRelockPasscode(message.id)}
-                  title="Lock message again"
-                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                >
-                  <EyeOff className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <p className="leading-relaxed whitespace-pre-wrap text-sm text-slate-50 font-medium">
-                {displayPasscodeText}
-              </p>
-              <div className="flex items-center justify-between text-[10px] mt-2 text-slate-400">
-                <span className="italic text-emerald-400">🏷️ {message.category || 'Secret'}</span>
-                <div className="flex items-center gap-2">
-                  <span>{formattedTime}</span>
-                  <span className="flex items-center gap-0.5 opacity-80">
-                    <Eye className="w-3 h-3" />
-                    <span>{viewsCount}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Sub-case 2C: Recipient Locked - Enter Secret Passcode */
-            <div className="relative w-72 sm:w-84 p-3.5 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-slate-900 via-slate-900/95 to-amber-950/30 shadow-xl backdrop-blur-md rounded-bl-sm">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold">
-                  <KeyRound className="w-3 h-3 text-amber-400" />
-                  <span>{message.category || 'Secret Message'}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                    Passcode Locked
-                  </span>
-                </div>
-              </div>
-
-              <div className="relative my-2 py-2 px-3 rounded-xl bg-slate-950/80 border border-slate-800">
-                <p className="text-xs text-slate-500 select-none filter blur-sm">
-                  This message is protected with a secret password. Enter passcode to read.
-                </p>
-              </div>
-
-              {message.passcodeHint && (
-                <div className="mb-2 px-2 py-1 bg-amber-950/40 border border-amber-500/20 rounded-lg text-[11px] text-amber-200 flex items-center gap-1.5">
-                  <span>💡 <strong>Hint:</strong> {message.passcodeHint}</span>
-                </div>
-              )}
-
-              {passcodeError && (
-                <div className="mb-2 px-2.5 py-1 bg-rose-950/80 border border-rose-500/40 rounded-lg text-[11px] text-rose-300 flex items-center gap-1.5 animate-shake">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
-                  <span>{passcodeError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleUnlockSubmit} className="mt-1 flex items-center gap-1.5">
-                <div className="relative flex-1">
-                  <input
-                    type={showPasscodeText ? "text" : "password"}
-                    value={inputPasscode}
-                    onChange={(e) => { setInputPasscode(e.target.value); setPasscodeError(''); }}
-                    placeholder="Enter secret password..."
-                    className="w-full pl-3 pr-7 py-1.5 bg-slate-950 border border-amber-500/40 focus:border-amber-400 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none"
-                    disabled={passcodeLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasscodeText(!showPasscodeText)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                  >
-                    {showPasscodeText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-                <button
-                  type="submit"
-                  disabled={passcodeLoading || !inputPasscode.trim()}
-                  className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 transition disabled:opacity-50 cursor-pointer shadow-md"
-                >
-                  {passcodeLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
-                  <span>Unlock</span>
-                </button>
-              </form>
-
-              <div className="flex items-center justify-between text-[10px] text-slate-500 mt-2">
-                <span>{formattedTime}</span>
-                <span className="flex items-center gap-0.5 opacity-70">
-                  <Eye className="w-3 h-3" />
-                  <span>{viewsCount}</span>
-                </span>
-              </div>
-            </div>
-          )
-        ) : unlocked ? (
-          /* Case 3: Private Message Revealed via Biometrics */
-          <div
-            className={`relative p-4 rounded-2xl border transition-all duration-300 shadow-xl ${
-              isMe
-                ? 'bg-purple-950/80 border-purple-500/80 text-purple-100 rounded-br-sm'
-                : 'bg-slate-900/95 border-purple-500/80 text-purple-100 rounded-bl-sm'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-3 pb-2 mb-2 border-b border-purple-500/30 text-xs">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold text-[11px]">
-                <Unlock className="w-3.5 h-3.5" />
-                <span>Biometric Shield Unlocked</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold animate-pulse">
-                  <Timer className="w-3 h-3" />
-                  {secondsLeft}s
-                </span>
-                <button
-                  onClick={() => onRelockClick(message.id)}
-                  title="Hide message immediately"
-                  className="p-1 rounded bg-slate-800 hover:bg-purple-800 text-slate-300 hover:text-white transition"
-                >
-                  <EyeOff className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {isEditing ? (
-              <form onSubmit={handleSaveEdit} className="flex flex-col gap-2 min-w-[220px]">
-                <input
-                  type="text"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  className="px-2.5 py-1 bg-slate-950 border border-slate-600 rounded-lg text-sm text-white focus:outline-none"
-                  autoFocus
-                />
-                <div className="flex items-center justify-end gap-1.5">
-                  <button type="button" onClick={() => setIsEditing(false)} className="p-1 rounded bg-slate-700 text-xs"><X className="w-3.5 h-3.5" /></button>
-                  <button type="submit" className="p-1 rounded bg-purple-600 text-white text-xs"><Check className="w-3.5 h-3.5" /></button>
-                </div>
-              </form>
             ) : (
-              <>
-                <p className="text-sm font-medium leading-relaxed text-slate-50 whitespace-pre-wrap">
-                  {message.text}
-                </p>
-
-                <div className="flex items-center justify-between text-[10px] mt-2 text-purple-300/80">
-                  <span className="italic">🏷️ {message.category || 'Feelings & Private'}</span>
-                  <div className="flex items-center gap-2">
-                    {message.isEdited && <span className="italic text-[9px]">edited</span>}
-                    <span>{formattedTime}</span>
-                    <span className="flex items-center gap-0.5 opacity-80">
-                      <Eye className="w-3 h-3" />
-                      <span>{viewsCount}</span>
-                    </span>
-                    {isMe && <CheckCheck className="w-3.5 h-3.5 text-cyan-300" />}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          /* Case 4: Private Message Locked with Biometrics */
-          <div
-            className={`relative w-72 sm:w-80 p-3.5 rounded-2xl border border-rose-500/40 bg-gradient-to-br from-slate-900/90 via-slate-900/95 to-rose-950/30 shadow-xl backdrop-blur-md ${
-              isMe ? 'rounded-br-sm' : 'rounded-bl-sm'
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2 mb-1.5">
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[10px] font-bold">
-                <Lock className="w-3 h-3" />
-                <span>{message.category || 'Private Message'}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+              <div className="relative z-10 flex items-center justify-end text-[10px] mt-1 text-slate-500">
                 <span>{formattedTime}</span>
-                <span className="flex items-center gap-0.5 opacity-70">
-                  <Eye className="w-3 h-3" />
-                  <span>{viewsCount}</span>
-                </span>
-                {isMe && <CheckCheck className="w-3.5 h-3.5 text-slate-500" />}
               </div>
-            </div>
-
-            <div className="relative my-2 py-2 px-3 rounded-xl bg-slate-950/70 border border-slate-800 overflow-hidden">
-              <p className="text-xs text-slate-500 select-none filter blur-sm">
-                This private message is protected by granular biometric encryption.
-              </p>
-            </div>
-
-            <button
-              onClick={() => onUnlockClick(message)}
-              className="w-full mt-1.5 py-2 px-3 bg-gradient-to-r from-rose-600 via-purple-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition cursor-pointer"
-            >
-              <Fingerprint className="w-4 h-4 text-rose-200 animate-pulse" />
-              <span>Verify Fingerprint / Face ID to Read</span>
-            </button>
+            )}
           </div>
         )}
 
@@ -460,6 +370,85 @@ export default function MessageItem({
         )}
 
       </div>
+
+      {/* ======================================================== */}
+      {/* Sleek Password Unlock Dialog Modal */}
+      {/* ======================================================== */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-slate-900 border border-amber-500/40 rounded-2xl p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                <KeyRound className="w-4 h-4 text-amber-400" />
+                <span>Unlock Secret Message</span>
+              </div>
+              <button
+                onClick={() => { setShowPasswordModal(false); setPasscodeError(''); }}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-300 space-y-1">
+              <p>This message was locked by <strong className="text-purple-300">{message.sender}</strong>.</p>
+              <p className="text-slate-400">Enter the password set by the sender to read this message.</p>
+            </div>
+
+            {message.passcodeHint && (
+              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-2">
+                <span>💡 <strong>Hint:</strong> {message.passcodeHint}</span>
+              </div>
+            )}
+
+            {passcodeError && (
+              <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-shake">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{passcodeError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUnlockSubmit} className="space-y-3">
+              <div className="relative">
+                <input
+                  type={showPasscodeText ? "text" : "password"}
+                  value={inputPasscode}
+                  onChange={(e) => { setInputPasscode(e.target.value); setPasscodeError(''); }}
+                  placeholder="Enter secret password..."
+                  className="w-full pl-3 pr-9 py-2.5 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none"
+                  autoFocus
+                  disabled={passcodeLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasscodeText(!showPasscodeText)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+                >
+                  {showPasscodeText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setShowPasswordModal(false); setPasscodeError(''); }}
+                  className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={passcodeLoading || !inputPasscode.trim()}
+                  className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 transition disabled:opacity-50 cursor-pointer shadow-lg shadow-amber-500/20"
+                >
+                  {passcodeLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
+                  <span>Unlock</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

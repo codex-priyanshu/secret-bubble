@@ -28,7 +28,10 @@
     "category": "Personal Feelings",
     "timestamp": "2026-08-28T18:19:26.132Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-4",
@@ -39,7 +42,10 @@
     "category": "Intimate / Private",
     "timestamp": "2026-08-28T18:27:26.132Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-5",
@@ -89,22 +95,28 @@
     "sender": "Rahul",
     "senderId": "user-rahul",
     "text": "suno na i love you",
-    "isLocked": false,
+    "isLocked": true,
     "category": "General",
     "timestamp": "2026-08-28T18:41:45.300Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942517510-dgtk",
     "sender": "Rahul",
     "senderId": "user-rahul",
     "text": "sex",
-    "isLocked": false,
+    "isLocked": true,
     "category": "General",
     "timestamp": "2026-08-28T18:41:57.510Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942535636-tnp4",
@@ -115,7 +127,10 @@
     "category": "Personal Feelings",
     "timestamp": "2026-08-28T18:42:15.636Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942548857-e2ay",
@@ -126,7 +141,10 @@
     "category": "Intimate / Private",
     "timestamp": "2026-08-28T18:42:28.857Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942566439-cepu",
@@ -137,7 +155,10 @@
     "category": "Confidential Secret",
     "timestamp": "2026-08-28T18:42:46.439Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942578720-7h4o",
@@ -148,7 +169,10 @@
     "category": "Financial / Password",
     "timestamp": "2026-08-28T18:42:58.720Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942845002-wt4s",
@@ -160,7 +184,10 @@
     "isAiShielded": true,
     "timestamp": "2026-08-28T18:47:25.002Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942852760-g952",
@@ -179,12 +206,15 @@
     "sender": "Rahul",
     "senderId": "user-rahul",
     "text": "mare pass aao na",
-    "isLocked": false,
+    "isLocked": true,
     "category": "General",
     "isAiShielded": false,
     "timestamp": "2026-08-28T18:47:44.784Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   },
   {
     "id": "msg-1787942881965-0mji",
@@ -196,6 +226,9 @@
     "isAiShielded": false,
     "timestamp": "2026-08-28T18:48:01.965Z",
     "roomId": "global",
-    "recipientId": null
+    "recipientId": null,
+    "hasPasscode": true,
+    "passcodeHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+    "passcodeHint": "1234"
   }
 ]
