@@ -343,7 +343,8 @@ function loadMessages() {
               hasPasscode: hasPasscode,
               passcodeHash: passcodeHash,
               passcodeHint: passcodeHint,
-              category: m.category || (sensitivity.isSensitive ? sensitivity.category : 'General')
+              category: m.category || (sensitivity.isSensitive ? sensitivity.category : 'General'),
+              e2eeEnvelope: m.e2eeEnvelope || null
             };
           });
         }
@@ -367,6 +368,7 @@ function saveMessages(msgs) {
       } catch (e) {}
       // Keep text for resilience against secret/key loss or disk migration
       copy.text = m.text || '';
+      copy.e2eeEnvelope = m.e2eeEnvelope || null;
       return copy;
     });
     fs.writeFileSync(DB_MESSAGES_FILE, JSON.stringify(diskMessages, null, 2), 'utf8');
@@ -848,7 +850,8 @@ app.get('/api/messages', (req, res) => {
     if (m.hasPasscode && m.senderId !== userId) {
       return {
         ...m,
-        text: '[🔒 Passcode Protected Secret Message]'
+        text: '[🔒 Passcode Protected Secret Message]',
+        e2eeEnvelope: m.e2eeEnvelope || null
       };
     }
     return m;
@@ -910,6 +913,7 @@ app.post('/api/messages/send', (req, res) => {
     selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
     expiresAt: expiresAt,
     viewers: [senderId],
+    e2eeEnvelope: msgData.e2eeEnvelope || null,
     timestamp: msgData.timestamp || new Date().toISOString()
   };
 
@@ -938,13 +942,13 @@ app.post('/api/messages/unlock-passcode', (req, res) => {
   }
 
   if (!msg.hasPasscode || !msg.passcodeHash) {
-    return res.json({ success: true, text: msg.text });
+    return res.json({ success: true, text: msg.text, e2eeEnvelope: msg.e2eeEnvelope || null });
   }
 
   const cleanPasscode = (passcode || '').trim();
   const inputHash = crypto.createHash('sha256').update(cleanPasscode).digest('hex');
   if (inputHash === msg.passcodeHash || cleanPasscode === '1234' || (msg.passcodeHint && cleanPasscode === msg.passcodeHint.trim())) {
-    return res.json({ success: true, text: msg.text });
+    return res.json({ success: true, text: msg.text, e2eeEnvelope: msg.e2eeEnvelope || null });
   } else {
     return res.status(401).json({ success: false, message: 'Incorrect passcode. Access denied.' });
   }
@@ -1105,6 +1109,7 @@ io.on('connection', (socket) => {
       selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
       expiresAt: expiresAt,
       viewers: [senderId],
+      e2eeEnvelope: msgData.e2eeEnvelope || null,
       timestamp: new Date().toISOString()
     };
 
@@ -1114,7 +1119,8 @@ io.on('connection', (socket) => {
     if (newMsg.hasPasscode) {
       const maskedMsg = {
         ...newMsg,
-        text: '[🔒 Passcode Protected Secret Message]'
+        text: '[🔒 Passcode Protected Secret Message]',
+        e2eeEnvelope: newMsg.e2eeEnvelope || null
       };
 
       if (newMsg.recipientId) {

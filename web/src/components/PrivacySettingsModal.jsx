@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, Bot, Shield, Clock, Flame, Heart, Lock, Key, CheckCircle, EyeOff, 
-  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2 
+  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2, Calculator 
 } from 'lucide-react';
 
 export default function PrivacySettingsModal({
@@ -256,7 +256,54 @@ export default function PrivacySettingsModal({
             </p>
           </div>
 
-          {/* 6. Telegram Security Health Center & Cryptographic Audit */}
+          {/* 6. Stealth Calculator Camouflage Disguise */}
+          <div className="p-4 rounded-2xl bg-neutral-950/90 border border-neutral-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-orange-500/20 text-orange-400">
+                  <Calculator className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Stealth Calculator Disguise</p>
+                  <p className="text-[11px] text-neutral-400">Camouflages the app as an innocent calculator</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider block mb-1">
+                  Secret PIN (Unlock)
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={settings.stealthPin || '1234'}
+                  onChange={(e) => onUpdateSettings({ ...settings, stealthPin: e.target.value.replace(/\D/g, '') || '1234' })}
+                  placeholder="1234"
+                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white font-mono focus:border-orange-500 focus:outline-none"
+                />
+                <span className="text-[9px] text-neutral-500 mt-0.5 block">Type PIN then "="</span>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-cyan-400 uppercase tracking-wider block mb-1">
+                  Decoy Duress PIN
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={settings.decoyPin || '9999'}
+                  onChange={(e) => onUpdateSettings({ ...settings, decoyPin: e.target.value.replace(/\D/g, '') || '9999' })}
+                  placeholder="9999"
+                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white font-mono focus:border-cyan-500 focus:outline-none"
+                />
+                <span className="text-[9px] text-neutral-500 mt-0.5 block">Opens empty clean decoy</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 7. Security Health Center & Cryptographic Audit */}
           <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -266,11 +313,22 @@ export default function PrivacySettingsModal({
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-                100% MILITARY GRADE
+                100% ZERO-KNOWLEDGE E2EE
               </span>
             </div>
 
             <div className="grid grid-cols-1 gap-2 pt-1 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <p className="font-semibold text-white text-[11px]">Client-Side Zero-Knowledge E2EE</p>
+                    <p className="text-[10px] text-slate-400">AES-256-GCM + PBKDF2 (Zero Plaintext on Server)</p>
+                  </div>
+                </div>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              </div>
+
               <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Database className="w-4 h-4 text-cyan-400" />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Lock, Unlock, Bot, Flame, Smile, Mic, Paperclip, X, KeyRound, Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react';
 import { analyzeMessageSensitivity } from '../utils/aiPrivacyDetector';
+import { encryptE2EE } from '../utils/e2eeCrypto';
 
 const DEFAULT_CATEGORIES = [
   { id: 'Adult & Physical Intimacy 🔞', label: 'Intimacy 🔞' },
@@ -72,7 +73,7 @@ export default function ChatInput({
     }
   }, [text, settings]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text.trim()) return;
 
@@ -96,8 +97,18 @@ export default function ChatInput({
     const finalPasscode = shouldLock ? (passcode.trim() || '1234') : null;
     const finalHint = shouldLock ? (passcodeHint.trim() || (passcode.trim() ? '' : '1234')) : null;
 
+    let e2eeEnvelope = null;
+    if (shouldLock && finalPasscode) {
+      try {
+        e2eeEnvelope = await encryptE2EE(text.trim(), finalPasscode);
+      } catch (err) {
+        console.warn('E2EE encryption warning:', err);
+      }
+    }
+
     onSendMessage({
       text: text.trim(),
+      e2eeEnvelope: e2eeEnvelope,
       isLocked: shouldLock,
       category: shouldLock ? finalCategory : 'General',
       isAiShielded: autoShielded || aiDetection.isSensitive,

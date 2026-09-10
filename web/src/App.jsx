@@ -13,6 +13,8 @@ import AppLockModal from './components/AppLockModal';
 import AiTrainingModal from './components/AiTrainingModal';
 import CreateGroupModal from './components/CreateGroupModal';
 import { useBiometrics } from './hooks/useBiometrics';
+import StealthCalculator from './components/StealthCalculator';
+import { decryptE2EE, isE2EEEncrypted } from './utils/e2eeCrypto';
 
 const getBackendUrl = () => {
   if (import.meta.env?.VITE_BACKEND_URL) {
@@ -27,6 +29,9 @@ const DEFAULT_SETTINGS = {
   autoRelockSeconds: 15,
   antiShoulderSurfing: true,
   idleLockMinutes: 5,
+  stealthCalculator: false,
+  stealthPin: '1234',
+  decoyPin: '9999',
   categories: {
     adult_intimacy: true,
     romance_feelings: true,
@@ -36,6 +41,14 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function App() {
+  const [isStealthMode, setIsStealthMode] = useState(() => {
+    try {
+      return localStorage.getItem('secret_bubble_stealth_active') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isDecoySession, setIsDecoySession] = useState(false);
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('secure_chat_user');
@@ -534,6 +547,27 @@ export default function App() {
 
   const handleUnlockPasscodeMessage = useCallback(async (messageId, passcode) => {
     try {
+      // 1. Client-Side Zero-Knowledge E2EE Decryption
+      const targetMsg = messages.find(m => m.id === messageId);
+      const e2eeCandidate = targetMsg?.e2eeEnvelope || (targetMsg && isE2EEEncrypted(targetMsg.text) ? targetMsg.text : null);
+      if (e2eeCandidate) {
+        const localDecrypted = await decryptE2EE(e2eeCandidate, passcode);
+        if (localDecrypted) {
+          setUnlockedPasscodeTexts(prev => ({
+            ...prev,
+            [messageId]: localDecrypted
+          }));
+          // Notify server asynchronously for view counting
+          fetch(`${backendUrl}/api/messages/unlock-passcode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messageId, passcode })
+          }).catch(() => {});
+          return { success: true, text: localDecrypted, isE2ee: true };
+        }
+      }
+
+      // 2. Server API fallback for server-hashed messages
       const res = await fetch(`${backendUrl}/api/messages/unlock-passcode`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -541,17 +575,25 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success && data.text) {
+        let finalText = data.text;
+        const envelope = data.e2eeEnvelope || (isE2EEEncrypted(data.text) ? data.text : null);
+        if (envelope) {
+          const decryptedFromEnvelope = await decryptE2EE(envelope, passcode);
+          if (decryptedFromEnvelope) {
+            finalText = decryptedFromEnvelope;
+          }
+        }
         setUnlockedPasscodeTexts(prev => ({
           ...prev,
-          [messageId]: data.text
+          [messageId]: finalText
         }));
-        return { success: true, text: data.text };
+        return { success: true, text: finalText };
       }
       return { success: false, message: data.message || 'Incorrect passcode' };
     } catch (err) {
-      return { success: false, message: 'Server connection error' };
+      return { success: false, message: 'Decryption failed or server error' };
     }
-  }, [backendUrl]);
+  }, [backendUrl, messages]);
 
   const handleRelockPasscodeMessage = useCallback((messageId) => {
     setUnlockedPasscodeTexts(prev => {
@@ -571,6 +613,28 @@ export default function App() {
     if (socket) socket.disconnect();
   };
 
+  if (isStealthMode) {
+    return (
+      <StealthCalculator
+        secretPin={settings.stealthPin || '1234'}
+        decoyPin={settings.decoyPin || '9999'}
+        onUnlock={(isDecoy) => {
+          setIsStealthMode(false);
+          setIsDecoySession(Boolean(isDecoy));
+          try {
+            localStorage.setItem('secret_bubble_stealth_active', 'false');
+          } catch {}
+        }}
+        onExitStealth={() => {
+          setIsStealthMode(false);
+          try {
+            localStorage.setItem('secret_bubble_stealth_active', 'false');
+          } catch {}
+        }}
+      />
+    );
+  }
+
   if (!currentUser) {
     return (
       <LoginPage
@@ -582,6 +646,25 @@ export default function App() {
       />
     );
   }
+
+  const displayedMessages = isDecoySession ? [
+    {
+      id: 'decoy-1',
+      sender: 'Campus Notes',
+      senderId: 'sys-decoy-1',
+      text: 'Shared the physics and mathematics notes from today.',
+      isLocked: false,
+      timestamp: new Date(Date.now() - 3600000).toISOString()
+    },
+    {
+      id: 'decoy-2',
+      sender: 'Study Group',
+      senderId: 'sys-decoy-2',
+      text: 'Assignment submission deadline is 5 PM tomorrow.',
+      isLocked: false,
+      timestamp: new Date().toISOString()
+    }
+  ] : messages;
 
   const isCurrentTargetTyping = selectedTarget.type === 'user' && Boolean(typingUsers[selectedTarget.id]);
 
@@ -649,6 +732,14 @@ export default function App() {
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
+            onToggleStealth={() => {
+              setIsStealthMode(true);
+              try {
+                localStorage.setItem('secret_bubble_stealth_active', 'true');
+              } catch {}
+            }}
+            isDecoyActive={isDecoySession}
+            onExitDecoy={() => setIsDecoySession(false)}
             aiEnabled={settings.aiEnabled}
             isTyping={isCurrentTargetTyping}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -656,7 +747,7 @@ export default function App() {
 
           {/* Messages Feed */}
           <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-1">
-            {messages.length === 0 ? (
+            {displayedMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600/20 to-indigo-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-3 shadow-lg">
                   {selectedTarget.id === 'user-meta-ai' ? (
@@ -681,7 +772,7 @@ export default function App() {
                 </p>
               </div>
             ) : (
-              messages.map((msg) => (
+              displayedMessages.map((msg) => (
                 <MessageItem
                   key={msg.id}
                   message={msg}

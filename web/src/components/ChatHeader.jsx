@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users } from 'lucide-react';
+import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Calculator } from 'lucide-react';
 
 export default function ChatHeader({
   target,
@@ -11,7 +11,10 @@ export default function ChatHeader({
   aiEnabled,
   isTyping,
   onToggleSidebar,
-  disappearingTimer
+  disappearingTimer,
+  onToggleStealth,
+  isDecoyActive,
+  onExitDecoy
 }) {
   const isMetaAi = target?.id === 'user-meta-ai' || target?.isBot;
 
@@ -129,6 +132,26 @@ export default function ChatHeader({
             <span>{disappearingTimer}s</span>
           </div>
         )}
+
+        {/* Decoy Session Active Warning */}
+        {isDecoyActive && (
+          <button
+            onClick={onExitDecoy}
+            className="px-2 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-xl text-[10px] font-bold flex items-center gap-1 hover:bg-amber-500/30 transition animate-pulse"
+            title="Decoy Mode Active. Click to exit."
+          >
+            <span>🛡️ DECOY MODE</span>
+          </button>
+        )}
+
+        {/* Stealth Calculator Camouflage (Panic Button) */}
+        <button
+          onClick={onToggleStealth}
+          className="p-2 bg-neutral-800/90 hover:bg-neutral-700 text-orange-400 hover:text-orange-300 border border-neutral-700/80 rounded-xl transition shadow-sm"
+          title="Stealth Mode: Instant Calculator Disguise"
+        >
+          <Calculator className="w-4 h-4" />
+        </button>
 
         {/* Telegram Instant App Lock */}
         <button
