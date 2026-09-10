@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   X, Bot, Shield, Clock, Flame, Heart, Lock, Key, CheckCircle, EyeOff, 
-  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2, Calculator 
+  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2, Headphones, Music 
 } from 'lucide-react';
 
 export default function PrivacySettingsModal({
@@ -256,24 +256,31 @@ export default function PrivacySettingsModal({
             </p>
           </div>
 
-          {/* 6. Stealth Calculator Camouflage Disguise */}
-          <div className="p-4 rounded-2xl bg-neutral-950/90 border border-neutral-800 space-y-3">
+          {/* 6. Stealth Lo-Fi Music Player Camouflage Disguise */}
+          <div className="p-4 rounded-2xl bg-purple-950/40 border border-purple-800/60 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-orange-500/20 text-orange-400">
-                  <Calculator className="w-4 h-4" />
+                <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400">
+                  <Headphones className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-white">Stealth Calculator Disguise</p>
-                  <p className="text-[11px] text-neutral-400">Camouflages the app as an innocent calculator</p>
+                  <p className="text-sm font-bold text-white">Lo-Fi Music Player Camouflage</p>
+                  <p className="text-[11px] text-purple-300/70">Disguises the entire app as a chill Lo-Fi music player</p>
                 </div>
               </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-purple-500/20 text-[11px] text-slate-300 space-y-1">
+              <p className="text-purple-300 font-semibold">⚡ How to unlock secret chat:</p>
+              <p>• <strong>Triple-tap</strong> the rotating vinyl disc</p>
+              <p>• Or tap the <strong>Heart ❤️</strong> icon 3 times</p>
+              <p>• Or tap <strong>EQ (Equalizer)</strong> icon and enter PIN</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div>
                 <label className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider block mb-1">
-                  Secret PIN (Unlock)
+                  Secret EQ PIN (Unlock)
                 </label>
                 <input
                   type="text"
@@ -281,9 +288,8 @@ export default function PrivacySettingsModal({
                   value={settings.stealthPin || '1234'}
                   onChange={(e) => onUpdateSettings({ ...settings, stealthPin: e.target.value.replace(/\D/g, '') || '1234' })}
                   placeholder="1234"
-                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white font-mono focus:border-orange-500 focus:outline-none"
+                  className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white font-mono focus:border-purple-500 focus:outline-none"
                 />
-                <span className="text-[9px] text-neutral-500 mt-0.5 block">Type PIN then "="</span>
               </div>
 
               <div>
@@ -298,7 +304,7 @@ export default function PrivacySettingsModal({
                   placeholder="9999"
                   className="w-full px-3 py-1.5 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white font-mono focus:border-cyan-500 focus:outline-none"
                 />
-                <span className="text-[9px] text-neutral-500 mt-0.5 block">Opens empty clean decoy</span>
+                <span className="text-[9px] text-neutral-500 mt-0.5 block">Opens clean decoy</span>
               </div>
             </div>
           </div>

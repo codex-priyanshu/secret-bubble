@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Calculator } from 'lucide-react';
+import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Headphones } from 'lucide-react';
 
 export default function ChatHeader({
   target,
@@ -144,13 +144,13 @@ export default function ChatHeader({
           </button>
         )}
 
-        {/* Stealth Calculator Camouflage (Panic Button) */}
+        {/* Stealth Music Player Camouflage (Panic Button) */}
         <button
           onClick={onToggleStealth}
-          className="p-2 bg-neutral-800/90 hover:bg-neutral-700 text-orange-400 hover:text-orange-300 border border-neutral-700/80 rounded-xl transition shadow-sm"
-          title="Stealth Mode: Instant Calculator Disguise"
+          className="p-2 bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 hover:text-purple-200 border border-purple-800/60 rounded-xl transition shadow-sm"
+          title="Panic Button: Instant Lo-Fi Music Disguise"
         >
-          <Calculator className="w-4 h-4" />
+          <Headphones className="w-4 h-4" />
         </button>
 
         {/* Telegram Instant App Lock */}

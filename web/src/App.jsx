@@ -13,7 +13,7 @@ import AppLockModal from './components/AppLockModal';
 import AiTrainingModal from './components/AiTrainingModal';
 import CreateGroupModal from './components/CreateGroupModal';
 import { useBiometrics } from './hooks/useBiometrics';
-import StealthCalculator from './components/StealthCalculator';
+import StealthMusicPlayer from './components/StealthMusicPlayer';
 import { decryptE2EE, isE2EEEncrypted } from './utils/e2eeCrypto';
 
 const getBackendUrl = () => {
@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS = {
   autoRelockSeconds: 15,
   antiShoulderSurfing: true,
   idleLockMinutes: 5,
-  stealthCalculator: false,
+  stealthMusicDisguise: false,
   stealthPin: '1234',
   decoyPin: '9999',
   categories: {
@@ -615,18 +615,12 @@ export default function App() {
 
   if (isStealthMode) {
     return (
-      <StealthCalculator
+      <StealthMusicPlayer
         secretPin={settings.stealthPin || '1234'}
         decoyPin={settings.decoyPin || '9999'}
         onUnlock={(isDecoy) => {
           setIsStealthMode(false);
           setIsDecoySession(Boolean(isDecoy));
-          try {
-            localStorage.setItem('secret_bubble_stealth_active', 'false');
-          } catch {}
-        }}
-        onExitStealth={() => {
-          setIsStealthMode(false);
           try {
             localStorage.setItem('secret_bubble_stealth_active', 'false');
           } catch {}
