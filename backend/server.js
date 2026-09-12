@@ -955,6 +955,91 @@ app.post('/api/messages/unlock-passcode', (req, res) => {
 });
 
 // =========================================================================
+// Real Online Music Search & YouTube Audio Streamer
+// =========================================================================
+app.get('/api/music/youtube-search', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) {
+    return res.json({ success: true, results: [] });
+  }
+
+  try {
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q + ' song')}`;
+    const ytRes = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    const html = await ytRes.text();
+    const results = [];
+
+    // 1. Try parsing ytInitialData
+    const jsonMatch = html.match(/var ytInitialData = ({.+?});<\/script>/);
+    if (jsonMatch) {
+      try {
+        const data = JSON.parse(jsonMatch[1]);
+        const sections = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+        for (const sec of sections) {
+          const items = sec?.itemSectionRenderer?.contents || [];
+          for (const item of items) {
+            const video = item.videoRenderer;
+            if (video && video.videoId) {
+              const durText = video.lengthText?.simpleText || '3:30';
+              let secs = 210;
+              const parts = durText.split(':').map(Number);
+              if (parts.length === 2) secs = (parts[0] * 60) + parts[1];
+              else if (parts.length === 3) secs = (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+
+              results.push({
+                id: `yt-${video.videoId}`,
+                youtubeId: video.videoId,
+                title: video.title?.runs?.[0]?.text || q,
+                artist: video.ownerText?.runs?.[0]?.text || "YouTube Music",
+                album: "YouTube",
+                artwork: video.thumbnail?.thumbnails?.[video.thumbnail.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`,
+                duration: secs,
+                durationText: durText,
+                isYoutube: true
+              });
+              if (results.length >= 15) break;
+            }
+          }
+          if (results.length >= 15) break;
+        }
+      } catch (e) {}
+    }
+
+    // 2. Fallback regex match if JSON format differed
+    if (results.length === 0) {
+      const regex = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+      let match;
+      while ((match = regex.exec(html)) !== null && results.length < 10) {
+        const vId = match[1];
+        if (!results.some(r => r.youtubeId === vId)) {
+          results.push({
+            id: `yt-${vId}`,
+            youtubeId: vId,
+            title: `${q} (Full Track)`,
+            artist: "YouTube Online",
+            album: "YouTube",
+            artwork: `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
+            duration: 230,
+            durationText: "3:50",
+            isYoutube: true
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, results });
+  } catch (err) {
+    console.error('YouTube search error:', err);
+    res.json({ success: false, results: [], message: err.message });
+  }
+});
+
+// =========================================================================
 // Custom Group Endpoints (Public & Private Channels)
 // =========================================================================
 const groupCreateLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 15, keyPrefix: 'group-create' });
