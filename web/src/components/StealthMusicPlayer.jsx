@@ -16,6 +16,7 @@ const FEATURED_ONLINE_TRACKS = [
     artist: "Arijit Singh, Pritam & Amitabh Bhattacharya",
     album: "Brahmāstra Soundtrack",
     duration: 268,
+    durationText: "4:28",
     isYoutube: true,
     artwork: "https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg",
     color: "from-amber-950/60 via-slate-950 to-slate-950"
@@ -27,9 +28,46 @@ const FEATURED_ONLINE_TRACKS = [
     artist: "Anirudh Ravichander, Arijit Singh & Shilpa Rao",
     album: "Jawan Soundtrack",
     duration: 200,
+    durationText: "3:20",
     isYoutube: true,
     artwork: "https://i.ytimg.com/vi/6mr4cYJ7yew/hqdefault.jpg",
     color: "from-rose-950/60 via-slate-950 to-slate-950"
+  },
+  {
+    id: 'yt-ElZfdU54Cp8',
+    youtubeId: 'ElZfdU54Cp8',
+    title: "Apna Bana Le - Bhediya (Full Audio)",
+    artist: "Arijit Singh & Sachin-Jigar",
+    album: "Bhediya Soundtrack",
+    duration: 261,
+    durationText: "4:21",
+    isYoutube: true,
+    artwork: "https://i.ytimg.com/vi/ElZfdU54Cp8/hqdefault.jpg",
+    color: "from-indigo-950/60 via-slate-950 to-slate-950"
+  },
+  {
+    id: 'yt-dCmp56tSSmA',
+    youtubeId: 'dCmp56tSSmA',
+    title: "295 - Sidhu Moose Wala (Full Track)",
+    artist: "Sidhu Moose Wala",
+    album: "Moosetape",
+    duration: 270,
+    durationText: "4:30",
+    isYoutube: true,
+    artwork: "https://i.ytimg.com/vi/dCmp56tSSmA/hqdefault.jpg",
+    color: "from-blue-950/60 via-slate-950 to-slate-950"
+  },
+  {
+    id: 'yt-RLzC55ai0eo',
+    youtubeId: 'RLzC55ai0eo',
+    title: "Heeriye (Official Full Song)",
+    artist: "Jasleen Royal ft. Arijit Singh",
+    album: "Single",
+    duration: 195,
+    durationText: "3:15",
+    isYoutube: true,
+    artwork: "https://i.ytimg.com/vi/RLzC55ai0eo/hqdefault.jpg",
+    color: "from-teal-950/60 via-slate-950 to-slate-950"
   },
   {
     id: 'yt-jfKfPfyJRdk',
@@ -38,20 +76,10 @@ const FEATURED_ONLINE_TRACKS = [
     artist: "Lofi Girl 24/7 Live Stream",
     album: "Chillhop 24/7",
     duration: 7200, // 2 hours
+    durationText: "2:00:00",
     isYoutube: true,
     artwork: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg",
     color: "from-purple-950/60 via-slate-950 to-slate-950"
-  },
-  {
-    id: 'yt-dCmp56tSSmA',
-    youtubeId: 'dCmp56tSSmA',
-    title: "295 - Sidhu Moose Wala (Official Audio)",
-    artist: "Sidhu Moose Wala",
-    album: "Moosetape",
-    duration: 270,
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/dCmp56tSSmA/hqdefault.jpg",
-    color: "from-blue-950/60 via-slate-950 to-slate-950"
   }
 ];
 
@@ -67,7 +95,8 @@ const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEA
 export default function StealthMusicPlayer({
   onUnlock,
   secretPin = '1234',
-  decoyPin = '9999'
+  decoyPin = '9999',
+  backendUrl = ''
 }) {
   const [tracks, setTracks] = useState(FEATURED_ONLINE_TRACKS);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -192,22 +221,105 @@ export default function StealthMusicPlayer({
     }
   }, [currentTrack, isPlaying, isMuted]);
 
+  const getBackendApiUrl = useCallback(() => {
+    if (backendUrl) return backendUrl.replace(/\/$/, '');
+    if (import.meta.env?.VITE_BACKEND_URL) return import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '');
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname || 'localhost';
+      return `http://${hostname}:5000`;
+    }
+    return '';
+  }, [backendUrl]);
+
+  // Handle Real Audio / YouTube Playback
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (currentTrack?.isYoutube) {
+      // YouTube mode: HTML5 audio pauses, iframe streams
+      audio.pause();
+      if (iframeRef.current?.contentWindow) {
+        try {
+          const cmd = isPlaying ? 'playVideo' : 'pauseVideo';
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: cmd, args: [] }),
+            '*'
+          );
+        } catch (e) {}
+      }
+    } else if (currentTrack?.url) {
+      // Local phone audio stream mode
+      audio.src = currentTrack.url;
+      audio.volume = isMuted ? 0 : volume / 100;
+      if (isPlaying) {
+        audio.play().catch(err => console.log('Audio playback notice:', err));
+      } else {
+        audio.pause();
+      }
+    }
+  }, [currentTrack, isPlaying, isMuted]);
+
   // Update Volume
   useEffect(() => {
-    if (audioRef.current) {
+    if (audioRef.current && !currentTrack?.isYoutube) {
       audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
-  }, [volume, isMuted]);
+    if (currentTrack?.isYoutube && iframeRef.current?.contentWindow) {
+      try {
+        const vol = isMuted ? 0 : volume;
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'setVolume', args: [vol] }),
+          '*'
+        );
+      } catch (e) {}
+    }
+  }, [volume, isMuted, currentTrack]);
+
+  // Listen to YouTube Iframe events (infoDelivery for real time/duration & onStateChange for auto-next)
+  useEffect(() => {
+    const handleYtMessage = (event) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (!data) return;
+
+        // Synchronize duration & current time from real YouTube player
+        if (data.event === 'infoDelivery' && data.info) {
+          if (typeof data.info.currentTime === 'number') {
+            setCurrentTime(Math.floor(data.info.currentTime));
+          }
+          if (typeof data.info.duration === 'number' && data.info.duration > 30) {
+            setDuration(Math.floor(data.info.duration));
+          }
+        }
+
+        // Handle video playback states: 0 = ENDED, 1 = PLAYING, 2 = PAUSED
+        if (data.event === 'onStateChange') {
+          if (data.info === 0) {
+            // Full song ended -> smoothly play next track
+            handleNextTrack();
+          } else if (data.info === 1) {
+            setIsPlaying(true);
+          } else if (data.info === 2) {
+            setIsPlaying(false);
+          }
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener('message', handleYtMessage);
+    return () => window.removeEventListener('message', handleYtMessage);
+  }, [handleNextTrack]);
 
   // Time progression for HTML5 audio
   const handleTimeUpdate = () => {
-    if (audioRef.current && !currentTrack.isYoutube) {
+    if (audioRef.current && !currentTrack?.isYoutube) {
       setCurrentTime(Math.floor(audioRef.current.currentTime));
     }
   };
 
   const handleLoadedMetadata = () => {
-    if (audioRef.current && !currentTrack.isYoutube) {
+    if (audioRef.current && !currentTrack?.isYoutube) {
       const dur = Math.floor(audioRef.current.duration);
       if (dur > 0) {
         setDuration(dur);
@@ -226,13 +338,13 @@ export default function StealthMusicPlayer({
     }
   };
 
-  // Continuous auto-progression timer for YouTube streams
+  // Continuous timer for UI progress (fallback in case iframe messages are delayed)
   useEffect(() => {
     let timer = null;
-    if (isPlaying && currentTrack.isYoutube) {
+    if (isPlaying && currentTrack?.isYoutube) {
       timer = setInterval(() => {
         setCurrentTime(prev => {
-          if (prev >= duration) {
+          if (duration > 0 && prev >= duration) {
             handleNextTrack();
             return 0;
           }
@@ -243,10 +355,20 @@ export default function StealthMusicPlayer({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isPlaying, currentTrack.isYoutube, duration, handleNextTrack]);
+  }, [isPlaying, currentTrack?.isYoutube, duration, handleNextTrack]);
 
   const togglePlay = () => {
-    setIsPlaying(p => !p);
+    const nextPlay = !isPlaying;
+    setIsPlaying(nextPlay);
+    if (currentTrack?.isYoutube && iframeRef.current?.contentWindow) {
+      try {
+        const cmd = nextPlay ? 'playVideo' : 'pauseVideo';
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: cmd, args: [] }),
+          '*'
+        );
+      } catch (e) {}
+    }
   };
 
   const handleSeek = (e) => {
@@ -256,13 +378,20 @@ export default function StealthMusicPlayer({
     const percentage = Math.max(0, Math.min(1, clickX / width));
     const newTime = Math.floor(percentage * duration);
     setCurrentTime(newTime);
-    if (audioRef.current && !currentTrack.isYoutube) {
+    if (currentTrack?.isYoutube && iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'seekTo', args: [newTime, true] }),
+          '*'
+        );
+      } catch (e) {}
+    } else if (audioRef.current && !currentTrack?.isYoutube) {
       audioRef.current.currentTime = newTime;
     }
   };
 
   // =========================================================================
-  // Unified Full-Song Search (YouTube + Online Streaming API)
+  // Unified Full-Song Search (100% Full-Length Songs - Zero 30-sec clips)
   // =========================================================================
   const handleSearchSubmit = async (e) => {
     e?.preventDefault();
@@ -286,6 +415,7 @@ export default function StealthMusicPlayer({
           artist: oembedData.author_name || "YouTube Music",
           album: "YouTube Online",
           duration: 260,
+          durationText: "Full Song",
           isYoutube: true,
           artwork: `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`,
           color: "from-red-950/60 via-slate-950 to-slate-950"
@@ -301,6 +431,7 @@ export default function StealthMusicPlayer({
           artist: "YouTube Online",
           album: "YouTube",
           duration: 260,
+          durationText: "Full Song",
           isYoutube: true,
           artwork: `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`,
           color: "from-red-950/60 via-slate-950 to-slate-950"
@@ -311,26 +442,34 @@ export default function StealthMusicPlayer({
       }
     }
 
-    // 2. Dual Search: Query our backend YouTube Search API AND global iTunes API
+    // 2. Full-Length Song Search via Backend API with intelligent fallback
     try {
-      const [backendYtRes, itunesRes] = await Promise.allSettled([
-        fetch(`/api/music/youtube-search?q=${encodeURIComponent(query)}`).then(r => r.json()),
-        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=12`).then(r => r.json())
-      ]);
+      const apiBase = getBackendApiUrl();
+      let backendData = null;
 
-      const combined = [];
+      try {
+        const res = await fetch(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+        if (res.ok) backendData = await res.json();
+      } catch (err) {
+        // Relative URL fallback
+        try {
+          const res = await fetch(`/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+          if (res.ok) backendData = await res.json();
+        } catch (e) {}
+      }
 
-      // YouTube Full Results (Highest Priority for complete songs)
-      if (backendYtRes.status === 'fulfilled' && backendYtRes.value?.success && Array.isArray(backendYtRes.value.results)) {
-        backendYtRes.value.results.forEach(item => {
-          combined.push({
+      const fullSongResults = [];
+
+      if (backendData?.success && Array.isArray(backendData.results) && backendData.results.length > 0) {
+        backendData.results.forEach(item => {
+          fullSongResults.push({
             id: item.id || `yt-${item.youtubeId}`,
             youtubeId: item.youtubeId,
             title: item.title,
             artist: item.artist,
-            album: item.album || "YouTube",
-            duration: item.duration || 230,
-            durationText: item.durationText || "3:50",
+            album: item.album || "YouTube Full Song",
+            duration: item.duration || 240,
+            durationText: item.durationText || "Full Song",
             artwork: item.artwork,
             isYoutube: true,
             color: "from-red-950/50 via-slate-950 to-slate-950"
@@ -338,27 +477,43 @@ export default function StealthMusicPlayer({
         });
       }
 
-      // Online High-Def Stream Results
-      if (itunesRes.status === 'fulfilled' && itunesRes.value?.results) {
-        itunesRes.value.results.forEach((item, idx) => {
-          combined.push({
-            id: `itunes-${item.trackId || idx}`,
-            title: item.trackName,
-            artist: item.artistName,
-            album: item.collectionName || 'Single',
-            duration: Math.floor((item.trackTimeMillis || 200000) / 1000),
-            url: item.previewUrl,
-            artwork: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : null,
-            isOnline: true,
-            color: "from-indigo-950/50 via-slate-950 to-slate-950"
-          });
-        });
+      // 3. Fallback: If 0 results, query YouTube search suggestions and retry
+      if (fullSongResults.length === 0) {
+        try {
+          const sugRes = await fetch(`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(query)}`);
+          const sugData = await sugRes.json();
+          if (Array.isArray(sugData?.[1]) && sugData[1].length > 0) {
+            const topSuggestion = sugData[1][0];
+            if (topSuggestion && topSuggestion !== query) {
+              const retryRes = await fetch(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(topSuggestion)}`);
+              if (retryRes.ok) {
+                const retryData = await retryRes.json();
+                if (retryData?.success && Array.isArray(retryData.results)) {
+                  retryData.results.forEach(item => {
+                    fullSongResults.push({
+                      id: item.id || `yt-${item.youtubeId}`,
+                      youtubeId: item.youtubeId,
+                      title: item.title,
+                      artist: item.artist,
+                      album: "YouTube Full Song",
+                      duration: item.duration || 240,
+                      durationText: item.durationText || "Full Song",
+                      artwork: item.artwork,
+                      isYoutube: true,
+                      color: "from-red-950/50 via-slate-950 to-slate-950"
+                    });
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {}
       }
 
-      if (combined.length > 0) {
-        setSearchResults(combined);
+      if (fullSongResults.length > 0) {
+        setSearchResults(fullSongResults);
       } else {
-        setSearchError('No songs found. Try searching another song title or artist.');
+        setSearchError('No songs found. Try another song title or artist name.');
       }
     } catch (err) {
       setSearchError('Network error. Please check your internet connection.');
@@ -494,19 +649,20 @@ export default function StealthMusicPlayer({
         playsInline
       />
 
-      {/* Persistent YouTube Audio/Video Frame (Kept rendered offscreen to guarantee continuous background audio) */}
+      {/* Persistent YouTube Audio/Video Frame (Kept rendered in-viewport to guarantee continuous background playback) */}
       {currentTrack.isYoutube && (
         <div 
           className={
             showVideoMode 
               ? "fixed top-14 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md p-2 animate-in zoom-in-95 duration-200" 
-              : "fixed -bottom-[999px] -right-[999px] w-12 h-12 opacity-0 pointer-events-none overflow-hidden"
+              : "fixed top-0 left-0 w-2 h-2 opacity-[0.001] pointer-events-none overflow-hidden -z-50"
           }
         >
           <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black">
             <iframe
               ref={iframeRef}
-              src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1`}
+              key={currentTrack.youtubeId}
+              src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
               title={currentTrack.title}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -539,14 +695,25 @@ export default function StealthMusicPlayer({
       <div className="flex items-center justify-between w-full max-w-md mx-auto pt-2 gap-2">
         
         {/* Open Online Search & Library */}
-        <button
-          onClick={() => setShowPlaylist(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-slate-200 transition active:scale-95 shadow-sm truncate"
-          title="Search YouTube & Online Songs"
-        >
-          <Search className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-          <span className="truncate">Search Any Song / YouTube</span>
-        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={() => { setActiveTab('search'); setShowPlaylist(true); }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-slate-200 transition active:scale-95 shadow-sm truncate cursor-pointer"
+            title="Search Any Song / YouTube"
+          >
+            <Search className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <span className="truncate">Search Song</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('playlist'); setShowPlaylist(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-xs font-semibold text-purple-200 transition active:scale-95 shadow-sm shrink-0 cursor-pointer"
+            title="Current Playlist"
+          >
+            <List className="w-3.5 h-3.5 text-purple-300" />
+            <span>Playlist ({tracks.length})</span>
+          </button>
+        </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-1.5 shrink-0">
@@ -733,15 +900,25 @@ export default function StealthMusicPlayer({
             </button>
           </div>
 
-          <button
-            onClick={() => setIsRepeat(r => !r)}
-            className={`p-2 rounded-full transition ${
-              isRepeat ? 'text-purple-400' : 'text-slate-400 hover:text-white'
-            }`}
-            title="Repeat"
-          >
-            <Repeat className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsRepeat(r => !r)}
+              className={`p-2 rounded-full transition ${
+                isRepeat ? 'text-purple-400' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Repeat"
+            >
+              <Repeat className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('playlist'); setShowPlaylist(true); }}
+              className="p-2 text-slate-400 hover:text-purple-300 rounded-full transition cursor-pointer"
+              title="Open Playlist / Queue"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
 
         </div>
 
@@ -788,22 +965,34 @@ export default function StealthMusicPlayer({
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex gap-2 border-b border-slate-800 pb-2">
+            <div className="flex gap-1.5 border-b border-slate-800 pb-2 overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('playlist')}
+                className={`flex-1 py-1.5 px-2 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'playlist'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-white'
+                }`}
+              >
+                <List className="w-3.5 h-3.5 text-purple-300" />
+                <span>Playlist ({tracks.length})</span>
+              </button>
+
               <button
                 onClick={() => setActiveTab('search')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'search'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'bg-slate-800/80 text-slate-400 hover:text-white'
                 }`}
               >
                 <Search className="w-3.5 h-3.5" />
-                <span>Search / YouTube</span>
+                <span>Search</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('trending')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'trending'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'bg-slate-800/80 text-slate-400 hover:text-white'
@@ -815,7 +1004,7 @@ export default function StealthMusicPlayer({
 
               <button
                 onClick={() => setActiveTab('phone')}
-                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'phone'
                     ? 'bg-purple-600 text-white shadow-md'
                     : 'bg-slate-800/80 text-slate-400 hover:text-white'
@@ -825,6 +1014,94 @@ export default function StealthMusicPlayer({
                 <span>Phone Songs</span>
               </button>
             </div>
+
+            {/* TAB 0: Active Playlist & Queue */}
+            {activeTab === 'playlist' && (
+              <div className="space-y-3 flex-1 flex flex-col min-h-0">
+                <div className="flex items-center justify-between px-1 py-1">
+                  <div>
+                    <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <List className="w-4 h-4 text-purple-400" />
+                      <span>Current Playing Queue ({tracks.length} Songs)</span>
+                    </h3>
+                    <p className="text-[10px] text-slate-400">Tapping any song plays full length immediately</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('search')}
+                    className="px-2.5 py-1 bg-purple-600/30 hover:bg-purple-600 text-purple-200 hover:text-white rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Add Songs</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                  {tracks.map((track, idx) => {
+                    const isCurrent = idx === currentTrackIndex;
+                    return (
+                      <div
+                        key={track.id || idx}
+                        onClick={() => {
+                          setCurrentTrackIndex(idx);
+                          setIsPlaying(true);
+                        }}
+                        className={`flex items-center justify-between p-2.5 rounded-2xl border transition cursor-pointer ${
+                          isCurrent 
+                            ? 'bg-purple-900/40 border-purple-500/60 shadow-lg shadow-purple-950/40' 
+                            : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/60 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 pr-2">
+                          <span className={`text-xs font-mono w-4 text-center shrink-0 ${isCurrent ? 'text-purple-400 font-bold' : 'text-slate-500'}`}>
+                            {isCurrent ? '▶' : idx + 1}
+                          </span>
+                          <img
+                            src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                            alt={track.title}
+                            className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10"
+                          />
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold truncate ${isCurrent ? 'text-purple-300' : 'text-white'}`}>
+                              {track.title}
+                            </p>
+                            <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                              <span className="px-1.5 py-0.2 rounded bg-emerald-600/30 text-emerald-300 text-[9px] font-bold">
+                                Full Song
+                              </span>
+                              {track.durationText && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  {track.durationText}
+                                </span>
+                              )}
+                              <span className="truncate">{track.artist}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isCurrent && isPlaying && (
+                            <div className="flex items-end gap-0.5 h-3 px-1">
+                              <span className="w-0.5 h-full bg-purple-400 animate-bounce" />
+                              <span className="w-0.5 h-2 bg-pink-400 animate-bounce delay-75" />
+                              <span className="w-0.5 h-3 bg-indigo-400 animate-bounce delay-150" />
+                            </div>
+                          )}
+                          {tracks.length > 1 && (
+                            <button
+                              onClick={(e) => handleDeleteTrack(track.id, e)}
+                              className="p-1.5 hover:bg-rose-900/40 text-slate-500 hover:text-rose-400 rounded-lg transition cursor-pointer"
+                              title="Remove from playlist"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* TAB 1: Online Search & YouTube Link */}
             {activeTab === 'search' && (
@@ -888,14 +1165,17 @@ export default function StealthMusicPlayer({
                         />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-white truncate">{item.title}</p>
-                          <p className="text-[11px] text-slate-400 truncate flex items-center gap-1">
-                            {item.isYoutube && (
-                              <span className="px-1 py-0.2 rounded bg-red-600/30 text-red-300 text-[9px] font-bold">
-                                YT
+                          <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
+                            <span className="px-1.5 py-0.2 rounded bg-emerald-600/30 text-emerald-300 text-[9px] font-bold">
+                              Full Song
+                            </span>
+                            {item.durationText && (
+                              <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 text-[9px] font-mono">
+                                {item.durationText}
                               </span>
                             )}
                             <span className="truncate">{item.artist}</span>
-                          </p>
+                          </div>
                         </div>
                       </div>
 

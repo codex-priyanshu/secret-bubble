@@ -618,6 +618,7 @@ export default function App() {
       <StealthMusicPlayer
         secretPin={settings.stealthPin || '1234'}
         decoyPin={settings.decoyPin || '9999'}
+        backendUrl={getBackendUrl()}
         onUnlock={(isDecoy) => {
           setIsStealthMode(false);
           setIsDecoySession(Boolean(isDecoy));

@@ -964,10 +964,10 @@ app.get('/api/music/youtube-search', async (req, res) => {
   }
 
   try {
-    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q + ' song')}`;
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q + ' full audio song')}`;
     const ytRes = await fetch(searchUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9'
       }
     });
@@ -975,7 +975,7 @@ app.get('/api/music/youtube-search', async (req, res) => {
     const results = [];
 
     // 1. Try parsing ytInitialData
-    const jsonMatch = html.match(/var ytInitialData = ({.+?});<\/script>/);
+    const jsonMatch = html.match(/(?:var\s+)?ytInitialData\s*=\s*({.+?});/);
     if (jsonMatch) {
       try {
         const data = JSON.parse(jsonMatch[1]);
@@ -985,27 +985,37 @@ app.get('/api/music/youtube-search', async (req, res) => {
           for (const item of items) {
             const video = item.videoRenderer;
             if (video && video.videoId) {
-              const durText = video.lengthText?.simpleText || '3:30';
-              let secs = 210;
-              const parts = durText.split(':').map(Number);
-              if (parts.length === 2) secs = (parts[0] * 60) + parts[1];
-              else if (parts.length === 3) secs = (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+              const durText = video.lengthText?.simpleText || '';
+              let secs = 240;
+              if (durText) {
+                const parts = durText.split(':').map(Number);
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                  secs = (parts[0] * 60) + parts[1];
+                } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+                  secs = (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+                }
+              }
+
+              const thumbs = video.thumbnail?.thumbnails || [];
+              const bestThumb = thumbs[thumbs.length - 1]?.url || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`;
+              const title = video.title?.runs?.[0]?.text || q;
+              const artist = video.ownerText?.runs?.[0]?.text || "YouTube Music";
 
               results.push({
                 id: `yt-${video.videoId}`,
                 youtubeId: video.videoId,
-                title: video.title?.runs?.[0]?.text || q,
-                artist: video.ownerText?.runs?.[0]?.text || "YouTube Music",
-                album: "YouTube",
-                artwork: video.thumbnail?.thumbnails?.[video.thumbnail.thumbnails.length - 1]?.url || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`,
+                title,
+                artist,
+                album: "YouTube Full Song",
+                artwork: bestThumb,
                 duration: secs,
-                durationText: durText,
+                durationText: durText || `${Math.floor(secs / 60)}:${secs % 60 < 10 ? '0' : ''}${secs % 60}`,
                 isYoutube: true
               });
-              if (results.length >= 15) break;
+              if (results.length >= 20) break;
             }
           }
-          if (results.length >= 15) break;
+          if (results.length >= 20) break;
         }
       } catch (e) {}
     }
@@ -1014,22 +1024,50 @@ app.get('/api/music/youtube-search', async (req, res) => {
     if (results.length === 0) {
       const regex = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
       let match;
-      while ((match = regex.exec(html)) !== null && results.length < 10) {
+      const seenIds = new Set();
+      const videoIds = [];
+      while ((match = regex.exec(html)) !== null && videoIds.length < 10) {
         const vId = match[1];
-        if (!results.some(r => r.youtubeId === vId)) {
-          results.push({
-            id: `yt-${vId}`,
-            youtubeId: vId,
-            title: `${q} (Full Track)`,
-            artist: "YouTube Online",
-            album: "YouTube",
-            artwork: `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
-            duration: 230,
-            durationText: "3:50",
-            isYoutube: true
-          });
+        if (!seenIds.has(vId)) {
+          seenIds.add(vId);
+          videoIds.push(vId);
         }
       }
+
+      // Query oEmbed for metadata in parallel
+      const oembedPromises = videoIds.map(async (vId) => {
+        try {
+          const oeRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vId}&format=json`);
+          if (oeRes.ok) {
+            const oeData = await oeRes.json();
+            return {
+              id: `yt-${vId}`,
+              youtubeId: vId,
+              title: oeData.title || `${q} (Full Track)`,
+              artist: oeData.author_name || "YouTube Music",
+              album: "YouTube Full Song",
+              artwork: oeData.thumbnail_url || `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
+              duration: 240,
+              durationText: "4:00",
+              isYoutube: true
+            };
+          }
+        } catch (e) {}
+        return {
+          id: `yt-${vId}`,
+          youtubeId: vId,
+          title: `${q} (Full Track)`,
+          artist: "YouTube Music",
+          album: "YouTube Full Song",
+          artwork: `https://i.ytimg.com/vi/${vId}/hqdefault.jpg`,
+          duration: 240,
+          durationText: "4:00",
+          isYoutube: true
+        };
+      });
+
+      const oembedResults = await Promise.all(oembedPromises);
+      results.push(...oembedResults);
     }
 
     res.json({ success: true, results });
