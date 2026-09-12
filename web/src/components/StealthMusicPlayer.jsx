@@ -3,61 +3,76 @@ import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, 
   Repeat, Shuffle, Heart, Disc, Sliders, Music, Radio, 
   Sparkles, Shield, X, Lock, Check, FolderPlus, List, 
-  Trash2, HardDrive, Smartphone, Music2, Plus
+  Trash2, HardDrive, Smartphone, Music2, Plus, Search, 
+  Globe, Flame, ExternalLink, Loader2, Video, Eye, EyeOff
 } from 'lucide-react';
 
-const INITIAL_DEMO_TRACKS = [
+const FEATURED_ONLINE_TRACKS = [
   {
-    id: 'demo-1',
-    title: "Midnight Memories (Lo-Fi Chill)",
-    artist: "Aura & Chillhop Beats",
-    album: "Focus & Serenity Vol. 4",
-    duration: 218, // 3:38
-    isLocal: false,
-    url: null,
-    color: "from-purple-900/40 via-indigo-950/60 to-slate-950",
-    accent: "text-purple-400"
+    id: 'online-kesariya',
+    title: "Kesariya (From Brahmastra)",
+    artist: "Pritam, Arijit Singh & Amitabh Bhattacharya",
+    album: "Brahmastra (Original Soundtrack)",
+    duration: 268,
+    url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/38/4c/5c/384c5c8f-3ff8-e457-b2f7-3158ce108649/mzaf_12389299033886433185.plus.aac.p.m4a",
+    artwork: "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/9f/13/ca/9f13ca3b-e533-03e0-f19a-f0aaa774581d/196589311191.jpg/600x600bb.jpg",
+    isOnline: true,
+    color: "from-amber-950/50 via-slate-950 to-slate-950"
   },
   {
-    id: 'demo-2',
-    title: "Rainy Cafe Dreams",
-    artist: "Komorebi Lofi",
-    album: "Coffee & Rain Sounds",
-    duration: 194, // 3:14
-    isLocal: false,
-    url: null,
-    color: "from-teal-900/40 via-slate-950 to-slate-950",
-    accent: "text-teal-400"
+    id: 'online-chaleya',
+    title: "Chaleya (From Jawan)",
+    artist: "Anirudh Ravichander, Arijit Singh & Shilpa Rao",
+    album: "Jawan Soundtrack",
+    duration: 200,
+    url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/76/05/d9/7605d905-f631-517d-df7f-e162affcd414/mzaf_9976541859961700749.plus.aac.p.m4a",
+    artwork: "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/bb/f4/f5/bbf4f511-3c12-c25e-a475-b6d06faa8c13/8902894362047_cover.jpg/600x600bb.jpg",
+    isOnline: true,
+    color: "from-rose-950/50 via-slate-950 to-slate-950"
   },
   {
-    id: 'demo-3',
-    title: "Stargazing at 3 AM",
-    artist: "Lunar Echoes",
-    album: "Deep Sleep & Study 432Hz",
-    duration: 245, // 4:05
-    isLocal: false,
-    url: null,
-    color: "from-rose-950/40 via-slate-950 to-slate-950",
-    accent: "text-rose-400"
+    id: 'online-lofi',
+    title: "Midnight Study Lo-Fi Beats",
+    artist: "Lofi Sleep Chill & Hip-Hop Beats",
+    album: "Lo-Fi Cafe 24/7",
+    duration: 180,
+    url: "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/10/0f/e6/100fe64f-0815-a9d5-9bec-e375ddd5a733/mzaf_8225005754342783380.plus.aac.p.m4a",
+    artwork: "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/71/15/c5/7115c542-cf70-35f6-e2e9-d2131ff538a2/5055803554880.png/600x600bb.jpg",
+    isOnline: true,
+    color: "from-purple-950/50 via-slate-950 to-slate-950"
   }
 ];
+
+function extractYouTubeId(url) {
+  if (!url) return null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  return match ? match[1] : null;
+}
 
 export default function StealthMusicPlayer({
   onUnlock,
   secretPin = '1234',
   decoyPin = '9999'
 }) {
-  const [tracks, setTracks] = useState(INITIAL_DEMO_TRACKS);
+  const [tracks, setTracks] = useState(FEATURED_ONLINE_TRACKS);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(218);
+  const [duration, setDuration] = useState(268);
   const [isLiked, setIsLiked] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [volume, setVolume] = useState(85);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [showVideoMode, setShowVideoMode] = useState(false);
+
+  // Online Search states
+  const [activeTab, setActiveTab] = useState('search'); // 'search' | 'trending' | 'phone'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchError, setSearchError] = useState('');
 
   // Secret unlock state
   const [tapCount, setTapCount] = useState(0);
@@ -71,42 +86,30 @@ export default function StealthMusicPlayer({
   // Audio elements
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
-  const synthCtxRef = useRef(null);
-  const synthIntervalRef = useRef(null);
+  const iframeRef = useRef(null);
 
   const currentTrack = tracks[currentTrackIndex] || tracks[0];
 
   // Update track duration when switching
   useEffect(() => {
     setCurrentTime(0);
-    if (currentTrack.isLocal && currentTrack.duration > 0) {
-      setDuration(currentTrack.duration);
-    } else {
-      setDuration(currentTrack.duration || 180);
-    }
+    setDuration(currentTrack.duration || 200);
   }, [currentTrackIndex, currentTrack]);
 
-  // Handle Real Audio Playback
+  // Handle Real Audio / YouTube Playback
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (currentTrack.isLocal && currentTrack.url) {
+    if (currentTrack.isYoutube) {
+      audio.pause();
+    } else if (currentTrack.url) {
       audio.src = currentTrack.url;
       audio.volume = isMuted ? 0 : volume / 100;
       if (isPlaying) {
-        audio.play().catch(err => console.log('Playback error:', err));
+        audio.play().catch(err => console.log('Playback notice:', err));
       } else {
         audio.pause();
-      }
-      stopSynthAudio();
-    } else {
-      // Demo Track: Use Web Audio API synthesizer so real audio comes out of speakers
-      audio.pause();
-      if (isPlaying && !isMuted) {
-        startSynthAudio();
-      } else {
-        stopSynthAudio();
       }
     }
   }, [currentTrack, isPlaying, isMuted]);
@@ -118,84 +121,18 @@ export default function StealthMusicPlayer({
     }
   }, [volume, isMuted]);
 
-  // Web Audio API Synthesizer (Generates warm, gentle lofi chords for demo tracks)
-  const startSynthAudio = () => {
-    try {
-      if (synthIntervalRef.current) return;
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!synthCtxRef.current) {
-        synthCtxRef.current = new AudioCtx();
-      }
-      const ctx = synthCtxRef.current;
-      if (ctx.state === 'suspended') ctx.resume();
-
-      const chords = [
-        [261.63, 329.63, 392.00, 493.88], // Cmaj7
-        [220.00, 261.63, 329.63, 392.00], // Am7
-        [174.61, 220.00, 261.63, 329.63], // Fmaj7
-        [196.00, 246.94, 293.66, 392.00]  // G7
-      ];
-      let chordIndex = 0;
-
-      const playChord = () => {
-        if (!synthCtxRef.current) return;
-        const currentChord = chords[chordIndex % chords.length];
-        chordIndex++;
-
-        currentChord.forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, ctx.currentTime);
-
-          const now = ctx.currentTime + (i * 0.08);
-          gain.gain.setValueAtTime(0.0001, now);
-          gain.gain.exponentialRampToValueAtTime((volume / 100) * 0.025, now + 0.1);
-          gain.gain.exponentialRampToValueAtTime(0.00001, now + 2.8);
-
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start(now);
-          osc.stop(now + 2.9);
-        });
-      };
-
-      playChord();
-      synthIntervalRef.current = setInterval(playChord, 3000);
-    } catch (e) {}
-  };
-
-  const stopSynthAudio = () => {
-    if (synthIntervalRef.current) {
-      clearInterval(synthIntervalRef.current);
-      synthIntervalRef.current = null;
-    }
-  };
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopSynthAudio();
-      if (synthCtxRef.current) {
-        try { synthCtxRef.current.close(); } catch {}
-      }
-    };
-  }, []);
-
-  // Time progression for simulated or local audio
+  // Time progression for HTML5 audio
   const handleTimeUpdate = () => {
-    if (audioRef.current && currentTrack.isLocal) {
+    if (audioRef.current && !currentTrack.isYoutube) {
       setCurrentTime(Math.floor(audioRef.current.currentTime));
     }
   };
 
   const handleLoadedMetadata = () => {
-    if (audioRef.current && currentTrack.isLocal) {
+    if (audioRef.current && !currentTrack.isYoutube) {
       const dur = Math.floor(audioRef.current.duration);
       if (dur > 0) {
         setDuration(dur);
-        setTracks(prev => prev.map((t, idx) => idx === currentTrackIndex ? { ...t, duration: dur } : t));
       }
     }
   };
@@ -211,10 +148,10 @@ export default function StealthMusicPlayer({
     }
   };
 
-  // Fallback progression timer for demo tracks
+  // Simulated timer progression for YouTube videos
   useEffect(() => {
     let timer = null;
-    if (isPlaying && !currentTrack.isLocal) {
+    if (isPlaying && currentTrack.isYoutube) {
       timer = setInterval(() => {
         setCurrentTime(prev => {
           if (prev >= duration) {
@@ -228,12 +165,9 @@ export default function StealthMusicPlayer({
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isPlaying, currentTrack.isLocal, duration]);
+  }, [isPlaying, currentTrack.isYoutube, duration]);
 
   const togglePlay = () => {
-    if (synthCtxRef.current && synthCtxRef.current.state === 'suspended') {
-      synthCtxRef.current.resume();
-    }
     setIsPlaying(p => !p);
   };
 
@@ -262,44 +196,131 @@ export default function StealthMusicPlayer({
     const percentage = Math.max(0, Math.min(1, clickX / width));
     const newTime = Math.floor(percentage * duration);
     setCurrentTime(newTime);
-    if (audioRef.current && currentTrack.isLocal) {
+    if (audioRef.current && !currentTrack.isYoutube) {
       audioRef.current.currentTime = newTime;
     }
   };
 
-  // Import Real Songs from Phone / Device
+  // Online Music Search & YouTube Link Handler
+  const handleSearchSubmit = async (e) => {
+    e?.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    setIsSearching(true);
+    setSearchError('');
+    setSearchResults([]);
+
+    // Check if query is a direct YouTube URL
+    const ytId = extractYouTubeId(query);
+    if (ytId) {
+      try {
+        const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`);
+        const oembedData = await oembedRes.json();
+        const ytTrack = {
+          id: `yt-${ytId}`,
+          title: oembedData.title || "YouTube Video Stream",
+          artist: oembedData.author_name || "YouTube Music",
+          album: "YouTube Online",
+          duration: 240,
+          isYoutube: true,
+          youtubeId: ytId,
+          artwork: `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`,
+          color: "from-red-950/50 via-slate-950 to-slate-950"
+        };
+        playTrackNow(ytTrack);
+        setIsSearching(false);
+        return;
+      } catch (err) {
+        // Fallback youtube track
+        const ytTrack = {
+          id: `yt-${ytId}`,
+          title: "YouTube Video Audio",
+          artist: "YouTube Online Stream",
+          album: "YouTube",
+          duration: 240,
+          isYoutube: true,
+          youtubeId: ytId,
+          artwork: `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`,
+          color: "from-red-950/50 via-slate-950 to-slate-950"
+        };
+        playTrackNow(ytTrack);
+        setIsSearching(false);
+        return;
+      }
+    }
+
+    // Otherwise, search global online music library via Apple Music / iTunes API
+    try {
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&limit=25`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const parsed = data.results.map((item, idx) => ({
+          id: `itunes-${item.trackId || idx}`,
+          title: item.trackName,
+          artist: item.artistName,
+          album: item.collectionName || 'Single',
+          duration: Math.floor((item.trackTimeMillis || 180000) / 1000),
+          url: item.previewUrl,
+          artwork: item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : null,
+          isOnline: true,
+          color: "from-indigo-950/50 via-slate-950 to-slate-950"
+        }));
+        setSearchResults(parsed);
+      } else {
+        setSearchError('No songs found. Try another artist or song name.');
+      }
+    } catch (err) {
+      setSearchError('Network connection issue. Please check your internet.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const playTrackNow = (track) => {
+    setTracks(prev => {
+      if (prev.some(t => t.id === track.id)) {
+        return prev;
+      }
+      return [track, ...prev];
+    });
+    setCurrentTrackIndex(0);
+    setIsPlaying(true);
+    setShowPlaylist(false);
+  };
+
+  // Import Local Songs from Phone Storage
   const handleFilesSelected = (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const newTracks = Array.from(files).map((file, i) => {
-      const cleanName = file.name.replace(/\.[^/.]+$/, ""); // remove extension
+      const cleanName = file.name.replace(/\.[^/.]+$/, "");
       const url = URL.createObjectURL(file);
       return {
         id: `phone-${Date.now()}-${i}`,
         title: cleanName,
         artist: "Phone Audio (फोन स्टोरेज)",
         album: "Device Downloads",
-        duration: 240, // default placeholder until metadata loads
+        duration: 200,
         isLocal: true,
-        file: file,
         url: url,
-        color: "from-blue-900/40 via-indigo-950/60 to-slate-950",
-        accent: "text-cyan-400"
+        artwork: null,
+        color: "from-blue-900/40 via-indigo-950/60 to-slate-950"
       };
     });
 
     setTracks(prev => [...newTracks, ...prev]);
     setCurrentTrackIndex(0);
     setIsPlaying(true);
-    setShowPlaylist(true);
+    setShowPlaylist(false);
   };
 
   const handleDeleteTrack = (id, e) => {
     e.stopPropagation();
     setTracks(prev => {
       const filtered = prev.filter(t => t.id !== id);
-      return filtered.length > 0 ? filtered : INITIAL_DEMO_TRACKS;
+      return filtered.length > 0 ? filtered : FEATURED_ONLINE_TRACKS;
     });
     if (currentTrack.id === id) {
       setCurrentTrackIndex(0);
@@ -356,7 +377,7 @@ export default function StealthMusicPlayer({
     } else if (clean === decoyPin) {
       if (onUnlock) onUnlock(true); // Decoy mode
     } else {
-      setCodeError('Equalizer preset applied.');
+      setCodeError('Preset profile applied.');
       setTimeout(() => {
         setShowCodeModal(false);
       }, 1000);
@@ -364,9 +385,9 @@ export default function StealthMusicPlayer({
   };
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col justify-between bg-gradient-to-b ${currentTrack.color || 'from-purple-900/40 via-indigo-950/60 to-slate-950'} text-slate-100 select-none p-5 sm:p-8 font-sans overflow-hidden transition-colors duration-700`}>
+    <div className={`fixed inset-0 z-50 flex flex-col justify-between bg-gradient-to-b ${currentTrack.color || 'from-indigo-950 via-slate-950 to-slate-950'} text-slate-100 select-none p-4 sm:p-7 font-sans overflow-hidden transition-colors duration-700`}>
       
-      {/* Hidden real HTML5 Audio Element */}
+      {/* Real HTML5 Audio Element for Online Streams & Phone Storage */}
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
@@ -374,7 +395,23 @@ export default function StealthMusicPlayer({
         onEnded={handleTrackEnded}
       />
 
-      {/* Hidden Native File Input for Phone / Downloads */}
+      {/* Hidden YouTube IFrame Embed Player */}
+      {currentTrack.isYoutube && (
+        <div className={showVideoMode ? "fixed top-16 left-1/2 -translate-x-1/2 z-40 w-full max-w-md p-2" : "hidden"}>
+          <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black">
+            <iframe
+              ref={iframeRef}
+              src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1`}
+              title={currentTrack.title}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Hidden File Input for Phone Local Songs */}
       <input
         type="file"
         ref={fileInputRef}
@@ -384,31 +421,34 @@ export default function StealthMusicPlayer({
         className="hidden"
       />
 
-      {/* Top Bar: Looks 100% like Spotify / Apple Music */}
-      <div className="flex items-center justify-between w-full max-w-md mx-auto pt-2">
+      {/* Top Bar: Search, Library, and Equalizer */}
+      <div className="flex items-center justify-between w-full max-w-md mx-auto pt-2 gap-2">
         
-        {/* Device Music / Playlist Library Button */}
+        {/* Open Online Search & Library */}
         <button
           onClick={() => setShowPlaylist(true)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-slate-200 transition active:scale-95 shadow-sm"
-          title="Open Device Music Library"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-slate-200 transition active:scale-95 shadow-sm truncate"
+          title="Search YouTube & Online Songs"
         >
-          <List className="w-3.5 h-3.5 text-purple-400" />
-          <span>My Songs ({tracks.length})</span>
+          <Search className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+          <span className="truncate">Search Online / Library</span>
         </button>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           
-          {/* Add Song from Device Button */}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold shadow-md shadow-purple-600/30 transition active:scale-95"
-            title="Import Downloaded Songs from Phone"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Add Songs</span>
-          </button>
+          {/* YouTube Video View Toggle if active track is YouTube */}
+          {currentTrack.isYoutube && (
+            <button
+              onClick={() => setShowVideoMode(!showVideoMode)}
+              className={`p-2 rounded-full border transition ${
+                showVideoMode ? 'bg-red-600 border-red-500 text-white' : 'bg-white/10 border-white/10 text-slate-300'
+              }`}
+              title="Toggle YouTube Video View"
+            >
+              <Video className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Equalizer (Secret Code Door) */}
           <button
@@ -419,7 +459,7 @@ export default function StealthMusicPlayer({
             <Sliders className="w-4 h-4" />
           </button>
           
-          {/* Help Button */}
+          {/* Discrete Help */}
           <button
             onClick={() => setShowHelpModal(true)}
             title="Info"
@@ -435,30 +475,44 @@ export default function StealthMusicPlayer({
         <div 
           onClick={handleCoverTap}
           className="relative group cursor-pointer"
-          title="Lo-Fi Vibes (Triple-tap to unlock)"
+          title="Lo-Fi Vibes (Triple-tap to unlock secret chat)"
         >
-          {/* Animated Vinyl Disc */}
+          {/* Animated Vinyl Disc with Real Album Artwork / YouTube Thumbnail */}
           <div className={`w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-neutral-950 border-4 border-neutral-900 shadow-2xl flex items-center justify-center relative overflow-hidden transition-transform duration-500 ${
             isPlaying ? 'animate-spin-slow' : ''
           }`}>
             
-            {/* Vinyl grooves styling */}
+            {/* Vinyl grooves */}
             <div className="absolute inset-3 rounded-full border border-neutral-800/80 pointer-events-none" />
             <div className="absolute inset-8 rounded-full border border-neutral-800/60 pointer-events-none" />
             <div className="absolute inset-14 rounded-full border border-neutral-800/40 pointer-events-none" />
             <div className="absolute inset-20 rounded-full border border-neutral-800/40 pointer-events-none" />
 
-            {/* Vinyl Center Art */}
-            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 p-1 shadow-inner flex items-center justify-center">
-              <div className="w-10 h-10 rounded-full bg-neutral-950 border-2 border-neutral-800 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-amber-400 shadow-sm" />
+            {/* Vinyl Center Art: Real Album Artwork if available */}
+            {currentTrack.artwork ? (
+              <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full overflow-hidden border-2 border-white/20 shadow-inner relative">
+                <img 
+                  src={currentTrack.artwork} 
+                  alt={currentTrack.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="absolute inset-0 m-auto w-8 h-8 rounded-full bg-neutral-950 border-2 border-neutral-800 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 p-1 shadow-inner flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-neutral-950 border-2 border-neutral-800 flex items-center justify-center">
+                  <div className="w-3 h-3 rounded-full bg-amber-400 shadow-sm" />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Equalizer Live Visualizer Waveform at the bottom of artwork */}
+          {/* Equalizer Live Visualizer Waveform */}
           {isPlaying && (
-            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg">
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/10 shadow-lg">
               <div className="w-1 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
               <div className="w-1 h-5 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
               <div className="w-1 h-7 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -469,26 +523,33 @@ export default function StealthMusicPlayer({
         </div>
 
         {/* Track Title & Artist */}
-        <div className="w-full flex items-center justify-between mt-8 px-2">
+        <div className="w-full flex items-center justify-between mt-7 px-2">
           <div className="min-w-0 pr-4">
             <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">
               {currentTrack.title}
             </h2>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5 truncate flex items-center gap-1.5">
-              {currentTrack.isLocal ? (
-                <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold border border-cyan-500/30">
+              {currentTrack.isYoutube ? (
+                <span className="px-1.5 py-0.2 rounded bg-red-600/30 text-red-300 text-[10px] font-bold border border-red-500/40">
+                  YOUTUBE
+                </span>
+              ) : currentTrack.isOnline ? (
+                <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                  ONLINE STREAM
+                </span>
+              ) : currentTrack.isLocal ? (
+                <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30">
                   PHONE STORAGE
                 </span>
               ) : null}
               <span>{currentTrack.artist}</span>
-              <span className="text-slate-500">• {currentTrack.album}</span>
             </p>
           </div>
 
           <button
             onClick={handleHeartClick}
             className="p-2 text-slate-400 hover:text-rose-400 rounded-full transition active:scale-125"
-            title="Save to Favorites"
+            title="Save to Favorites (Tap 3 times to unlock)"
           >
             <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500 text-rose-500' : ''}`} />
           </button>
@@ -531,7 +592,7 @@ export default function StealthMusicPlayer({
           <div className="flex items-center gap-4">
             <button
               onClick={handlePrevTrack}
-              className="p-2 text-slate-300 hover:text-white transition active:scale-90"
+              className="p-2 text-slate-300 hover:text-white transition active:scale-90 cursor-pointer"
               title="Previous Track"
             >
               <SkipBack className="w-6 h-6 fill-current" />
@@ -551,7 +612,7 @@ export default function StealthMusicPlayer({
 
             <button
               onClick={handleNextTrack}
-              className="p-2 text-slate-300 hover:text-white transition active:scale-90"
+              className="p-2 text-slate-300 hover:text-white transition active:scale-90 cursor-pointer"
               title="Next Track"
             >
               <SkipForward className="w-6 h-6 fill-current" />
@@ -593,17 +654,16 @@ export default function StealthMusicPlayer({
 
       </div>
 
-      {/* Playlist / Songs Library Modal Drawer */}
+      {/* Online Music & YouTube Search Modal Drawer */}
       {showPlaylist && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 max-h-[88vh] flex flex-col">
             
             {/* Header */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <Music2 className="w-4 h-4 text-purple-400" />
-                <span>Device Music Library</span>
-                <span className="text-xs text-slate-400 font-normal">({tracks.length} songs)</span>
+                <Globe className="w-4 h-4 text-purple-400" />
+                <span>Online Music & YouTube Streamer</span>
               </div>
               <button
                 onClick={() => setShowPlaylist(false)}
@@ -613,71 +673,200 @@ export default function StealthMusicPlayer({
               </button>
             </div>
 
-            {/* Prominent Import from Phone Downloads Button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition active:scale-98 cursor-pointer"
-            >
-              <FolderPlus className="w-4 h-4" />
-              <span>Open Songs from Phone Storage / Downloads</span>
-            </button>
+            {/* Navigation Tabs */}
+            <div className="flex gap-2 border-b border-slate-800 pb-2">
+              <button
+                onClick={() => setActiveTab('search')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                  activeTab === 'search'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Search / YouTube</span>
+              </button>
 
-            {/* Songs List */}
-            <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-              {tracks.map((track, idx) => {
-                const isSelected = idx === currentTrackIndex;
-                return (
+              <button
+                onClick={() => setActiveTab('trending')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                  activeTab === 'trending'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Flame className="w-3.5 h-3.5 text-orange-400" />
+                <span>Trending Hits</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('phone')}
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition flex items-center justify-center gap-1.5 ${
+                  activeTab === 'phone'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Phone Songs</span>
+              </button>
+            </div>
+
+            {/* TAB 1: Online Search & YouTube Link */}
+            {activeTab === 'search' && (
+              <div className="space-y-3 flex-1 flex flex-col min-h-0">
+                
+                {/* Search Input Bar */}
+                <form onSubmit={handleSearchSubmit} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search any song, artist or paste YouTube link..."
+                      className="w-full pl-9 pr-3 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none"
+                    />
+                    <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5 shadow-md cursor-pointer"
+                  >
+                    {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Search</span>}
+                  </button>
+                </form>
+
+                {/* Search Helper Hints */}
+                <div className="flex flex-wrap gap-1 text-[10px] text-slate-400">
+                  <span className="opacity-70">Popular:</span>
+                  {['Arijit Singh', 'Kesariya', 'Chaleya', 'Sidhu Moose Wala', 'Lofi Hindi', 'Taylor Swift'].map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => { setSearchQuery(tag); }}
+                      className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-purple-300 transition"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+
+                {searchError && (
+                  <p className="text-xs text-rose-400 text-center py-2">{searchError}</p>
+                )}
+
+                {/* Search Results List */}
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+                  {searchResults.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => playTrackNow(item)}
+                      className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-800/80 border border-transparent hover:border-purple-500/30 cursor-pointer transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 pr-2">
+                        <img
+                          src={item.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                          alt={item.title}
+                          className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{item.title}</p>
+                          <p className="text-[11px] text-slate-400 truncate">{item.artist}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="p-2 rounded-xl bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white transition shrink-0"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {searchResults.length === 0 && !isSearching && (
+                    <div className="text-center py-8 text-slate-500 text-xs">
+                      <Globe className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                      <p>Type any song name or paste a YouTube video link to stream online directly from the internet.</p>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 2: Trending Online Hits */}
+            {activeTab === 'trending' && (
+              <div className="space-y-2 flex-1 overflow-y-auto pr-1">
+                <p className="text-xs text-slate-400 mb-2">Curated online streaming tracks (ready to play):</p>
+                {FEATURED_ONLINE_TRACKS.map((item) => (
                   <div
-                    key={track.id || idx}
-                    onClick={() => {
-                      setCurrentTrackIndex(idx);
-                      setIsPlaying(true);
-                      setShowPlaylist(false);
-                    }}
-                    className={`flex items-center justify-between p-3 rounded-2xl cursor-pointer transition ${
-                      isSelected
-                        ? 'bg-purple-950/60 border border-purple-500/40 text-purple-200 shadow-md'
-                        : 'hover:bg-slate-800/80 text-slate-300'
-                    }`}
+                    key={item.id}
+                    onClick={() => playTrackNow(item)}
+                    className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950/60 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/40 cursor-pointer transition"
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold ${
-                        isSelected ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {isSelected && isPlaying ? (
-                          <Radio className="w-4 h-4 animate-pulse" />
-                        ) : (
-                          idx + 1
-                        )}
-                      </div>
+                      <img
+                        src={item.artwork}
+                        alt={item.title}
+                        className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10"
+                      />
                       <div className="min-w-0">
-                        <p className={`text-xs font-semibold truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
-                          {track.title}
-                        </p>
-                        <p className="text-[10px] text-slate-400 truncate">
-                          {track.artist}
-                        </p>
+                        <p className="text-xs font-bold text-white truncate">{item.title}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{item.artist}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[11px] text-slate-500 font-mono">
-                        {formatTime(track.duration || 0)}
-                      </span>
-                      {track.isLocal && (
-                        <button
-                          onClick={(e) => handleDeleteTrack(track.id, e)}
-                          className="p-1 hover:bg-rose-900/40 text-slate-500 hover:text-rose-400 rounded-lg transition"
-                          title="Remove from playlist"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      className="p-2 rounded-xl bg-purple-600 text-white transition shrink-0 shadow-md shadow-purple-600/30"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    </button>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
+
+            {/* TAB 3: Phone Downloaded Songs */}
+            {activeTab === 'phone' && (
+              <div className="space-y-3 flex-1 flex flex-col min-h-0">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-98 cursor-pointer"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>Choose MP3 Songs from Phone Storage / Downloads</span>
+                </button>
+
+                <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                  {tracks.filter(t => t.isLocal).map((track, idx) => (
+                    <div
+                      key={track.id}
+                      onClick={() => playTrackNow(track)}
+                      className="flex items-center justify-between p-2.5 rounded-2xl hover:bg-slate-800/80 cursor-pointer transition text-xs"
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="font-semibold text-white truncate">{track.title}</p>
+                        <p className="text-[10px] text-slate-400">{track.artist}</p>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteTrack(track.id, e)}
+                        className="p-1.5 hover:bg-rose-900/40 text-slate-500 hover:text-rose-400 rounded-lg transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {tracks.filter(t => t.isLocal).length === 0 && (
+                    <p className="text-xs text-slate-500 text-center py-6">
+                      No local songs imported yet. Click the button above to import your downloaded songs.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -746,11 +935,11 @@ export default function StealthMusicPlayer({
           <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-2xl">
             <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
               <Music className="w-4 h-4" />
-              <span>Real Music Player Disguise</span>
+              <span>Real Online & YouTube Player</span>
             </div>
             
             <div className="text-xs text-slate-300 space-y-2 leading-relaxed">
-              <p>This screen is a real audio music player that plays actual downloaded songs from your phone storage.</p>
+              <p>This player streams real songs from the internet (YouTube & Online Search) and plays phone storage downloads.</p>
               
               <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-[11px] font-mono">
                 <p className="text-purple-300">⚡ <strong>How to unlock secret chat:</strong></p>
