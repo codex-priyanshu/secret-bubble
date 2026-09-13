@@ -10,75 +10,75 @@ import {
 
 const FEATURED_ONLINE_TRACKS = [
   {
-    id: 'yt-BddP6PYo2gs',
-    youtubeId: 'BddP6PYo2gs',
-    title: "Kesariya - Brahmāstra (Full Song)",
-    artist: "Arijit Singh, Pritam & Amitabh Bhattacharya",
+    id: 'track-rjkrTnma',
+    title: "Kesariya - Brahmāstra",
+    artist: "Pritam, Arijit Singh, Amitabh Bhattacharya",
     album: "Brahmāstra Soundtrack",
     duration: 268,
     durationText: "4:28",
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/BddP6PYo2gs/hqdefault.jpg",
+    url: "https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4",
+    artwork: "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
+    isAudioStream: true,
     color: "from-amber-950/60 via-slate-950 to-slate-950"
   },
   {
-    id: 'yt-6mr4cYJ7yew',
-    youtubeId: '6mr4cYJ7yew',
-    title: "Chaleya - Jawan (Full Song)",
-    artist: "Anirudh Ravichander, Arijit Singh & Shilpa Rao",
+    id: 'track-faloMmjX',
+    title: "Chaleya - Jawan",
+    artist: "Anirudh Ravichander, Arijit Singh, Shilpa Rao",
     album: "Jawan Soundtrack",
     duration: 200,
     durationText: "3:20",
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/6mr4cYJ7yew/hqdefault.jpg",
+    url: "https://aac.saavncdn.com/047/d1366530468931703ac909e82a3ee788_320.mp4",
+    artwork: "https://c.saavncdn.com/047/Jawan-Hindi-2023-20230921190854-500x500.jpg",
+    isAudioStream: true,
     color: "from-rose-950/60 via-slate-950 to-slate-950"
   },
   {
-    id: 'yt-ElZfdU54Cp8',
-    youtubeId: 'ElZfdU54Cp8',
-    title: "Apna Bana Le - Bhediya (Full Audio)",
-    artist: "Arijit Singh & Sachin-Jigar",
+    id: 'track-qZtKBMZ_',
+    title: "Apna Bana Le - Bhediya",
+    artist: "Sachin-Jigar, Arijit Singh",
     album: "Bhediya Soundtrack",
     duration: 261,
     durationText: "4:21",
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/ElZfdU54Cp8/hqdefault.jpg",
+    url: "https://aac.saavncdn.com/815/483a6e118e8108cbb3e5cd8701674f32_320.mp4",
+    artwork: "https://c.saavncdn.com/815/Bhediya-Hindi-2023-20230927155213-500x500.jpg",
+    isAudioStream: true,
     color: "from-indigo-950/60 via-slate-950 to-slate-950"
   },
   {
-    id: 'yt-dCmp56tSSmA',
-    youtubeId: 'dCmp56tSSmA',
-    title: "295 - Sidhu Moose Wala (Full Track)",
+    id: 'track-H2r9PnvA',
+    title: "295 - Moosetape",
     artist: "Sidhu Moose Wala",
     album: "Moosetape",
     duration: 270,
     durationText: "4:30",
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/dCmp56tSSmA/hqdefault.jpg",
+    url: "https://aac.saavncdn.com/609/852628435c98083dfe217c1cfa731bb5_320.mp4",
+    artwork: "https://c.saavncdn.com/609/Moosetape-Punjabi-2021-20260626155141-500x500.jpg",
+    isAudioStream: true,
     color: "from-blue-950/60 via-slate-950 to-slate-950"
   },
   {
-    id: 'yt-RLzC55ai0eo',
-    youtubeId: 'RLzC55ai0eo',
-    title: "Heeriye (Official Full Song)",
-    artist: "Jasleen Royal ft. Arijit Singh",
+    id: 'track-NIidiD9g',
+    title: "Heeriye (feat. Arijit Singh)",
+    artist: "Jasleen Royal, Arijit Singh, Dulquer Salmaan",
     album: "Single",
-    duration: 195,
-    durationText: "3:15",
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/RLzC55ai0eo/hqdefault.jpg",
+    duration: 194,
+    durationText: "3:14",
+    url: "https://aac.saavncdn.com/022/a192e8d320ea5630db314d04fedf0aa5_320.mp4",
+    artwork: "https://c.saavncdn.com/022/Heeriye-feat-Arijit-Singh-Hindi-2023-20230928050405-500x500.jpg",
+    isAudioStream: true,
     color: "from-teal-950/60 via-slate-950 to-slate-950"
   },
   {
-    id: 'yt-jfKfPfyJRdk',
-    youtubeId: 'jfKfPfyJRdk',
-    title: "Lofi Hip Hop Radio - Beats to Relax/Study to",
-    artist: "Lofi Girl 24/7 Live Stream",
+    id: 'track-lofi-stream',
+    title: "Lofi Chill Radio - Relax / Study",
+    artist: "24/7 Continuous Background Stream",
     album: "Chillhop 24/7",
-    duration: 7200, // 2 hours
+    duration: 7200,
     durationText: "2:00:00",
-    isYoutube: true,
-    artwork: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg",
+    url: "https://play.streamafrica.net/lofiradio",
+    artwork: "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80",
+    isAudioStream: true,
     color: "from-purple-950/60 via-slate-950 to-slate-950"
   }
 ];
@@ -186,6 +186,36 @@ export default function StealthMusicPlayer({
         navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
         navigator.mediaSession.setActionHandler('nexttrack', () => handleNextTrack());
         navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevTrack());
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+          if (typeof details.seekTime === 'number') {
+            setCurrentTime(Math.floor(details.seekTime));
+            if (audioRef.current && currentTrack?.url) {
+              audioRef.current.currentTime = details.seekTime;
+            }
+          }
+        });
+        navigator.mediaSession.setActionHandler('seekbackward', () => {
+          if (audioRef.current && currentTrack?.url) {
+            audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
+            setCurrentTime(Math.floor(audioRef.current.currentTime));
+          }
+        });
+        navigator.mediaSession.setActionHandler('seekforward', () => {
+          if (audioRef.current && currentTrack?.url) {
+            audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
+            setCurrentTime(Math.floor(audioRef.current.currentTime));
+          }
+        });
+
+        if ('setPositionState' in navigator.mediaSession && duration > 0) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration: Math.max(1, duration),
+              playbackRate: 1,
+              position: Math.min(Math.max(0, currentTime), duration)
+            });
+          } catch (e) {}
+        }
       } catch (e) {}
     }
 
@@ -199,27 +229,8 @@ export default function StealthMusicPlayer({
         bgAudio.pause();
       }
     }
-  }, [currentTrack, isPlaying, handleNextTrack, handlePrevTrack]);
+  }, [currentTrack, isPlaying, currentTime, duration, handleNextTrack, handlePrevTrack]);
 
-  // Handle Real Audio / YouTube Playback
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (currentTrack.isYoutube) {
-      // YouTube mode: HTML5 audio pauses, iframe streams
-      audio.pause();
-    } else if (currentTrack.url) {
-      // Local/Online stream mode
-      audio.src = currentTrack.url;
-      audio.volume = isMuted ? 0 : volume / 100;
-      if (isPlaying) {
-        audio.play().catch(err => console.log('Audio playback notice:', err));
-      } else {
-        audio.pause();
-      }
-    }
-  }, [currentTrack, isPlaying, isMuted]);
 
   const getBackendApiUrl = useCallback(() => {
     if (backendUrl) return backendUrl.replace(/\/$/, '');
@@ -236,8 +247,19 @@ export default function StealthMusicPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (currentTrack?.isYoutube) {
-      // YouTube mode: HTML5 audio pauses, iframe streams
+    if (currentTrack?.url) {
+      // Direct full-length audio stream mode (Native HTML5 audio enables continuous background playback)
+      if (!audio.src || (!audio.src.endsWith(currentTrack.url) && !currentTrack.url.endsWith(audio.src))) {
+        audio.src = currentTrack.url;
+      }
+      audio.volume = isMuted ? 0 : volume / 100;
+      if (isPlaying) {
+        audio.play().catch(err => console.log('Audio playback notice:', err));
+      } else {
+        audio.pause();
+      }
+    } else if (currentTrack?.isYoutube) {
+      // YouTube fallback mode: HTML5 audio pauses, iframe streams
       audio.pause();
       if (iframeRef.current?.contentWindow) {
         try {
@@ -247,15 +269,6 @@ export default function StealthMusicPlayer({
             '*'
           );
         } catch (e) {}
-      }
-    } else if (currentTrack?.url) {
-      // Local phone audio stream mode
-      audio.src = currentTrack.url;
-      audio.volume = isMuted ? 0 : volume / 100;
-      if (isPlaying) {
-        audio.play().catch(err => console.log('Audio playback notice:', err));
-      } else {
-        audio.pause();
       }
     }
   }, [currentTrack, isPlaying, isMuted]);
@@ -378,20 +391,20 @@ export default function StealthMusicPlayer({
     const percentage = Math.max(0, Math.min(1, clickX / width));
     const newTime = Math.floor(percentage * duration);
     setCurrentTime(newTime);
-    if (currentTrack?.isYoutube && iframeRef.current?.contentWindow) {
+    if (audioRef.current && currentTrack?.url) {
+      audioRef.current.currentTime = newTime;
+    } else if (currentTrack?.isYoutube && iframeRef.current?.contentWindow) {
       try {
         iframeRef.current.contentWindow.postMessage(
           JSON.stringify({ event: 'command', func: 'seekTo', args: [newTime, true] }),
           '*'
         );
       } catch (e) {}
-    } else if (audioRef.current && !currentTrack?.isYoutube) {
-      audioRef.current.currentTime = newTime;
     }
   };
 
   // =========================================================================
-  // Unified Full-Song Search (100% Full-Length Songs - Zero 30-sec clips)
+  // Unified Full-Song Search (Direct Background Audio Streams & YouTube Fallback)
   // =========================================================================
   const handleSearchSubmit = async (e) => {
     e?.preventDefault();
@@ -442,18 +455,17 @@ export default function StealthMusicPlayer({
       }
     }
 
-    // 2. Full-Length Song Search via Backend API with intelligent fallback
+    // 2. Full-Length Direct Audio Song Search via Backend API
     try {
       const apiBase = getBackendApiUrl();
       let backendData = null;
 
       try {
-        const res = await fetch(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`${apiBase}/api/music/search?q=${encodeURIComponent(query)}`);
         if (res.ok) backendData = await res.json();
       } catch (err) {
-        // Relative URL fallback
         try {
-          const res = await fetch(`/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+          const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
           if (res.ok) backendData = await res.json();
         } catch (e) {}
       }
@@ -463,48 +475,43 @@ export default function StealthMusicPlayer({
       if (backendData?.success && Array.isArray(backendData.results) && backendData.results.length > 0) {
         backendData.results.forEach(item => {
           fullSongResults.push({
-            id: item.id || `yt-${item.youtubeId}`,
-            youtubeId: item.youtubeId,
+            id: item.id || `track-${item.youtubeId || Math.random()}`,
             title: item.title,
             artist: item.artist,
-            album: item.album || "YouTube Full Song",
+            album: item.album || "Full Song",
             duration: item.duration || 240,
             durationText: item.durationText || "Full Song",
             artwork: item.artwork,
-            isYoutube: true,
-            color: "from-red-950/50 via-slate-950 to-slate-950"
+            url: item.url || null,
+            youtubeId: item.youtubeId || null,
+            isAudioStream: Boolean(item.url),
+            isYoutube: !item.url && Boolean(item.youtubeId),
+            color: "from-purple-950/50 via-slate-950 to-slate-950"
           });
         });
       }
 
-      // 3. Fallback: If 0 results, query YouTube search suggestions and retry
+      // 3. Fallback: If 0 results, query YouTube search fallback
       if (fullSongResults.length === 0) {
         try {
-          const sugRes = await fetch(`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(query)}`);
-          const sugData = await sugRes.json();
-          if (Array.isArray(sugData?.[1]) && sugData[1].length > 0) {
-            const topSuggestion = sugData[1][0];
-            if (topSuggestion && topSuggestion !== query) {
-              const retryRes = await fetch(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(topSuggestion)}`);
-              if (retryRes.ok) {
-                const retryData = await retryRes.json();
-                if (retryData?.success && Array.isArray(retryData.results)) {
-                  retryData.results.forEach(item => {
-                    fullSongResults.push({
-                      id: item.id || `yt-${item.youtubeId}`,
-                      youtubeId: item.youtubeId,
-                      title: item.title,
-                      artist: item.artist,
-                      album: "YouTube Full Song",
-                      duration: item.duration || 240,
-                      durationText: item.durationText || "Full Song",
-                      artwork: item.artwork,
-                      isYoutube: true,
-                      color: "from-red-950/50 via-slate-950 to-slate-950"
-                    });
-                  });
-                }
-              }
+          const ytRes = await fetch(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+          if (ytRes.ok) {
+            const ytData = await ytRes.json();
+            if (ytData?.success && Array.isArray(ytData.results)) {
+              ytData.results.forEach(item => {
+                fullSongResults.push({
+                  id: item.id || `yt-${item.youtubeId}`,
+                  youtubeId: item.youtubeId,
+                  title: item.title,
+                  artist: item.artist,
+                  album: "YouTube Full Song",
+                  duration: item.duration || 240,
+                  durationText: item.durationText || "Full Song",
+                  artwork: item.artwork,
+                  isYoutube: true,
+                  color: "from-red-950/50 via-slate-950 to-slate-950"
+                });
+              });
             }
           }
         } catch (e) {}
@@ -524,12 +531,14 @@ export default function StealthMusicPlayer({
 
   const playTrackNow = (track) => {
     setTracks(prev => {
-      if (prev.some(t => t.id === track.id)) {
+      const idx = prev.findIndex(t => t.id === track.id);
+      if (idx !== -1) {
+        setCurrentTrackIndex(idx);
         return prev;
       }
+      setCurrentTrackIndex(0);
       return [track, ...prev];
     });
-    setCurrentTrackIndex(0);
     setIsPlaying(true);
     setShowPlaylist(false);
   };

@@ -955,8 +955,124 @@ app.post('/api/messages/unlock-passcode', (req, res) => {
 });
 
 // =========================================================================
-// Real Online Music Search & YouTube Audio Streamer
+// Real Online Music Search & Audio Streamer (Background Playback Enabled)
 // =========================================================================
+const CryptoJS = require('crypto-js');
+
+function decryptSaavnUrl(encUrl) {
+  if (!encUrl) return null;
+  try {
+    const key = CryptoJS.enc.Utf8.parse('38346591');
+    const decrypted = CryptoJS.DES.decrypt(
+      { ciphertext: CryptoJS.enc.Base64.parse(encUrl) },
+      key,
+      { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 }
+    );
+    const url = decrypted.toString(CryptoJS.enc.Utf8);
+    return url ? url.replace('_96.mp4', '_320.mp4') : null;
+  } catch { return null; }
+}
+
+function cleanHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim();
+}
+
+// Unified Audio Search: Returns direct audio streams for continuous background playback
+app.get('/api/music/search', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) {
+    return res.json({ success: true, results: [] });
+  }
+
+  try {
+    const searchUrl = `https://www.jiosaavn.com/api.php?__call=autocomplete.get&_marker=0&query=${encodeURIComponent(q)}&ctx=android&_format=json`;
+    const saavnRes = await fetch(searchUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    const data = await saavnRes.json();
+    const songs = data.songs?.data || [];
+
+    const results = [];
+
+    if (songs.length > 0) {
+      const pids = songs.slice(0, 15).map(s => s.id).join(',');
+      const detailsUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${pids}`;
+      const detRes = await fetch(detailsUrl);
+      const detData = await detRes.json();
+
+      for (const s of songs.slice(0, 15)) {
+        const details = detData[s.id];
+        if (details && details.encrypted_media_url) {
+          const directAudio = decryptSaavnUrl(details.encrypted_media_url);
+          if (directAudio) {
+            const dur = parseInt(details.duration, 10) || 240;
+            const min = Math.floor(dur / 60);
+            const sec = dur % 60;
+            const img = (details.image || s.image || '')
+              .replace('50x50.jpg', '500x500.jpg')
+              .replace('150x150.jpg', '500x500.jpg');
+
+            results.push({
+              id: `track-${s.id}`,
+              title: cleanHtml(details.song || s.title),
+              artist: cleanHtml(details.primary_artists || s.more_info?.primary_artists || 'Online Music'),
+              album: cleanHtml(details.album || s.album || 'Online Album'),
+              duration: dur,
+              durationText: `${min}:${sec < 10 ? '0' : ''}${sec}`,
+              artwork: img,
+              url: directAudio,
+              isAudioStream: true
+            });
+          }
+        }
+      }
+    }
+
+    // If direct audio search yielded results, return immediately
+    if (results.length > 0) {
+      return res.json({ success: true, results, source: 'direct-audio' });
+    }
+
+    // Fallback to YouTube scraper if no direct audio was found
+    return res.redirect(`/api/music/youtube-search?q=${encodeURIComponent(q)}`);
+  } catch (err) {
+    console.error('Unified audio search error:', err);
+    return res.redirect(`/api/music/youtube-search?q=${encodeURIComponent(q)}`);
+  }
+});
+
+// Proxy Audio Stream (helps if client has CORS or byte-range issues)
+app.get('/api/music/proxy-stream', async (req, res) => {
+  const audioUrl = req.query.url;
+  if (!audioUrl) return res.status(400).send('Audio URL required');
+
+  try {
+    const range = req.headers.range;
+    const audioRes = await fetch(audioUrl, {
+      headers: range ? { range } : {}
+    });
+
+    res.status(audioRes.status);
+    for (const [key, value] of audioRes.headers.entries()) {
+      if (['content-type', 'content-length', 'accept-ranges', 'content-range'].includes(key.toLowerCase())) {
+        res.setHeader(key, value);
+      }
+    }
+    const arrayBuffer = await audioRes.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (err) {
+    console.error('Audio proxy error:', err);
+    res.status(502).send('Error streaming audio');
+  }
+});
+
 app.get('/api/music/youtube-search', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) {
