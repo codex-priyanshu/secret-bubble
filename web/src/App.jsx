@@ -40,6 +40,29 @@ const DEFAULT_SETTINGS = {
   }
 };
 
+// Robust deduplicator to prevent double message rendering or duplicate cached history
+function deduplicateMessages(msgList) {
+  if (!Array.isArray(msgList)) return [];
+  const seenIds = new Set();
+  const result = [];
+  for (const m of msgList) {
+    if (!m || !m.id) continue;
+    if (seenIds.has(m.id)) continue;
+    seenIds.add(m.id);
+
+    // Duplicate check: if a message with the exact same sender, text, and sent within 4s already exists, collapse it
+    const isDup = result.some(prev => 
+      prev.senderId === m.senderId &&
+      prev.text === m.text &&
+      Math.abs(new Date(prev.timestamp).getTime() - new Date(m.timestamp).getTime()) < 4000
+    );
+    if (!isDup) {
+      result.push(m);
+    }
+  }
+  return result;
+}
+
 export default function App() {
   const [isStealthMode, setIsStealthMode] = useState(() => {
     try {
@@ -73,8 +96,10 @@ export default function App() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          // Filter out any stale dummy messages from early development
-          return parsed.filter(m => m.senderId !== 'user-priya' && m.senderId !== 'user-rahul');
+          // Filter out any stale dummy messages from early development and deduplicate
+          return deduplicateMessages(
+            parsed.filter(m => m.senderId !== 'user-priya' && m.senderId !== 'user-rahul')
+          );
         }
       }
       return [];
@@ -293,7 +318,7 @@ export default function App() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
-          setMessages(parsed);
+          setMessages(deduplicateMessages(parsed));
         }
       }
     } catch {}
@@ -313,10 +338,11 @@ export default function App() {
       const res = await fetch(url);
       const data = await res.json();
       if (data.success && Array.isArray(data.messages)) {
-        setMessages(data.messages);
+        const deduped = deduplicateMessages(data.messages);
+        setMessages(deduped);
         try {
           const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
-          localStorage.setItem(key, JSON.stringify(data.messages.slice(-100)));
+          localStorage.setItem(key, JSON.stringify(deduped.slice(-100)));
         } catch {}
         
         // Mark viewed
@@ -405,8 +431,31 @@ export default function App() {
 
       if (isForCurrentTarget) {
         setMessages(prev => {
-          if (prev.some(m => m.id === msg.id)) return prev;
-          const updated = [...prev, msg];
+          // Check if message with this ID already exists
+          const existingIdx = prev.findIndex(m => m.id === msg.id);
+          if (existingIdx !== -1) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...updated[existingIdx], ...msg };
+            return updated;
+          }
+
+          // Check if it's an optimistic duplicate from this sender (same text, sent within 4s)
+          const optIdx = prev.findIndex(m => 
+            m.senderId === msg.senderId &&
+            m.text === msg.text &&
+            Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 4000
+          );
+          if (optIdx !== -1) {
+            const updated = [...prev];
+            updated[optIdx] = msg;
+            try {
+              const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
+              localStorage.setItem(key, JSON.stringify(updated.slice(-100)));
+            } catch {}
+            return updated;
+          }
+
+          const updated = deduplicateMessages([...prev, msg]);
           try {
             const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
             localStorage.setItem(key, JSON.stringify(updated.slice(-100)));
@@ -500,7 +549,7 @@ export default function App() {
     // Optimistically update UI and update local storage cache immediately
     setMessages(prev => {
       if (prev.some(m => m.id === payload.id)) return prev;
-      const updated = [...prev, payload];
+      const updated = deduplicateMessages([...prev, payload]);
       try {
         const key = `secure_chat_cache_${selectedTarget.type}_${selectedTarget.id}`;
         localStorage.setItem(key, JSON.stringify(updated.slice(-100)));

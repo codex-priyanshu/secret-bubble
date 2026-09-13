@@ -42,6 +42,7 @@ export default function ChatInput({
   const [aiDetection, setAiDetection] = useState({ isSensitive: false });
   const typingTimeoutRef = useRef(null);
   const timerIntervalRef = useRef(null);
+  const isSubmittingRef = useRef(false);
 
   // Live real-time AI Sensitivity scanning as user types
   useEffect(() => {
@@ -70,57 +71,68 @@ export default function ChatInput({
   }, [text, settings]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!text.trim()) return;
+    e?.preventDefault();
+    const currentText = text.trim();
+    if (!currentText || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
-    if (onStopTyping) onStopTyping();
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-    let finalLocked = isLocked;
-    let finalCategory = selectedCategory;
-    let autoShielded = false;
-
-    if (settings?.aiEnabled) {
-      const analysis = analyzeMessageSensitivity(text, settings.categories);
-      if (analysis.isSensitive) {
-        finalLocked = true;
-        finalCategory = analysis.category;
-        autoShielded = true;
-      }
-    }
-
-    const shouldLock = Boolean(finalLocked || enablePasscodeLock || autoShielded || aiDetection.isSensitive);
-    const finalPasscode = shouldLock ? (passcode.trim() || '1234') : null;
-    const finalHint = shouldLock ? (passcodeHint.trim() || (passcode.trim() ? '' : '1234')) : null;
-
-    let e2eeEnvelope = null;
-    if (shouldLock && finalPasscode) {
-      try {
-        e2eeEnvelope = await encryptE2EE(text.trim(), finalPasscode);
-      } catch (err) {
-        console.warn('E2EE encryption warning:', err);
-      }
-    }
-
-    onSendMessage({
-      text: text.trim(),
-      e2eeEnvelope: e2eeEnvelope,
-      isLocked: shouldLock,
-      category: shouldLock ? finalCategory : 'General',
-      isAiShielded: autoShielded || aiDetection.isSensitive,
-      selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
-      hasPasscode: shouldLock,
-      passcode: finalPasscode,
-      passcodeHint: finalHint
-    });
-
+    // Immediately clear text input so user cannot double-submit
     setText('');
     setIsLocked(false);
     setEnablePasscodeLock(false);
+    const passToUse = passcode.trim();
+    const hintToUse = passcodeHint.trim();
     setPasscode('');
     setPasscodeHint('');
     setShowPasscodeText(false);
     setAiDetection({ isSensitive: false });
+
+    if (onStopTyping) onStopTyping();
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    try {
+      let finalLocked = isLocked;
+      let finalCategory = selectedCategory;
+      let autoShielded = false;
+
+      if (settings?.aiEnabled) {
+        const analysis = analyzeMessageSensitivity(currentText, settings.categories);
+        if (analysis.isSensitive) {
+          finalLocked = true;
+          finalCategory = analysis.category;
+          autoShielded = true;
+        }
+      }
+
+      const shouldLock = Boolean(finalLocked || enablePasscodeLock || autoShielded || aiDetection.isSensitive);
+      const finalPasscode = shouldLock ? (passToUse || '1234') : null;
+      const finalHint = shouldLock ? (hintToUse || (passToUse ? '' : '1234')) : null;
+
+      let e2eeEnvelope = null;
+      if (shouldLock && finalPasscode) {
+        try {
+          e2eeEnvelope = await encryptE2EE(currentText, finalPasscode);
+        } catch (err) {
+          console.warn('E2EE encryption warning:', err);
+        }
+      }
+
+      onSendMessage({
+        text: currentText,
+        e2eeEnvelope: e2eeEnvelope,
+        isLocked: shouldLock,
+        category: shouldLock ? finalCategory : 'General',
+        isAiShielded: autoShielded || aiDetection.isSensitive,
+        selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
+        hasPasscode: shouldLock,
+        passcode: finalPasscode,
+        passcodeHint: finalHint
+      });
+    } finally {
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+      }, 350);
+    }
   };
 
   const handleVoiceRecord = () => {

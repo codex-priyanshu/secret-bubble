@@ -1414,8 +1414,10 @@ io.on('connection', (socket) => {
     const selfDestructSecs = msgData.selfDestructSecs ? parseInt(msgData.selfDestructSecs, 10) : 0;
     const expiresAt = selfDestructSecs > 0 ? Date.now() + (selfDestructSecs * 1000) : null;
 
+    const msgId = msgData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4));
+
     const newMsg = {
-      id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      id: msgId,
       sender: senderName,
       senderId: senderId,
       senderAvatar: msgData.senderAvatar || null,
@@ -1433,10 +1435,16 @@ io.on('connection', (socket) => {
       expiresAt: expiresAt,
       viewers: [senderId],
       e2eeEnvelope: msgData.e2eeEnvelope || null,
-      timestamp: new Date().toISOString()
+      timestamp: msgData.timestamp || new Date().toISOString()
     };
 
-    messages.push(newMsg);
+    messages = loadMessages();
+    const existingIndex = messages.findIndex(m => m.id === newMsg.id);
+    if (existingIndex !== -1) {
+      messages[existingIndex] = newMsg;
+    } else {
+      messages.push(newMsg);
+    }
     saveMessages(messages);
 
     if (newMsg.hasPasscode) {
