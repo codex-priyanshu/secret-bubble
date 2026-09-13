@@ -617,6 +617,38 @@ app.post('/api/ai/test', aiTestLimiter, async (req, res) => {
 // =========================================================================
 // Authentication Endpoints (Salted PBKDF2 + HMAC Session Tokens)
 // =========================================================================
+app.get('/api/auth/me', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ success: false, message: 'No authorization session token provided' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const session = verifySessionToken(token);
+  if (!session) {
+    return res.status(401).json({ success: false, message: 'Session expired or signature invalid' });
+  }
+
+  users = loadUsers();
+  const user = users.find(u => u.id === session.userId);
+  if (!user) {
+    return res.status(401).json({ success: false, message: 'User account not found' });
+  }
+
+  res.json({
+    success: true,
+    user: {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      avatarColor: user.avatarColor,
+      avatarUrl: user.avatarUrl || null,
+      bio: user.bio || '',
+      isOnline: true
+    }
+  });
+});
+
 app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
   const { username, name, password, avatarUrl } = req.body;
   if (!username || !password) {
@@ -630,15 +662,19 @@ app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
   // Ensure fresh users list from disk
   users = loadUsers();
 
-  const rawUsername = (username || '').trim().toLowerCase().replace(/^@+/, '');
-  const cleanUsername = sanitizeText(rawUsername);
+  const cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
 
-  if (!cleanUsername) {
-    return res.status(400).json({ success: false, message: 'Valid username is required' });
+  if (!cleanUsername || cleanUsername.length < 3) {
+    return res.status(400).json({ success: false, message: 'Username must be at least 3 characters (letters, numbers, underscores only)' });
   }
 
-  if (cleanUsername === 'meta_ai' || cleanUsername === 'admin' || cleanUsername === 'system') {
-    return res.status(400).json({ success: false, message: 'This username is reserved' });
+  if (cleanUsername.length > 25) {
+    return res.status(400).json({ success: false, message: 'Username cannot exceed 25 characters' });
+  }
+
+  const reservedUsernames = ['meta_ai', 'admin', 'system', 'anonymous', 'guest', 'global', 'moderator', 'support'];
+  if (reservedUsernames.includes(cleanUsername)) {
+    return res.status(400).json({ success: false, message: 'This username is reserved by system' });
   }
 
   const existing = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
@@ -700,7 +736,7 @@ app.post('/api/auth/login', authLoginLimiter, (req, res) => {
   // Ensure fresh users list from disk
   users = loadUsers();
 
-  const cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '');
+  const cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
   const user = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
 
   if (!user) {
@@ -733,6 +769,54 @@ app.post('/api/auth/login', authLoginLimiter, (req, res) => {
     success: true,
     user: safeUser,
     token
+  });
+});
+
+app.post('/api/auth/change-password', (req, res) => {
+  const authHeader = req.headers.authorization;
+  let verifiedUserId = null;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const session = verifySessionToken(authHeader.split(' ')[1]);
+    if (session) verifiedUserId = session.userId;
+  }
+
+  const { userId, currentPassword, newPassword } = req.body;
+  const targetUserId = verifiedUserId || userId;
+
+  if (!targetUserId) {
+    return res.status(401).json({ success: false, message: 'User authorization required' });
+  }
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, message: 'Current password and new password are required' });
+  }
+
+  if (newPassword.length < 4) {
+    return res.status(400).json({ success: false, message: 'New password must be at least 4 characters long' });
+  }
+
+  users = loadUsers();
+  const user = users.find(u => u.id === targetUserId);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  const check = verifyPassword(currentPassword, user.passwordHash);
+  if (!check.valid) {
+    return res.status(401).json({ success: false, message: 'Incorrect current password' });
+  }
+
+  // Hash new password using PBKDF2 (100,000 iterations)
+  user.passwordHash = hashPassword(newPassword);
+  saveUsers(users);
+
+  const newToken = generateSessionToken(user);
+
+  res.json({
+    success: true,
+    message: 'Password successfully updated!',
+    token: newToken
   });
 });
 
@@ -835,7 +919,7 @@ app.get('/api/messages', (req, res) => {
     });
   } else if (userId && targetId) {
     filtered = messages.filter(m => 
-      !m.roomId && (
+      Boolean(m.recipientId) && (
         (m.senderId === userId && m.recipientId === targetId) ||
         (m.senderId === targetId && m.recipientId === userId)
       )
@@ -947,7 +1031,7 @@ app.post('/api/messages/unlock-passcode', (req, res) => {
 
   const cleanPasscode = (passcode || '').trim();
   const inputHash = crypto.createHash('sha256').update(cleanPasscode).digest('hex');
-  if (inputHash === msg.passcodeHash || cleanPasscode === '1234' || (msg.passcodeHint && cleanPasscode === msg.passcodeHint.trim())) {
+  if (inputHash === msg.passcodeHash || (msg.passcodeHint && cleanPasscode === msg.passcodeHint.trim())) {
     return res.json({ success: true, text: msg.text, e2eeEnvelope: msg.e2eeEnvelope || null });
   } else {
     return res.status(401).json({ success: false, message: 'Incorrect passcode. Access denied.' });
@@ -1396,25 +1480,6 @@ io.on('connection', (socket) => {
       }
     }
 
-  // Socket Unlock Passcode verification
-  socket.on('unlock_passcode', ({ messageId, passcode }, callback) => {
-    messages = loadMessages();
-    const msg = messages.find(m => m.id === messageId);
-    if (!msg) {
-      return callback && callback({ success: false, message: 'Message not found or expired' });
-    }
-    if (!msg.hasPasscode || !msg.passcodeHash) {
-      return callback && callback({ success: true, text: msg.text });
-    }
-    const cleanPasscode = (passcode || '').trim();
-    const inputHash = crypto.createHash('sha256').update(cleanPasscode).digest('hex');
-    if (inputHash === msg.passcodeHash || cleanPasscode === '1234' || (msg.passcodeHint && cleanPasscode === msg.passcodeHint.trim())) {
-      return callback && callback({ success: true, text: msg.text });
-    } else {
-      return callback && callback({ success: false, message: 'Incorrect passcode. Access denied.' });
-    }
-  });
-
     // Meta AI Response
     if (isToMetaAi) {
       const senderSockets = onlineUsers.get(senderId);
@@ -1452,6 +1517,25 @@ io.on('connection', (socket) => {
           senderSockets.forEach(sId => io.to(sId).emit('user_stop_typing', { senderId: 'user-meta-ai' }));
         }
       }
+    }
+  });
+
+  // Socket Unlock Passcode verification (Top-level socket listener)
+  socket.on('unlock_passcode', ({ messageId, passcode }, callback) => {
+    messages = loadMessages();
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg) {
+      return callback && callback({ success: false, message: 'Message not found or expired' });
+    }
+    if (!msg.hasPasscode || !msg.passcodeHash) {
+      return callback && callback({ success: true, text: msg.text });
+    }
+    const cleanPasscode = (passcode || '').trim();
+    const inputHash = crypto.createHash('sha256').update(cleanPasscode).digest('hex');
+    if (inputHash === msg.passcodeHash || (msg.passcodeHint && cleanPasscode === msg.passcodeHint.trim())) {
+      return callback && callback({ success: true, text: msg.text });
+    } else {
+      return callback && callback({ success: false, message: 'Incorrect passcode. Access denied.' });
     }
   });
 

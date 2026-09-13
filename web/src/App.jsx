@@ -68,7 +68,14 @@ export default function App() {
   const [messages, setMessages] = useState(() => {
     try {
       const cached = localStorage.getItem('secure_chat_cache_room_global');
-      return cached ? JSON.parse(cached) : [];
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          // Filter out any stale dummy messages from early development
+          return parsed.filter(m => m.senderId !== 'user-priya' && m.senderId !== 'user-rahul');
+        }
+      }
+      return [];
     } catch {
       return [];
     }
@@ -97,6 +104,48 @@ export default function App() {
   }, [currentUser]);
 
   const backendUrl = useMemo(() => getBackendUrl(), []);
+
+  // Session token verification against backend on startup & purge old dummy cache
+  useEffect(() => {
+    try {
+      const globalCache = localStorage.getItem('secure_chat_cache_room_global');
+      if (globalCache && (globalCache.includes('user-priya') || globalCache.includes('user-rahul'))) {
+        localStorage.removeItem('secure_chat_cache_room_global');
+        setMessages([]);
+      }
+    } catch {}
+
+    const token = localStorage.getItem('secure_chat_token');
+    if (!token) {
+      if (currentUser) {
+        setCurrentUser(null);
+        localStorage.removeItem('secure_chat_user');
+      }
+      return;
+    }
+
+    fetch(`${backendUrl}/api/auth/me`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          setCurrentUser(data.user);
+          localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
+        } else {
+          // Token invalid or user removed from DB -> clean redirect to login
+          localStorage.removeItem('secure_chat_user');
+          localStorage.removeItem('secure_chat_token');
+          setAuthToken(null);
+          setCurrentUser(null);
+        }
+      })
+      .catch(() => {
+        // Offline / network failure - retain state for offline usage
+      });
+  }, [backendUrl]);
 
   const [settings, setSettings] = useState(() => {
     try {
@@ -339,9 +388,9 @@ export default function App() {
 
       const isForCurrentTarget =
         currentTarget.type === 'room'
-          ? (!msg.recipientId && msg.roomId === currentTarget.id)
+          ? (!msg.recipientId && (msg.roomId === currentTarget.id || (!msg.roomId && currentTarget.id === 'global')))
           : (currentTarget.type === 'user' &&
-              !msg.roomId &&
+              Boolean(msg.recipientId) &&
               ((msg.senderId === currentTarget.id && msg.recipientId === user.id) ||
                (msg.senderId === user.id && msg.recipientId === currentTarget.id)));
 

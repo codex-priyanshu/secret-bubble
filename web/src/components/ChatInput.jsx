@@ -52,10 +52,6 @@ export default function ChatInput({
         setIsLocked(true);
         setEnablePasscodeLock(true);
         setSelectedCategory(result.category);
-        if (!passcode) {
-          setPasscode('1234');
-          setPasscodeHint('1234');
-        }
       }
     } else {
       setAiDetection({ isSensitive: false });
@@ -282,10 +278,6 @@ export default function ChatInput({
             const next = !isLocked;
             setIsLocked(next);
             setEnablePasscodeLock(next);
-            if (next && !passcode) {
-              setPasscode('1234');
-              setPasscodeHint('1234');
-            }
           }}
           className={`p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 flex items-center justify-center shrink-0 cursor-pointer ${
             isLocked

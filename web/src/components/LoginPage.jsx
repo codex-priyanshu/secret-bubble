@@ -14,7 +14,9 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -38,8 +40,15 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
     e.preventDefault();
     setError('');
 
-    if (!username.trim() || !password.trim()) {
-      setError('Please fill in both username and password.');
+    const cleanUser = username.trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
+
+    if (!cleanUser || cleanUser.length < 3) {
+      setError('Username must be at least 3 characters (letters, numbers, underscores only).');
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('Password is required.');
       return;
     }
 
@@ -48,8 +57,12 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
       return;
     }
 
+    if (isRegister && password !== confirmPassword) {
+      setError('Passwords do not match. Please re-type identical password.');
+      return;
+    }
+
     setLoading(true);
-    const cleanUser = username.trim().toLowerCase().replace(/^@+/, '');
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
     const payload = isRegister
       ? { username: cleanUser, name: name.trim() || cleanUser, password, avatarUrl: avatarUrl || null }
@@ -193,7 +206,7 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your name (e.g. Rahul Sharma)"
+                    placeholder="Enter your name (e.g. Priyanshu Maurya)"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
                   />
                 </div>
@@ -202,7 +215,7 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
           )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Username</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1.5">Username (Handle)</label>
             <div className="relative">
               <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
@@ -210,10 +223,13 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Unique username (e.g. rahul_99)"
+                placeholder="Unique username (e.g. alex_07)"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
               />
             </div>
+            {isRegister && (
+              <p className="text-[10px] text-slate-500 mt-1">Letters, numbers and underscores only (min 3 chars)</p>
+            )}
           </div>
 
           <div>
@@ -237,6 +253,30 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
               </button>
             </div>
           </div>
+
+          {isRegister && (
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">Confirm Password</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter identical password"
+                  className="w-full pl-10 pr-10 py-2.5 bg-slate-950/90 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"

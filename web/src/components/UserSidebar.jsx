@@ -25,7 +25,7 @@ export default function UserSidebar({
 
   // Separate Meta AI Bot, Public Channel, and real users
   const metaAiBot = users.find(u => u.id === 'user-meta-ai' || u.isBot);
-  const realUsers = users.filter(u => u.id !== currentUser.id && u.id !== 'user-meta-ai' && !u.isBot);
+  const realUsers = users.filter(u => u.id !== currentUser?.id && u.id !== 'user-meta-ai' && !u.isBot);
 
   const cleanSearch = search.trim().toLowerCase().replace(/^@+/, '');
   const rawSearch = search.trim().toLowerCase();
@@ -52,7 +52,7 @@ export default function UserSidebar({
         <div className="relative">
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer"
             title="Telegram Menu"
           >
             <Menu className="w-5 h-5" />
@@ -67,12 +67,12 @@ export default function UserSidebar({
               />
               <div className="absolute left-0 top-12 z-50 w-56 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-2 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-150">
                 <div className="p-2.5 border-b border-slate-800 flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${currentUser.avatarColor || 'from-purple-600 to-indigo-500'} flex items-center justify-center text-white font-bold text-xs`}>
-                    {currentUser.name.charAt(0)}
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${currentUser?.avatarColor || 'from-purple-600 to-indigo-500'} flex items-center justify-center text-white font-bold text-xs`}>
+                    {(currentUser?.name?.charAt(0) || 'U').toUpperCase()}
                   </div>
                   <div className="truncate">
-                    <p className="font-bold text-white truncate">{currentUser.name}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">@{currentUser.username}</p>
+                    <p className="font-bold text-white truncate">{currentUser?.name || 'User'}</p>
+                    <p className="text-[10px] text-slate-400 font-mono">@{currentUser?.username || ''}</p>
                   </div>
                 </div>
 
