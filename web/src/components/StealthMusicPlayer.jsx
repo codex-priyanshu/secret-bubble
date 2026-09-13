@@ -5,7 +5,7 @@ import {
   Sparkles, Shield, X, Lock, Check, FolderPlus, List, 
   Trash2, HardDrive, Smartphone, Music2, Plus, Search, 
   Globe, Flame, ExternalLink, Loader2, Video, Eye, EyeOff,
-  Headphones, ChevronDown, RadioTower
+  Headphones, ChevronDown, RadioTower, KeyRound, AlertCircle
 } from 'lucide-react';
 
 const FEATURED_ONLINE_TRACKS = [
@@ -118,12 +118,44 @@ export default function StealthMusicPlayer({
   const [searchResults, setSearchResults] = useState([]);
   const [searchError, setSearchError] = useState('');
 
-  // Secret unlock state
+  // Secret unlock & PINs setup state
+  const [isPinSetupDone, setIsPinSetupDone] = useState(() => {
+    try {
+      return localStorage.getItem('secret_bubble_pins_configured') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [activeSecretPin, setActiveSecretPin] = useState(() => {
+    try {
+      return localStorage.getItem('secret_bubble_secret_pin') || secretPin || '1234';
+    } catch {
+      return secretPin || '1234';
+    }
+  });
+  const [activeDecoyPin, setActiveDecoyPin] = useState(() => {
+    try {
+      return localStorage.getItem('secret_bubble_decoy_pin') || decoyPin || '9999';
+    } catch {
+      return decoyPin || '9999';
+    }
+  });
+
+  // First-time PIN creation modal
+  const [showSetupPinModal, setShowSetupPinModal] = useState(false);
+  const [setupSecretPin, setSetupSecretPin] = useState('');
+  const [setupDecoyPin, setSetupDecoyPin] = useState('');
+  const [showSetupSecretEye, setShowSetupSecretEye] = useState(false);
+  const [showSetupDecoyEye, setShowSetupDecoyEye] = useState(false);
+  const [setupError, setSetupError] = useState('');
+
+  // Returning user PIN modal
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
   const [heartTapCount, setHeartTapCount] = useState(0);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [inputCode, setInputCode] = useState('');
+  const [showCodeEye, setShowCodeEye] = useState(false);
   const [codeError, setCodeError] = useState('');
   const [showHelpModal, setShowHelpModal] = useState(false);
 
@@ -587,14 +619,29 @@ export default function StealthMusicPlayer({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
+  // Centralized Trigger for Secret Vault Unlock
+  const triggerSecretUnlock = () => {
+    if (!isPinSetupDone) {
+      setShowSetupPinModal(true);
+      setSetupSecretPin('');
+      setSetupDecoyPin('');
+      setSetupError('');
+    } else {
+      setShowCodeModal(true);
+      setInputCode('');
+      setCodeError('');
+    }
+  };
+
   // Secret Unlock Trigger 1: Triple-tap on Vinyl / Album Art
   const handleCoverTap = () => {
     const now = Date.now();
-    if (now - lastTapTime < 500) {
+    if (now - lastTapTime < 600) {
       const newCount = tapCount + 1;
       setTapCount(newCount);
       if (newCount >= 3) {
-        if (onUnlock) onUnlock(false);
+        triggerSecretUnlock();
+        setTapCount(0);
       }
     } else {
       setTapCount(1);
@@ -608,7 +655,7 @@ export default function StealthMusicPlayer({
     setHeartTapCount(c => {
       const next = c + 1;
       if (next >= 3) {
-        if (onUnlock) onUnlock(false);
+        triggerSecretUnlock();
         return 0;
       }
       return next;
@@ -616,25 +663,72 @@ export default function StealthMusicPlayer({
     setTimeout(() => setHeartTapCount(0), 1000);
   };
 
-  // Secret Unlock Trigger 3: Clicking Equalizer / Sliders opens Code Dialog
+  // Secret Unlock Trigger 3: Clicking Equalizer / Sliders opens Vault Unlock
   const handleEqualizerClick = () => {
-    setShowCodeModal(true);
-    setInputCode('');
-    setCodeError('');
+    triggerSecretUnlock();
   };
 
+  // First-time PIN setup submit
+  const handleSetupPinSubmit = (e) => {
+    e.preventDefault();
+    setSetupError('');
+
+    const sPin = setupSecretPin.trim().replace(/\D/g, '');
+    const dPin = setupDecoyPin.trim().replace(/\D/g, '');
+
+    if (!sPin || sPin.length < 4) {
+      setSetupError('Secret PIN must be at least 4 digits (e.g. 1234)');
+      return;
+    }
+
+    if (dPin && dPin.length < 4) {
+      setSetupError('Decoy PIN must be at least 4 digits (e.g. 9999)');
+      return;
+    }
+
+    if (dPin && sPin === dPin) {
+      setSetupError('Secret PIN and Decoy PIN cannot be identical! Both must be different.');
+      return;
+    }
+
+    const finalDecoy = dPin || (sPin === '9999' ? '8888' : '9999');
+
+    try {
+      localStorage.setItem('secret_bubble_secret_pin', sPin);
+      localStorage.setItem('secret_bubble_decoy_pin', finalDecoy);
+      localStorage.setItem('secret_bubble_pins_configured', 'true');
+    } catch {}
+
+    setActiveSecretPin(sPin);
+    setActiveDecoyPin(finalDecoy);
+    setIsPinSetupDone(true);
+    setShowSetupPinModal(false);
+
+    // Proceed directly to vault unlock
+    if (onUnlock) onUnlock(false);
+  };
+
+  // Returning user PIN submit
   const handleCodeSubmit = (e) => {
     e.preventDefault();
-    const clean = inputCode.trim();
-    if (clean === secretPin) {
+    const clean = inputCode.trim().replace(/\D/g, '');
+
+    if (!clean) {
+      setCodeError('Please enter your 4-digit PIN');
+      return;
+    }
+
+    if (clean === activeSecretPin) {
+      setShowCodeModal(false);
+      setInputCode('');
       if (onUnlock) onUnlock(false);
-    } else if (clean === decoyPin) {
+    } else if (clean === activeDecoyPin) {
+      setShowCodeModal(false);
+      setInputCode('');
       if (onUnlock) onUnlock(true); // Decoy mode
     } else {
-      setCodeError('Preset profile applied.');
-      setTimeout(() => {
-        setShowCodeModal(false);
-      }, 1000);
+      setCodeError('Incorrect PIN code. Disguise active.');
+      setInputCode('');
     }
   };
 
@@ -1285,6 +1379,109 @@ export default function StealthMusicPlayer({
         </div>
       )}
 
+      {/* First Time Security Passcode Setup Modal */}
+      {showSetupPinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm tracking-wide">
+                <KeyRound className="w-5 h-5" />
+                <span>Security PIN Setup (पासवर्ड बनाएं)</span>
+              </div>
+              <button
+                onClick={() => setShowSetupPinModal(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Set your personal PINs for disguise unlocking. You can set a real PIN and an optional decoy PIN.
+            </p>
+
+            <form onSubmit={handleSetupPinSubmit} className="space-y-4">
+              {/* Secret PIN (Primary) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Secret PIN (असली पासवर्ड) <span className="text-red-400">*</span></span>
+                  <span className="text-[10px] text-purple-400 font-normal">Opens Real Chat</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSetupSecretEye ? "text" : "password"}
+                    value={setupSecretPin}
+                    onChange={(e) => { setSetupSecretPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSetupError(''); }}
+                    placeholder="e.g. 1234"
+                    maxLength={8}
+                    autoFocus
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-sm text-white font-mono tracking-widest focus:outline-none pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupSecretEye(!showSetupSecretEye)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                  >
+                    {showSetupSecretEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Decoy PIN (Optional / Secondary) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Decoy PIN (नकली / डिकॉय पिन)</span>
+                  <span className="text-[10px] text-amber-400 font-normal">Opens Fake Notes</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSetupDecoyEye ? "text" : "password"}
+                    value={setupDecoyPin}
+                    onChange={(e) => { setSetupDecoyPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSetupError(''); }}
+                    placeholder="Optional (e.g. 9999)"
+                    maxLength={8}
+                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl text-sm text-white font-mono tracking-widest focus:outline-none pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupDecoyEye(!showSetupDecoyEye)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                  >
+                    {showSetupDecoyEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Dono PIN same nahi hone chahiye. Agar khali chhodenge to decoy 9999 rahega.
+                </p>
+              </div>
+
+              {setupError && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs animate-shake">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{setupError}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowSetupPinModal(false)}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/30"
+                >
+                  Save & Open
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Secret Code Dialog (Disguised as Audio Equalizer Preset) */}
       {showCodeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
@@ -1307,14 +1504,24 @@ export default function StealthMusicPlayer({
             </p>
 
             <form onSubmit={handleCodeSubmit} className="space-y-3">
-              <input
-                type="password"
-                value={inputCode}
-                onChange={(e) => { setInputCode(e.target.value); setCodeError(''); }}
-                placeholder="Enter preset code..."
-                autoFocus
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-sm text-white font-mono text-center tracking-widest focus:outline-none"
-              />
+              <div className="relative">
+                <input
+                  type={showCodeEye ? "text" : "password"}
+                  value={inputCode}
+                  onChange={(e) => { setInputCode(e.target.value.replace(/\D/g, '').slice(0, 8)); setCodeError(''); }}
+                  placeholder="Enter preset PIN..."
+                  autoFocus
+                  maxLength={8}
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-sm text-white font-mono text-center tracking-widest focus:outline-none pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCodeEye(!showCodeEye)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                >
+                  {showCodeEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
 
               {codeError && (
                 <p className="text-[11px] text-amber-400 text-center font-medium animate-shake">

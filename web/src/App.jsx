@@ -43,9 +43,11 @@ const DEFAULT_SETTINGS = {
 export default function App() {
   const [isStealthMode, setIsStealthMode] = useState(() => {
     try {
-      return localStorage.getItem('secret_bubble_stealth_active') === 'true';
+      // By default on initial load or fresh open, always show the disguise Music Player
+      const sessionUnlocked = sessionStorage.getItem('secret_bubble_session_unlocked') === 'true';
+      return !sessionUnlocked;
     } catch {
-      return false;
+      return true;
     }
   });
   const [isDecoySession, setIsDecoySession] = useState(false);
@@ -160,6 +162,13 @@ export default function App() {
     setSettings(newSettings);
     try {
       localStorage.setItem('secure_chat_settings', JSON.stringify(newSettings));
+      if (newSettings.stealthPin) {
+        localStorage.setItem('secret_bubble_secret_pin', newSettings.stealthPin);
+        localStorage.setItem('secret_bubble_pins_configured', 'true');
+      }
+      if (newSettings.decoyPin) {
+        localStorage.setItem('secret_bubble_decoy_pin', newSettings.decoyPin);
+      }
     } catch {}
   };
 
@@ -655,10 +664,14 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('secure_chat_user');
     localStorage.removeItem('secure_chat_token');
+    try {
+      sessionStorage.removeItem('secret_bubble_session_unlocked');
+    } catch {}
     setAuthToken(null);
     setCurrentUser(null);
     setMessages([]);
     setUnlockedPasscodeTexts({});
+    setIsStealthMode(true);
     if (socket) socket.disconnect();
   };
 
@@ -672,6 +685,7 @@ export default function App() {
           setIsStealthMode(false);
           setIsDecoySession(Boolean(isDecoy));
           try {
+            sessionStorage.setItem('secret_bubble_session_unlocked', 'true');
             localStorage.setItem('secret_bubble_stealth_active', 'false');
           } catch {}
         }}
@@ -779,6 +793,7 @@ export default function App() {
             onToggleStealth={() => {
               setIsStealthMode(true);
               try {
+                sessionStorage.removeItem('secret_bubble_session_unlocked');
                 localStorage.setItem('secret_bubble_stealth_active', 'true');
               } catch {}
             }}
