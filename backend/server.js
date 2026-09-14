@@ -87,7 +87,9 @@ const io = new Server(server, {
 });
 
 const DB_MESSAGES_FILE = path.join(__dirname, 'messages.json');
+const DB_MESSAGES_BACKUP_FILE = path.join(__dirname, 'messages_backup.json');
 const DB_USERS_FILE = path.join(__dirname, 'users.json');
+const DB_USERS_BACKUP_FILE = path.join(__dirname, 'users_backup.json');
 const DB_AI_TRAINING_FILE = path.join(__dirname, 'ai_training_data.json');
 const DB_GROUPS_FILE = path.join(__dirname, 'groups.json');
 
@@ -286,7 +288,19 @@ function loadUsers() {
       const raw = fs.readFileSync(DB_USERS_FILE, 'utf8');
       if (raw && raw.trim()) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    }
+    // Redundancy: Check backup file if primary file was wiped or empty
+    if (fs.existsSync(DB_USERS_BACKUP_FILE)) {
+      const rawBackup = fs.readFileSync(DB_USERS_BACKUP_FILE, 'utf8');
+      if (rawBackup && rawBackup.trim()) {
+        const parsedBackup = JSON.parse(rawBackup);
+        if (Array.isArray(parsedBackup) && parsedBackup.length > 0) {
+          console.log(`[Persistence] Restored ${parsedBackup.length} user accounts from backup file.`);
+          saveUsers(parsedBackup);
+          return parsedBackup;
+        }
       }
     }
   } catch (err) {
@@ -297,7 +311,11 @@ function loadUsers() {
 
 function saveUsers(usersList) {
   try {
-    fs.writeFileSync(DB_USERS_FILE, JSON.stringify(usersList, null, 2), 'utf8');
+    const jsonStr = JSON.stringify(usersList, null, 2);
+    fs.writeFileSync(DB_USERS_FILE, jsonStr, 'utf8');
+    if (Array.isArray(usersList) && usersList.length > 0) {
+      fs.writeFileSync(DB_USERS_BACKUP_FILE, jsonStr, 'utf8');
+    }
   } catch (err) {
     console.error('Error saving users to disk:', err);
   }
@@ -307,47 +325,55 @@ let users = loadUsers();
 
 function loadMessages() {
   try {
+    let raw = '';
     if (fs.existsSync(DB_MESSAGES_FILE)) {
-      const raw = fs.readFileSync(DB_MESSAGES_FILE, 'utf8');
-      if (raw && raw.trim()) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          return parsed.map(m => {
-            let text = m.text;
-            if (m.encryptedPayload) {
-              const decrypted = decryptMessageText(m.encryptedPayload);
-              if (decrypted && !decrypted.startsWith('[Decryption failed')) {
-                text = decrypted;
-              } else if (!text) {
-                text = decrypted;
-              }
+      raw = fs.readFileSync(DB_MESSAGES_FILE, 'utf8');
+    }
+    if ((!raw || !raw.trim() || raw.trim() === '[]') && fs.existsSync(DB_MESSAGES_BACKUP_FILE)) {
+      const rawBackup = fs.readFileSync(DB_MESSAGES_BACKUP_FILE, 'utf8');
+      if (rawBackup && rawBackup.trim() && rawBackup.trim() !== '[]') {
+        raw = rawBackup;
+        console.log('[Persistence] Restored messages from backup file.');
+      }
+    }
+    if (raw && raw.trim()) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map(m => {
+          let text = m.text;
+          if (m.encryptedPayload) {
+            const decrypted = decryptMessageText(m.encryptedPayload);
+            if (decrypted && !decrypted.startsWith('[Decryption failed')) {
+              text = decrypted;
+            } else if (!text) {
+              text = decrypted;
             }
-            // Backward compatibility: If no roomId and no recipientId, default to 'global'
-            const roomId = (!m.recipientId && !m.roomId) ? 'global' : (m.roomId || null);
-            const finalText = text || m.text || '';
-            const sensitivity = analyzeSensitivity(finalText);
-            const shouldBeLocked = Boolean(m.isLocked || m.hasPasscode || sensitivity.isSensitive);
-            let hasPasscode = Boolean(m.hasPasscode || shouldBeLocked);
-            let passcodeHash = m.passcodeHash;
-            let passcodeHint = m.passcodeHint;
-            if (shouldBeLocked && !passcodeHash) {
-              passcodeHash = crypto.createHash('sha256').update('1234').digest('hex');
-              passcodeHint = passcodeHint || '1234';
-            }
+          }
+          // Backward compatibility: If no roomId and no recipientId, default to 'global'
+          const roomId = (!m.recipientId && !m.roomId) ? 'global' : (m.roomId || null);
+          const finalText = text || m.text || '';
+          const sensitivity = analyzeSensitivity(finalText);
+          const shouldBeLocked = Boolean(m.isLocked || m.hasPasscode || sensitivity.isSensitive);
+          let hasPasscode = Boolean(m.hasPasscode || shouldBeLocked);
+          let passcodeHash = m.passcodeHash;
+          let passcodeHint = m.passcodeHint;
+          if (shouldBeLocked && !passcodeHash) {
+            passcodeHash = crypto.createHash('sha256').update('1234').digest('hex');
+            passcodeHint = passcodeHint || '1234';
+          }
 
-            return {
-              ...m,
-              text: finalText,
-              roomId: roomId,
-              isLocked: shouldBeLocked,
-              hasPasscode: hasPasscode,
-              passcodeHash: passcodeHash,
-              passcodeHint: passcodeHint,
-              category: m.category || (sensitivity.isSensitive ? sensitivity.category : 'General'),
-              e2eeEnvelope: m.e2eeEnvelope || null
-            };
-          });
-        }
+          return {
+            ...m,
+            text: finalText,
+            roomId: roomId,
+            isLocked: shouldBeLocked,
+            hasPasscode: hasPasscode,
+            passcodeHash: passcodeHash,
+            passcodeHint: passcodeHint,
+            category: m.category || (sensitivity.isSensitive ? sensitivity.category : 'General'),
+            e2eeEnvelope: m.e2eeEnvelope || null
+          };
+        });
       }
     }
   } catch (err) {
@@ -371,7 +397,11 @@ function saveMessages(msgs) {
       copy.e2eeEnvelope = m.e2eeEnvelope || null;
       return copy;
     });
-    fs.writeFileSync(DB_MESSAGES_FILE, JSON.stringify(diskMessages, null, 2), 'utf8');
+    const jsonStr = JSON.stringify(diskMessages, null, 2);
+    fs.writeFileSync(DB_MESSAGES_FILE, jsonStr, 'utf8');
+    if (Array.isArray(diskMessages) && diskMessages.length > 0) {
+      fs.writeFileSync(DB_MESSAGES_BACKUP_FILE, jsonStr, 'utf8');
+    }
   } catch (err) {
     console.error('Error saving messages to disk:', err);
   }
@@ -630,7 +660,26 @@ app.get('/api/auth/me', (req, res) => {
   }
 
   users = loadUsers();
-  const user = users.find(u => u.id === session.userId);
+  let user = users.find(u => u.id === session.userId || (u.username && session.username && u.username.toLowerCase() === session.username.toLowerCase()));
+
+  // Auto-heal / restore user if server restarted or container reset
+  if (!user && session.username) {
+    const cleanUsername = (session.username || '').trim().toLowerCase().replace(/^@+/, '');
+    const restoredUser = {
+      id: session.userId || ('user-' + Date.now()),
+      username: cleanUsername,
+      name: sanitizeText(session.name || cleanUsername),
+      avatarColor: 'from-purple-600 to-indigo-500',
+      avatarUrl: null,
+      bio: 'Hey there! I am using Secret-Bubble.',
+      createdAt: new Date().toISOString()
+    };
+    users.push(restoredUser);
+    saveUsers(users);
+    user = restoredUser;
+    console.log(`[Auto-Heal] Successfully restored user @${cleanUsername} from verified session token`);
+  }
+
   if (!user) {
     return res.status(401).json({ success: false, message: 'User account not found' });
   }
@@ -641,7 +690,7 @@ app.get('/api/auth/me', (req, res) => {
       id: user.id,
       username: user.username,
       name: user.name,
-      avatarColor: user.avatarColor,
+      avatarColor: user.avatarColor || 'from-purple-600 to-indigo-500',
       avatarUrl: user.avatarUrl || null,
       bio: user.bio || '',
       isOnline: true
@@ -677,9 +726,32 @@ app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
     return res.status(400).json({ success: false, message: 'This username is reserved by system' });
   }
 
-  const existing = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
+  let existing = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
+  
+  // If user was pre-provisioned or recoverable, claim the account with this password
+  if (existing && existing.isRecoverable) {
+    existing.name = sanitizeText(name ? name.trim() : existing.name);
+    existing.passwordHash = hashPassword(password);
+    delete existing.isRecoverable;
+    if (avatarUrl) existing.avatarUrl = avatarUrl;
+    saveUsers(users);
+
+    const safeUser = {
+      id: existing.id,
+      username: existing.username,
+      name: existing.name,
+      avatarColor: existing.avatarColor,
+      avatarUrl: existing.avatarUrl,
+      bio: existing.bio,
+      isOnline: false
+    };
+    io.emit('user_registered', safeUser);
+    const token = generateSessionToken(safeUser);
+    return res.json({ success: true, user: safeUser, token });
+  }
+
   if (existing) {
-    return res.status(400).json({ success: false, message: 'Username already taken. Please choose another.' });
+    return res.status(400).json({ success: false, message: 'Username already taken. Please choose another or sign in.' });
   }
 
   const colors = [
@@ -728,7 +800,7 @@ app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
 });
 
 app.post('/api/auth/login', authLoginLimiter, (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, cachedProfile } = req.body;
   if (!username || !password) {
     return res.status(400).json({ success: false, message: 'Username and password required' });
   }
@@ -737,15 +809,50 @@ app.post('/api/auth/login', authLoginLimiter, (req, res) => {
   users = loadUsers();
 
   const cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
-  const user = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
+  let user = users.find(u => (u.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername);
+
+  // 1. If user is marked recoverable (pre-provisioned account), set their password and proceed
+  if (user && user.isRecoverable) {
+    user.passwordHash = hashPassword(password);
+    delete user.isRecoverable;
+    saveUsers(users);
+  }
+
+  // 2. If user was not found on this server instance (e.g. Render container restart), but client has cached profile:
+  if (!user && cachedProfile && (cachedProfile.username || '').toLowerCase().replace(/^@+/, '') === cleanUsername) {
+    const restoredUser = {
+      id: cachedProfile.id || ('user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4)),
+      username: cleanUsername,
+      name: sanitizeText(cachedProfile.name ? cachedProfile.name.trim() : cleanUsername),
+      passwordHash: hashPassword(password),
+      avatarColor: cachedProfile.avatarColor || 'from-purple-600 to-indigo-500',
+      avatarUrl: cachedProfile.avatarUrl || null,
+      bio: 'Hey there! I am using Secret-Bubble.',
+      createdAt: new Date().toISOString()
+    };
+    users.push(restoredUser);
+    saveUsers(users);
+    user = restoredUser;
+    console.log(`[Auto-Recovery] Seamlessly restored account @${cleanUsername} during login`);
+  }
 
   if (!user) {
-    return res.status(401).json({ success: false, message: 'Invalid username or password' });
+    return res.status(401).json({ 
+      success: false, 
+      notFound: true,
+      cleanUsername,
+      message: `Account "@${cleanUsername}" was not found on this server. Tap below to create it with this password instantly.` 
+    });
   }
 
   const verification = verifyPassword(password, user.passwordHash);
   if (!verification.valid) {
-    return res.status(401).json({ success: false, message: 'Invalid username or password' });
+    return res.status(401).json({ 
+      success: false, 
+      wrongPassword: true,
+      cleanUsername,
+      message: `Incorrect password for @${cleanUsername}. Please re-check your password.` 
+    });
   }
 
   // Automatic hash upgrade from legacy SHA-256 to Salted PBKDF2 (100,000 rounds)
@@ -758,7 +865,7 @@ app.post('/api/auth/login', authLoginLimiter, (req, res) => {
     id: user.id,
     username: user.username,
     name: user.name,
-    avatarColor: user.avatarColor,
+    avatarColor: user.avatarColor || 'from-purple-600 to-indigo-500',
     avatarUrl: user.avatarUrl || null,
     bio: user.bio || ''
   };
@@ -769,6 +876,15 @@ app.post('/api/auth/login', authLoginLimiter, (req, res) => {
     success: true,
     user: safeUser,
     token
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'online',
+    app: 'Secret-Bubble',
+    timestamp: new Date().toISOString(),
+    usersCount: (loadUsers()).length
   });
 });
 

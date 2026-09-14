@@ -14,6 +14,7 @@ import AiTrainingModal from './components/AiTrainingModal';
 import CreateGroupModal from './components/CreateGroupModal';
 import { useBiometrics } from './hooks/useBiometrics';
 import StealthMusicPlayer from './components/StealthMusicPlayer';
+import InstallAppModal from './components/InstallAppModal';
 import { decryptE2EE, isE2EEEncrypted } from './utils/e2eeCrypto';
 
 const getBackendUrl = () => {
@@ -21,7 +22,10 @@ const getBackendUrl = () => {
     return import.meta.env.VITE_BACKEND_URL;
   }
   const hostname = window.location.hostname || 'localhost';
-  return `http://${hostname}:5000`;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+    return `http://${hostname}:5000`;
+  }
+  return 'https://secret-bubble-backend.onrender.com';
 };
 
 const DEFAULT_SETTINGS = {
@@ -74,6 +78,23 @@ export default function App() {
     }
   });
   const [isDecoySession, setIsDecoySession] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(() => {
+    try {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      if (isStandalone) return false;
+      return sessionStorage.getItem('secret_bubble_install_dismissed') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const handleCloseInstallModal = () => {
+    setShowInstallModal(false);
+    try {
+      sessionStorage.setItem('secret_bubble_install_dismissed', 'true');
+    } catch {}
+  };
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('secure_chat_user');
@@ -162,15 +183,13 @@ export default function App() {
           setCurrentUser(data.user);
           localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
         } else {
-          // Token invalid or user removed from DB -> clean redirect to login
-          localStorage.removeItem('secure_chat_user');
-          localStorage.removeItem('secure_chat_token');
-          setAuthToken(null);
-          setCurrentUser(null);
+          // If server is cold-booting or restarted, do not immediately erase user
+          console.warn('Session verification notice:', data?.message);
         }
       })
-      .catch(() => {
-        // Offline / network failure - retain state for offline usage
+      .catch((err) => {
+        // Offline / network failure / cold boot - retain state for offline usage
+        console.warn('Backend connection notice:', err?.message || err);
       });
   }, [backendUrl]);
 
@@ -726,31 +745,44 @@ export default function App() {
 
   if (isStealthMode) {
     return (
-      <StealthMusicPlayer
-        secretPin={settings.stealthPin || '1234'}
-        decoyPin={settings.decoyPin || '9999'}
-        backendUrl={getBackendUrl()}
-        onUnlock={(isDecoy) => {
-          setIsStealthMode(false);
-          setIsDecoySession(Boolean(isDecoy));
-          try {
-            sessionStorage.setItem('secret_bubble_session_unlocked', 'true');
-            localStorage.setItem('secret_bubble_stealth_active', 'false');
-          } catch {}
-        }}
-      />
+      <>
+        <StealthMusicPlayer
+          secretPin={settings.stealthPin || '1234'}
+          decoyPin={settings.decoyPin || '9999'}
+          backendUrl={getBackendUrl()}
+          onOpenInstall={() => setShowInstallModal(true)}
+          onUnlock={(isDecoy) => {
+            setIsStealthMode(false);
+            setIsDecoySession(Boolean(isDecoy));
+            try {
+              sessionStorage.setItem('secret_bubble_session_unlocked', 'true');
+              localStorage.setItem('secret_bubble_stealth_active', 'false');
+            } catch {}
+          }}
+        />
+        <InstallAppModal
+          isOpen={showInstallModal}
+          onClose={handleCloseInstallModal}
+        />
+      </>
     );
   }
 
   if (!currentUser) {
     return (
-      <LoginPage
-        onLoginSuccess={(user, token) => {
-          setCurrentUser(user);
-          if (token) setAuthToken(token);
-        }}
-        backendUrl={backendUrl}
-      />
+      <>
+        <LoginPage
+          onLoginSuccess={(user, token) => {
+            setCurrentUser(user);
+            if (token) setAuthToken(token);
+          }}
+          backendUrl={backendUrl}
+        />
+        <InstallAppModal
+          isOpen={showInstallModal}
+          onClose={handleCloseInstallModal}
+        />
+      </>
     );
   }
 
@@ -817,6 +849,7 @@ export default function App() {
             onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             onRefreshUsers={fetchUsers}
+            onOpenInstall={() => setShowInstallModal(true)}
             unreadCounts={unreadCounts}
           />
         </div>
@@ -839,6 +872,7 @@ export default function App() {
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
+            onOpenInstall={() => setShowInstallModal(true)}
             onToggleStealth={() => {
               setIsStealthMode(true);
               try {
@@ -962,6 +996,12 @@ export default function App() {
         users={users}
         backendUrl={backendUrl}
         onGroupCreated={handleGroupCreated}
+      />
+
+      {/* PWA Download / Install App Modal */}
+      <InstallAppModal
+        isOpen={showInstallModal}
+        onClose={handleCloseInstallModal}
       />
 
     </div>

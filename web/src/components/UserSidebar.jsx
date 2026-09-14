@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, User, Search, MessageSquare, Globe, Shield, LogOut, Camera, 
-  Pin, Bot, CheckCheck, Menu, Moon, Lock, Settings as SettingsIcon, Sparkles, Plus, Brain, X, RefreshCw 
+  Pin, Bot, CheckCheck, Menu, Moon, Lock, Settings as SettingsIcon, Sparkles, Plus, Brain, X, RefreshCw, Download 
 } from 'lucide-react';
 
 export default function UserSidebar({
@@ -17,6 +17,7 @@ export default function UserSidebar({
   onOpenAiTraining,
   onOpenCreateGroup,
   onRefreshUsers,
+  onOpenInstall,
   unreadCounts = {}
 }) {
   const [search, setSearch] = useState('');
@@ -115,6 +116,16 @@ export default function UserSidebar({
                   <SettingsIcon className="w-4 h-4 text-cyan-400" />
                   <span>Privacy & AI Shield</span>
                 </button>
+
+                {onOpenInstall && (
+                  <button
+                    onClick={() => { setIsMenuOpen(false); onOpenInstall(); }}
+                    className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-emerald-300 hover:text-white flex items-center gap-2.5 transition"
+                  >
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    <span className="font-semibold">Install / Download App</span>
+                  </button>
+                )}
 
                 <div className="border-t border-slate-800 my-1" />
 

@@ -11,7 +11,21 @@ const PRESET_AVATARS = [
 
 export default function LoginPage({ onLoginSuccess, backendUrl }) {
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => {
+    try {
+      const saved = localStorage.getItem('secret_bubble_saved_account');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.username) return p.username;
+      }
+      const u = localStorage.getItem('secure_chat_user');
+      if (u) {
+        const p = JSON.parse(u);
+        if (p.username) return p.username;
+      }
+    } catch {}
+    return 'nothing';
+  });
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -20,6 +34,7 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [notFoundUser, setNotFoundUser] = useState('');
   const fileInputRef = useRef(null);
 
   const handleFileUpload = (e) => {
@@ -36,9 +51,50 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
     reader.readAsDataURL(file);
   };
 
+  const handleQuickCreate = async () => {
+    if (!username.trim() || !password.trim()) return;
+    setError('');
+    setLoading(true);
+    const cleanUser = username.trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
+    try {
+      const res = await fetch(`${backendUrl}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: cleanUser,
+          name: name.trim() || cleanUser,
+          password: password.trim(),
+          avatarUrl: avatarUrl || null
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Registration failed');
+      }
+      try {
+        localStorage.setItem('secret_bubble_saved_account', JSON.stringify({
+          username: cleanUser,
+          name: data.user?.name || cleanUser,
+          avatarUrl: data.user?.avatarUrl || null,
+          avatarColor: data.user?.avatarColor || null
+        }));
+      } catch {}
+      if (data.token) {
+        localStorage.setItem('secure_chat_token', data.token);
+      }
+      localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
+      onLoginSuccess(data.user, data.token);
+    } catch (err) {
+      setError(err.message || 'Error creating account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
+    setNotFoundUser('');
 
     const cleanUser = username.trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
 
@@ -64,9 +120,16 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
 
     setLoading(true);
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+
+    let savedAccount = null;
+    try {
+      const saved = localStorage.getItem('secret_bubble_saved_account');
+      if (saved) savedAccount = JSON.parse(saved);
+    } catch {}
+
     const payload = isRegister
       ? { username: cleanUser, name: name.trim() || cleanUser, password, avatarUrl: avatarUrl || null }
-      : { username: cleanUser, password };
+      : { username: cleanUser, password, cachedProfile: savedAccount };
 
     try {
       const res = await fetch(`${backendUrl}${endpoint}`, {
@@ -77,8 +140,21 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
+        if (data.notFound) {
+          setNotFoundUser(cleanUser);
+        }
         throw new Error(data.message || 'Authentication failed');
       }
+
+      // Save user account for future auto-recovery
+      try {
+        localStorage.setItem('secret_bubble_saved_account', JSON.stringify({
+          username: cleanUser,
+          name: data.user?.name || name || cleanUser,
+          avatarUrl: data.user?.avatarUrl || avatarUrl || null,
+          avatarColor: data.user?.avatarColor || null
+        }));
+      } catch {}
 
       if (data.token) {
         localStorage.setItem('secure_chat_token', data.token);
@@ -103,12 +179,19 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
         
         {/* Brand Icon & Telegram Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex p-3.5 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 text-white shadow-xl shadow-purple-600/30 mb-3">
-            <Shield className="w-8 h-8" />
+          <div className="inline-flex p-1 rounded-3xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 text-white shadow-xl shadow-purple-600/30 mb-3 w-16 h-16 overflow-hidden border-2 border-white/20">
+            <img
+              src="/app-logo.png"
+              alt="App Logo"
+              className="w-full h-full object-cover rounded-2xl"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Secret-Bubble</h1>
           <p className="text-xs text-slate-400 mt-1">
-            Telegram-Grade E2EE & Biometric Privacy Chat
+            Music & Zero-Trace Private Vault
           </p>
         </div>
 
@@ -142,8 +225,19 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
 
         {/* Error Notification */}
         {error && (
-          <div className="p-3 mb-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs text-center font-medium animate-in fade-in">
-            {error}
+          <div className="p-3.5 mb-4 rounded-2xl bg-rose-950/70 border border-rose-500/40 text-rose-300 text-xs text-center font-medium animate-in fade-in space-y-2.5">
+            <p className="leading-relaxed">{error}</p>
+            {notFoundUser && (
+              <button
+                type="button"
+                onClick={handleQuickCreate}
+                disabled={loading}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-purple-600/30 transition cursor-pointer active:scale-95"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Create @{notFoundUser} with this password (1-Click)</span>
+              </button>
+            )}
           </div>
         )}
 

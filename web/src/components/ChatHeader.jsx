@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Headphones } from 'lucide-react';
+import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Headphones, Download } from 'lucide-react';
 
 export default function ChatHeader({
   target,
@@ -14,7 +14,8 @@ export default function ChatHeader({
   disappearingTimer,
   onToggleStealth,
   isDecoyActive,
-  onExitDecoy
+  onExitDecoy,
+  onOpenInstall
 }) {
   const isMetaAi = target?.id === 'user-meta-ai' || target?.isBot;
 
@@ -141,6 +142,17 @@ export default function ChatHeader({
             title="Decoy Mode Active. Click to exit."
           >
             <span>🛡️ DECOY MODE</span>
+          </button>
+        )}
+
+        {/* Install / Download App Button */}
+        {onOpenInstall && (
+          <button
+            onClick={onOpenInstall}
+            className="p-2 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-emerald-200 border border-emerald-800/60 rounded-xl transition shadow-sm"
+            title="Download / Install App on Phone"
+          >
+            <Download className="w-4 h-4" />
           </button>
         )}
 

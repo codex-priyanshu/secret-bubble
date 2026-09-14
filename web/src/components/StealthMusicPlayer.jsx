@@ -5,7 +5,7 @@ import {
   Sparkles, Shield, X, Lock, Check, FolderPlus, List, 
   Trash2, HardDrive, Smartphone, Music2, Plus, Search, 
   Globe, Flame, ExternalLink, Loader2, Video, Eye, EyeOff,
-  Headphones, ChevronDown, ChevronUp, RadioTower, KeyRound, AlertCircle
+  Headphones, ChevronDown, ChevronUp, RadioTower, KeyRound, AlertCircle, Download
 } from 'lucide-react';
 
 const FEATURED_ONLINE_TRACKS = [
@@ -96,7 +96,8 @@ export default function StealthMusicPlayer({
   onUnlock,
   secretPin = '1234',
   decoyPin = '9999',
-  backendUrl = ''
+  backendUrl = '',
+  onOpenInstall
 }) {
   const [tracks, setTracks] = useState(FEATURED_ONLINE_TRACKS);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -801,8 +802,15 @@ export default function StealthMusicPlayer({
           {/* List View Top Header */}
           <div className="flex items-center justify-between px-1 pb-3 border-b border-white/10 shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-purple-600/30">
-                <Music className="w-5 h-5" />
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-purple-600/30 overflow-hidden border border-white/20">
+                <img
+                  src="/app-logo.png"
+                  alt="App Logo"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
               </div>
               <div>
                 <h1 className="text-sm font-bold text-white tracking-wide flex items-center gap-1.5">
@@ -814,6 +822,18 @@ export default function StealthMusicPlayer({
             </div>
 
             <div className="flex items-center gap-1.5">
+              {/* Install App Button */}
+              {onOpenInstall && (
+                <button
+                  onClick={onOpenInstall}
+                  title="Download / Install App on Phone"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold text-[11px] shadow-sm transition active:scale-95 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Install</span>
+                </button>
+              )}
+
               {/* YouTube Video View Toggle */}
               {currentTrack.isYoutube && (
                 <button
@@ -1232,6 +1252,17 @@ export default function StealthMusicPlayer({
 
             {/* Action Controls */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {onOpenInstall && (
+                <button
+                  onClick={onOpenInstall}
+                  title="Download / Install App on Phone"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold text-[11px] shadow-sm transition active:scale-95 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Install</span>
+                </button>
+              )}
+
               {currentTrack.isYoutube && (
                 <button
                   onClick={() => setShowVideoMode(!showVideoMode)}
