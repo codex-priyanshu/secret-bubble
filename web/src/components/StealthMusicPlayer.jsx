@@ -783,7 +783,7 @@ export default function StealthMusicPlayer({
       return {
         id: `phone-${Date.now()}-${i}`,
         title: cleanName,
-        artist: "Phone Audio (फोन स्टोरेज)",
+        artist: "Phone Audio",
         album: "Device Downloads",
         duration: 200,
         isLocal: true,
@@ -1363,7 +1363,7 @@ export default function StealthMusicPlayer({
                   {isLoadingMore ? (
                     <div className="flex items-center justify-center gap-2 text-xs text-purple-400 font-medium py-3 animate-pulse">
                       <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                      <span>Loading more songs... (नए गाने लोड हो रहे हैं...)</span>
+                      <span>Loading more songs...</span>
                     </div>
                   ) : (
                     <div className="text-[11px] text-slate-500 py-2 flex items-center justify-center gap-1.5 opacity-60">
