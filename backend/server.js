@@ -1248,6 +1248,95 @@ app.get('/api/music/search', async (req, res) => {
   }
 });
 
+// Endless Feed / Recommendations for Infinite Scrolling: Returns batches of popular streaming tracks by page
+const FEED_TOPICS = [
+  'Trending Hindi Hits',
+  'Arijit Singh Best',
+  'Sidhu Moose Wala Top',
+  'Bollywood Romantic Hits',
+  'Diljit Dosanjh Hits',
+  'Pritam Blockbusters',
+  'Anirudh Ravichander Viral',
+  'Shreya Ghoshal Hits',
+  'Atif Aslam Melody',
+  'Lofi Hindi Chill',
+  'Punjabi Party Bangers',
+  'Darshan Raval Hits',
+  'KK Evergreen Hits',
+  'Mohit Chauhan Melodies',
+  'Sonu Nigam Romantic',
+  'Jubin Nautiyal Hits',
+  'B Praak Emotional Hits',
+  'A.R. Rahman Classics',
+  'Bollywood 2000s Nostalgia',
+  'Badshah Party Hits',
+  'King Rap Hits',
+  'Honey Singh Hits',
+  'Sachet Tandon & Parampara',
+  'Armaan Malik Melodies'
+];
+
+app.get('/api/music/feed', async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const topic = FEED_TOPICS[(page - 1) % FEED_TOPICS.length];
+
+  try {
+    const searchUrl = `https://www.jiosaavn.com/api.php?__call=autocomplete.get&_marker=0&query=${encodeURIComponent(topic)}&ctx=android&_format=json`;
+    const saavnRes = await fetch(searchUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    const data = await saavnRes.json();
+    const songs = data.songs?.data || [];
+    const results = [];
+
+    if (songs.length > 0) {
+      const pids = songs.slice(0, 15).map(s => s.id).join(',');
+      const detailsUrl = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${pids}`;
+      const detRes = await fetch(detailsUrl);
+      const detData = await detRes.json();
+
+      for (const s of songs.slice(0, 15)) {
+        const details = detData[s.id];
+        if (details && details.encrypted_media_url) {
+          const directAudio = decryptSaavnUrl(details.encrypted_media_url);
+          if (directAudio) {
+            const dur = parseInt(details.duration, 10) || 240;
+            const min = Math.floor(dur / 60);
+            const sec = dur % 60;
+            const img = (details.image || s.image || '')
+              .replace('50x50.jpg', '500x500.jpg')
+              .replace('150x150.jpg', '500x500.jpg');
+
+            results.push({
+              id: `track-${s.id}-${page}`,
+              title: cleanHtml(details.song || s.title),
+              artist: cleanHtml(details.primary_artists || s.more_info?.primary_artists || 'Online Music'),
+              album: cleanHtml(details.album || s.album || 'Online Album'),
+              duration: dur,
+              durationText: `${min}:${sec < 10 ? '0' : ''}${sec}`,
+              artwork: img,
+              url: directAudio,
+              isAudioStream: true
+            });
+          }
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      page,
+      topic,
+      results,
+      hasMore: true
+    });
+  } catch (err) {
+    console.error('Music feed error:', err);
+    return res.status(500).json({ success: false, error: err.message, results: [] });
+  }
+});
+
+
 // Proxy Audio Stream (helps if client has CORS or byte-range issues)
 app.get('/api/music/proxy-stream', async (req, res) => {
   const audioUrl = req.query.url;
