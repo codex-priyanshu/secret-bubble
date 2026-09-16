@@ -1109,6 +1109,13 @@ export default function StealthMusicPlayer({
   };
 
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -1229,7 +1236,7 @@ export default function StealthMusicPlayer({
   };
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col justify-between bg-gradient-to-b ${currentTrack.color || 'from-indigo-950 via-slate-950 to-slate-950'} text-slate-100 select-none p-4 sm:p-7 font-sans overflow-hidden transition-colors duration-700`}>
+    <div className="fixed inset-0 z-50 flex flex-col justify-between bg-[#121212] text-[#b3b3b3] select-none font-sans overflow-hidden">
       
       {/* Background audio keep-alive (silently ensures mobile OS does not pause background stream) */}
       <audio
@@ -1248,7 +1255,7 @@ export default function StealthMusicPlayer({
         playsInline
       />
 
-      {/* Persistent YouTube Audio/Video Frame (Kept rendered in-viewport to guarantee continuous background playback) */}
+      {/* Persistent YouTube Audio/Video Frame */}
       {currentTrack.isYoutube && (
         <div 
           className={
@@ -1291,754 +1298,59 @@ export default function StealthMusicPlayer({
       />
 
       {/* =========================================================================
-          VIEW 1: All Songs List & Music Browser (Default App View on Open)
+          VIEW 1: Spotify Main Music Lounge & Browser
           ========================================================================= */}
       {viewMode === 'list' && (
-        <div className="flex-1 flex flex-col w-full max-w-lg mx-auto h-full overflow-hidden pb-20 pt-1">
+        <div className="flex-1 flex flex-col w-full h-full overflow-hidden pb-20">
           
-          {/* List View Top Header */}
-          <div className="flex items-center justify-between px-1 pb-3 border-b border-white/10 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-purple-600/30 overflow-hidden border border-white/20">
-                <img
-                  src="/app-logo.png"
-                  alt="App Logo"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
+          {/* Spotify Top Header */}
+          <div className="bg-[#121212]/95 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3 border-b border-[#242424]/80 flex items-center justify-between gap-3 shrink-0">
+            {/* Spotify Brand Logo */}
+            <div className="flex items-center gap-2.5 shrink-0 cursor-pointer" onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}>
+              <div className="w-8 h-8 rounded-full bg-[#1ed760] flex items-center justify-center text-black shadow-lg shadow-[#1ed760]/20">
+                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.22.36-.684.475-1.044.255-2.862-1.748-6.463-2.144-10.707-1.173-.412.094-.823-.162-.917-.574-.094-.412.162-.823.574-.917 4.646-1.062 8.627-.615 11.84 1.365.36.22.474.684.254 1.044zm1.47-3.262c-.276.449-.865.594-1.314.318-3.276-2.013-8.27-2.597-12.145-1.421-.504.153-1.036-.134-1.189-.638-.153-.504.134-1.036.638-1.189 4.432-1.345 9.94-.7 13.692 1.616.449.276.594.865.318 1.314zm.126-3.41c-3.928-2.332-10.407-2.547-14.17-1.404-.602.183-1.24-.165-1.423-.767-.183-.602.165-1.24.767-1.423 4.331-1.314 11.488-1.062 15.992 1.613.541.321.717 1.026.396 1.567-.321.541-1.026.717-1.562.414z"/>
+                </svg>
               </div>
-              <div>
-                <h1 className="text-sm font-bold text-white tracking-wide flex items-center gap-1.5">
-                  <span>Music Lounge</span>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                </h1>
-                <p className="text-[10px] text-slate-400">Online Streaming & Phone Audio</p>
+              <div className="hidden sm:block">
+                <span className="text-base font-extrabold text-white tracking-tight">Spotify</span>
+                <span className="text-[10px] text-[#1ed760] font-bold block -mt-1 tracking-wider uppercase">Music Lounge</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {/* Install App Button */}
-              {onOpenInstall && (
-                <button
-                  onClick={onOpenInstall}
-                  title="Download / Install App on Phone"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold text-[11px] shadow-sm transition active:scale-95 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Install</span>
-                </button>
-              )}
-
-              {/* YouTube Video View Toggle */}
-              {currentTrack.isYoutube && (
-                <button
-                  onClick={() => setShowVideoMode(!showVideoMode)}
-                  className={`p-2 rounded-full border transition active:scale-90 ${
-                    showVideoMode ? 'bg-red-600 border-red-500 text-white' : 'bg-white/10 border-white/10 text-slate-300'
-                  }`}
-                  title="Toggle YouTube Video View"
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-              )}
-
-              {/* Equalizer (Secret Code Door) */}
-              <button
-                onClick={handleEqualizerClick}
-                title="Audio Equalizer / Sound Presets"
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition active:scale-95 cursor-pointer"
-              >
-                <Sliders className="w-4 h-4" />
-              </button>
-
-              {/* Discrete Help */}
-              <button
-                onClick={() => setShowHelpModal(true)}
-                title="Info"
-                className="p-1.5 text-slate-400 hover:text-white rounded-full transition text-[11px] underline"
-              >
-                Help
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Search Bar at Top */}
-          <div className="pt-3 pb-2 space-y-2 shrink-0">
-            <form onSubmit={handleSearchSubmit} className="flex gap-2">
-              <div className="relative flex-1">
+            {/* Spotify Centered Pill Search Input */}
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-auto">
+              <div className="relative w-full">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search any song, artist or paste YouTube link..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-950/80 border border-slate-700/80 focus:border-purple-500 rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none shadow-inner"
+                  placeholder="What do you want to play?"
+                  className="w-full pl-9 pr-8 py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-white rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
                 />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-[#b3b3b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-              <button
-                type="submit"
-                disabled={isSearching || !searchQuery.trim()}
-                className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition disabled:opacity-50 flex items-center gap-1.5 shadow-md shadow-purple-600/30 cursor-pointer shrink-0"
-              >
-                {isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Search</span>}
-              </button>
             </form>
 
-            {/* Popular Query Badges */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-[10px] text-slate-400">
-              <span className="opacity-70 shrink-0">Popular:</span>
-              {['Arijit Singh', 'Kesariya', 'Chaleya', 'Sidhu Moose Wala', 'Lofi Hindi'].map(tag => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery(tag);
-                    setActiveTab('search');
-                    setTimeout(() => handleSearchSubmit(), 50);
-                  }}
-                  className="px-2 py-0.5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-purple-300 transition shrink-0 cursor-pointer"
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Navigation Category Tabs */}
-          <div className="flex gap-1.5 py-2 border-b border-white/10 shrink-0 overflow-x-auto no-scrollbar">
-            <button
-              onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
-              className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeTab === 'playlist'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>All Songs ({tracks.length})</span>
-            </button>
-
-            <button
-              onClick={() => { setActiveTab('playlists'); setSelectedPlaylistView(null); }}
-              className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeTab === 'playlists'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white'
-              }`}
-            >
-              <ListMusic className="w-3.5 h-3.5 text-pink-400" />
-              <span>Playlists</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('trending')}
-              className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeTab === 'trending'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Flame className="w-3.5 h-3.5 text-orange-400" />
-              <span>Trending Hits</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('phone')}
-              className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                activeTab === 'phone'
-                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                  : 'bg-slate-800/70 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Phone Storage</span>
-            </button>
-
-            {searchResults.length > 0 && (
-              <button
-                onClick={() => setActiveTab('search')}
-                className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'search'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'bg-slate-800/70 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Search className="w-3.5 h-3.5 text-purple-300" />
-                <span>Results ({searchResults.length})</span>
-              </button>
-            )}
-          </div>
-
-          {/* Main Scrollable Song List with Infinite Non-Stop Streaming */}
-          <div
-            ref={listScrollRef}
-            onScroll={handleContainerScroll}
-            className="flex-1 overflow-y-auto space-y-1.5 pt-2 pr-0.5 pb-28"
-          >
-            {/* TAB 0: All Songs Queue */}
-            {activeTab === 'playlist' && (
-              <div className="space-y-1.5">
-                {tracks.map((track, idx) => {
-                  const isCurrent = idx === currentTrackIndex;
-                  return (
-                    <div
-                      key={track.id || idx}
-                      onClick={() => {
-                        setCurrentTrackIndex(idx);
-                        setIsPlaying(true);
-                      }}
-                      className={`flex items-center justify-between p-2.5 rounded-2xl border transition cursor-pointer active:scale-[0.99] group ${
-                        isCurrent
-                          ? 'bg-purple-900/40 border-purple-500/60 shadow-lg shadow-purple-950/40'
-                          : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/60 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 pr-2">
-                        <span className={`text-xs font-mono w-4 text-center shrink-0 ${isCurrent ? 'text-purple-400 font-bold' : 'text-slate-500'}`}>
-                          {isCurrent ? '▶' : idx + 1}
-                        </span>
-                        <img
-                          src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
-                          alt={track.title}
-                          className="w-11 h-11 rounded-xl object-cover shrink-0 border border-white/10 shadow-sm"
-                        />
-                        <div className="min-w-0">
-                          <p className={`text-xs font-bold truncate ${isCurrent ? 'text-purple-200' : 'text-white'}`}>
-                            {track.title}
-                          </p>
-                          <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5 mt-0.5">
-                            {track.isYoutube ? (
-                              <span className="px-1.5 py-0.2 rounded bg-red-600/30 text-red-300 text-[9px] font-bold">
-                                YouTube
-                              </span>
-                            ) : track.isLocal ? (
-                              <span className="px-1.5 py-0.2 rounded bg-cyan-600/30 text-cyan-300 text-[9px] font-bold">
-                                Phone
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 rounded bg-emerald-600/30 text-emerald-300 text-[9px] font-bold">
-                                Online
-                              </span>
-                            )}
-                            {track.durationText && (
-                              <span className="text-[10px] text-slate-400 font-mono">
-                                {track.durationText}
-                              </span>
-                            )}
-                            <span className="truncate">{track.artist}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Add to Playlist button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAddToPlaylistTrack(track);
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-purple-300 hover:bg-white/5 rounded-lg transition"
-                          title="Add to Playlist"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Favorite / Heart button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleLikeTrack(track);
-                          }}
-                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-white/5 rounded-lg transition"
-                          title="Favorite / Like"
-                        >
-                          <Heart className={`w-3.5 h-3.5 ${likedSongIds.includes(track.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
-                        </button>
-
-                        {isCurrent && isPlaying ? (
-                          <div className="flex items-end gap-0.5 h-3 px-1">
-                            <span className="w-0.5 h-full bg-purple-400 animate-bounce" />
-                            <span className="w-0.5 h-2 bg-pink-400 animate-bounce delay-75" />
-                            <span className="w-0.5 h-3 bg-indigo-400 animate-bounce delay-150" />
-                          </div>
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-purple-300 group-hover:bg-purple-600/30 transition">
-                            <Play className="w-3 h-3 fill-current ml-0.5" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Infinite Scroll Sentinel & Loader (Songs Keep Flowing Non-Stop) */}
-                <div ref={sentinelRef} className="py-4 text-center">
-                  {isLoadingMore ? (
-                    <div className="flex items-center justify-center gap-2 text-xs text-purple-400 font-medium py-3 animate-pulse">
-                      <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
-                      <span>Loading more songs...</span>
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-slate-500 py-2 flex items-center justify-center gap-1.5 opacity-60">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Scroll down for endless non-stop songs</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: Playlists */}
-            {activeTab === 'playlists' && (
-              <div className="space-y-4 pb-6">
-                {!selectedPlaylistView ? (
-                  <>
-                    {/* Playlists Top Bar */}
-                    <div className="flex items-center justify-between pt-1">
-                      <div>
-                        <h2 className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
-                          <ListMusic className="w-4 h-4 text-purple-400" />
-                          <span>Music Playlists</span>
-                        </h2>
-                        <p className="text-[10px] text-slate-400">Curated collections & custom playlists</p>
-                      </div>
-                      <button
-                        onClick={() => setShowCreatePlaylistModal(true)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-[11px] shadow-md shadow-purple-600/30 transition active:scale-95 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Create Playlist</span>
-                      </button>
-                    </div>
-
-                    {/* Special Hero Card: Liked Songs */}
-                    <div
-                      onClick={() => {
-                        const likedSongsList = getPlaylistSongs({ id: 'pl-liked' });
-                        setSelectedPlaylistView({
-                          id: 'pl-liked',
-                          title: 'Liked Songs',
-                          description: 'All your favorite favorited tracks',
-                          cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
-                          gradient: 'from-rose-600 to-pink-900',
-                          badge: 'Favorites',
-                          isLikedCollection: true,
-                          songs: likedSongsList
-                        });
-                      }}
-                      className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-purple-950/60 to-slate-900/80 border border-rose-500/40 hover:border-rose-400 transition cursor-pointer flex items-center justify-between group shadow-lg active:scale-[0.99]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-rose-600/40 shrink-0">
-                          <Heart className="w-6 h-6 fill-current" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-white group-hover:text-rose-300 transition">Liked Songs</p>
-                          <p className="text-[10px] text-slate-400">{likedSongIds.length} tracks favorited</p>
-                        </div>
-                      </div>
-                      <div className="p-2 rounded-full bg-white/10 text-rose-300 group-hover:bg-rose-600 group-hover:text-white transition">
-                        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                      </div>
-                    </div>
-
-                    {/* Section: Curated Playlists */}
-                    <div className="space-y-2">
-                      <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Curated Playlists</p>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {CURATED_PLAYLISTS.map((pl) => {
-                          const plSongs = getPlaylistSongs(pl);
-                          return (
-                            <div
-                              key={pl.id}
-                              onClick={() => setSelectedPlaylistView({ ...pl, songs: plSongs })}
-                              className="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-purple-500/50 bg-slate-950/60 cursor-pointer transition shadow-md hover:shadow-purple-950/40 active:scale-[0.98]"
-                            >
-                              <div className="aspect-square w-full relative overflow-hidden bg-slate-900">
-                                <img
-                                  src={pl.cover}
-                                  alt={pl.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                                />
-                                <div className={`absolute inset-0 bg-gradient-to-t ${pl.gradient} opacity-40 group-hover:opacity-20 transition`} />
-                                <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase tracking-wider">
-                                  {pl.badge}
-                                </span>
-                                <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition">
-                                  <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                                </div>
-                              </div>
-                              <div className="p-2.5">
-                                <p className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition">{pl.title}</p>
-                                <p className="text-[10px] text-slate-400 line-clamp-1">{plSongs.length} Songs</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Section: Custom User Playlists */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Custom Playlists</p>
-                        <span className="text-[10px] text-slate-500">{customPlaylists.length} created</span>
-                      </div>
-
-                      {customPlaylists.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2.5">
-                          {customPlaylists.map((pl) => (
-                            <div
-                              key={pl.id}
-                              onClick={() => setSelectedPlaylistView(pl)}
-                              className="group rounded-2xl p-2.5 border border-white/10 hover:border-purple-500/50 bg-slate-950/60 cursor-pointer transition shadow-md active:scale-[0.98]"
-                            >
-                              <div className="aspect-square w-full rounded-xl overflow-hidden bg-gradient-to-tr from-purple-700 via-indigo-700 to-cyan-600 flex items-center justify-center text-white mb-2 shadow-inner">
-                                <ListMusic className="w-8 h-8 opacity-80" />
-                              </div>
-                              <p className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition">{pl.title}</p>
-                              <p className="text-[10px] text-slate-400 truncate">{pl.songs?.length || 0} Songs</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => setShowCreatePlaylistModal(true)}
-                          className="p-5 rounded-2xl border border-dashed border-slate-700/80 hover:border-purple-500/50 bg-slate-950/40 text-center cursor-pointer transition"
-                        >
-                          <Plus className="w-6 h-6 text-purple-400 mx-auto mb-1.5" />
-                          <p className="text-xs font-bold text-white">Create Your First Playlist</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">Collect your favorite gym, chill, or roadtrip tracks</p>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  /* Detail View of Selected Playlist */
-                  <div className="space-y-3 animate-in fade-in duration-200">
-                    <button
-                      onClick={() => setSelectedPlaylistView(null)}
-                      className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 font-semibold transition cursor-pointer py-1"
-                    >
-                      <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>Back to All Playlists</span>
-                    </button>
-
-                    <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-purple-950/80 via-slate-950 to-slate-900 border border-purple-500/30 flex items-center justify-between gap-3 shadow-xl">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={selectedPlaylistView.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
-                          alt={selectedPlaylistView.title}
-                          className="w-14 h-14 rounded-xl object-cover border border-white/10 shadow-lg shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-bold text-white truncate">{selectedPlaylistView.title}</h3>
-                          <p className="text-[10px] text-slate-400 line-clamp-1">{selectedPlaylistView.description}</p>
-                          <p className="text-[10px] text-purple-400 font-semibold mt-0.5">
-                            {getPlaylistSongs(selectedPlaylistView).length} tracks
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => playPlaylistAll(selectedPlaylistView)}
-                          disabled={getPlaylistSongs(selectedPlaylistView).length === 0}
-                          className="flex items-center gap-1 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition active:scale-95 cursor-pointer"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                          <span>Play All</span>
-                        </button>
-                        {selectedPlaylistView.isCustom && (
-                          <button
-                            onClick={(e) => handleDeleteCustomPlaylist(selectedPlaylistView.id, e)}
-                            className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition cursor-pointer"
-                            title="Delete Playlist"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {getPlaylistSongs(selectedPlaylistView).map((track, idx) => {
-                        const isCurrent = track.id === currentTrack.id;
-                        return (
-                          <div
-                            key={track.id || idx}
-                            onClick={() => playTrackNow(track)}
-                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition cursor-pointer active:scale-[0.99] group ${
-                              isCurrent
-                                ? 'bg-purple-900/40 border-purple-500/60 shadow-lg shadow-purple-950/40'
-                                : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/60 hover:border-slate-700'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0 pr-2">
-                              <span className={`text-xs font-mono w-4 text-center shrink-0 ${isCurrent ? 'text-purple-400 font-bold' : 'text-slate-500'}`}>
-                                {isCurrent ? '▶' : idx + 1}
-                              </span>
-                              <img
-                                src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
-                                alt={track.title}
-                                className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10"
-                              />
-                              <div className="min-w-0">
-                                <p className={`text-xs font-bold truncate ${isCurrent ? 'text-purple-200' : 'text-white'}`}>{track.title}</p>
-                                <p className="text-[10px] text-slate-400 truncate">{track.artist}</p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
-                              {selectedPlaylistView.isCustom && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => handleRemoveSongFromPlaylist(selectedPlaylistView.id, track.id, e)}
-                                  className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition"
-                                  title="Remove from playlist"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-purple-300 group-hover:bg-purple-600/30 transition">
-                                <Play className="w-3 h-3 fill-current ml-0.5" />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {getPlaylistSongs(selectedPlaylistView).length === 0 && (
-                        <div className="text-center py-12 text-slate-500 text-xs">
-                          <ListMusic className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                          <p className="font-semibold text-slate-400">No songs in this playlist yet</p>
-                          <p className="text-[11px] text-slate-500 mt-1">Tap the '+' button on any song to add it here.</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB 1: Search Results */}
-            {activeTab === 'search' && (
-              <div className="space-y-2">
-                {searchResults.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => playTrackNow(item)}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950/60 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/40 cursor-pointer transition"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <img
-                        src={item.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
-                        alt={item.title}
-                        className="w-11 h-11 rounded-xl object-cover shrink-0 border border-white/10"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{item.title}</p>
-                        <p className="text-[11px] text-slate-400 truncate">{item.artist}</p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="p-2 rounded-xl bg-purple-600 text-white transition shrink-0 shadow-md shadow-purple-600/30"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                    </button>
-                  </div>
-                ))}
-                {searchResults.length === 0 && !isSearching && (
-                  <div className="text-center py-10 text-slate-500 text-xs">
-                    <Globe className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-                    <p>Type any song name or artist in the search bar above to stream songs online.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB 2: Trending Hits */}
-            {activeTab === 'trending' && (
-              <div className="space-y-2">
-                {FEATURED_ONLINE_TRACKS.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => playTrackNow(item)}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950/60 hover:bg-purple-950/40 border border-slate-800 hover:border-purple-500/40 cursor-pointer transition"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 pr-2">
-                      <img
-                        src={item.artwork}
-                        alt={item.title}
-                        className="w-11 h-11 rounded-xl object-cover shrink-0 border border-white/10"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{item.title}</p>
-                        <p className="text-[11px] text-slate-400 truncate">{item.artist}</p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="p-2 rounded-xl bg-purple-600 text-white transition shrink-0 shadow-md shadow-purple-600/30"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-current" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* TAB 3: Phone Storage */}
-            {activeTab === 'phone' && (
-              <div className="space-y-3">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-98 cursor-pointer"
-                >
-                  <FolderPlus className="w-4 h-4" />
-                  <span>Choose MP3 Songs from Phone Storage / Downloads</span>
-                </button>
-
-                <div className="space-y-1.5">
-                  {tracks.filter(t => t.isLocal).map((track) => (
-                    <div
-                      key={track.id}
-                      onClick={() => playTrackNow(track)}
-                      className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 cursor-pointer transition text-xs"
-                    >
-                      <div className="min-w-0 pr-2">
-                        <p className="font-semibold text-white truncate">{track.title}</p>
-                        <p className="text-[10px] text-slate-400">{track.artist}</p>
-                      </div>
-                      <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition">
-                        <Play className="w-3 h-3 fill-current ml-0.5" />
-                      </div>
-                    </div>
-                  ))}
-
-                  {tracks.filter(t => t.isLocal).length === 0 && (
-                    <p className="text-xs text-slate-500 text-center py-6">
-                      No local songs imported yet. Click the button above to import your downloaded songs.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Sticky Bottom Mini Player (like Spotify / YouTube Music) */}
-          <div className="fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 border-t border-slate-800 backdrop-blur-xl max-w-lg mx-auto shadow-2xl">
-            {/* Top 2px live progress strip */}
-            <div className="w-full h-1 bg-white/10">
-              <div 
-                className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 transition-all duration-150"
-                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-              />
-            </div>
-
-            <div className="p-2.5 flex items-center justify-between gap-3">
-              {/* Tap to open full vinyl player */}
-              <div 
-                onClick={() => setViewMode('nowPlaying')}
-                className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group"
-                title="Tap to open full player screen"
-              >
-                <div className="relative shrink-0">
-                  <img
-                    src={currentTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
-                    alt={currentTrack.title}
-                    className={`w-11 h-11 rounded-xl object-cover border border-white/20 shadow-md ${isPlaying ? 'animate-spin-slow' : ''}`}
-                  />
-                  <div className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-slate-950 border border-white/30" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition">
-                    {currentTrack.title}
-                  </p>
-                  <p className="text-[10px] text-slate-400 truncate">
-                    {currentTrack.artist}
-                  </p>
-                </div>
-              </div>
-
-              {/* Controls on Mini Player */}
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={handleHeartClick}
-                  className="p-2 text-slate-400 hover:text-rose-400 rounded-full transition active:scale-125"
-                  title="Like (Tap 3x to unlock secret vault)"
-                >
-                  <Heart className={`w-4 h-4 ${isLiked ? 'fill-rose-500 text-rose-500' : ''}`} />
-                </button>
-
-                <button
-                  onClick={togglePlay}
-                  className="w-9 h-9 rounded-full bg-white text-slate-950 flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition cursor-pointer"
-                  title={isPlaying ? "Pause" : "Play"}
-                >
-                  {isPlaying ? (
-                    <Pause className="w-4 h-4 fill-current" />
-                  ) : (
-                    <Play className="w-4 h-4 fill-current translate-x-0.5" />
-                  )}
-                </button>
-
-                <button
-                  onClick={handleNextTrack}
-                  className="p-2 text-slate-300 hover:text-white transition active:scale-90 cursor-pointer"
-                  title="Next Track"
-                >
-                  <SkipForward className="w-4 h-4 fill-current" />
-                </button>
-
-                <button
-                  onClick={() => setViewMode('nowPlaying')}
-                  className="p-2 text-purple-400 hover:text-purple-200 transition"
-                  title="Expand Full Screen"
-                >
-                  <ChevronUp className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* =========================================================================
-          VIEW 2: Full "Now Playing" Vinyl Disc Screen (Expands on Mini-Player Tap)
-          ========================================================================= */}
-      {viewMode === 'nowPlaying' && (
-        <div className="flex-1 flex flex-col justify-between w-full max-w-md mx-auto h-full animate-in fade-in zoom-in-95 duration-200">
-          
-          {/* Top Bar with "Back to Songs List" */}
-          <div className="flex items-center justify-between w-full pt-1">
-            <button
-              onClick={() => setViewMode('list')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-slate-200 transition active:scale-95 shadow-sm cursor-pointer"
-              title="Return to Songs List"
-            >
-              <ChevronDown className="w-4 h-4" />
-              <span>All Songs</span>
-            </button>
-
-            {/* Action Controls */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            {/* Right Action Icons */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {onOpenInstall && (
                 <button
                   onClick={onOpenInstall}
-                  title="Download / Install App on Phone"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-bold text-[11px] shadow-sm transition active:scale-95 cursor-pointer"
+                  title="Install Spotify App"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs shadow transition active:scale-95 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Install</span>
+                  <span className="hidden md:inline">Install App</span>
                 </button>
               )}
 
@@ -2046,7 +1358,7 @@ export default function StealthMusicPlayer({
                 <button
                   onClick={() => setShowVideoMode(!showVideoMode)}
                   className={`p-2 rounded-full border transition active:scale-90 ${
-                    showVideoMode ? 'bg-red-600 border-red-500 text-white' : 'bg-white/10 border-white/10 text-slate-300'
+                    showVideoMode ? 'bg-[#1ed760] border-[#1ed760] text-black' : 'bg-[#242424] border-transparent text-white hover:bg-[#2a2a2a]'
                   }`}
                   title="Toggle YouTube Video View"
                 >
@@ -2058,7 +1370,7 @@ export default function StealthMusicPlayer({
               <button
                 onClick={handleEqualizerClick}
                 title="Audio Equalizer"
-                className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-white/5 transition"
+                className="p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
               >
                 <Sliders className="w-4 h-4" />
               </button>
@@ -2067,110 +1379,1057 @@ export default function StealthMusicPlayer({
               <button
                 onClick={() => setShowHelpModal(true)}
                 title="Info"
-                className="p-1.5 text-slate-400 hover:text-white rounded-full transition text-[11px] underline"
+                className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full transition text-[11px]"
               >
                 Help
               </button>
             </div>
           </div>
 
-          {/* Center Vinyl Disc & Cover */}
-          <div className="flex flex-col items-center justify-center my-auto w-full">
-            <div 
-              onClick={handleCoverTap}
-              className="relative group cursor-pointer"
-              title="Lo-Fi Vibes (Triple-tap to unlock secret chat)"
+          {/* Spotify Filter Chips Row */}
+          <div className="px-4 sm:px-8 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 bg-[#121212]">
+            <button
+              onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
+              className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap ${
+                activeTab === 'playlist'
+                  ? 'bg-white text-black shadow-md font-bold'
+                  : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+              }`}
             >
-              {/* Animated Vinyl Disc */}
-              <div className={`w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-neutral-950 border-4 border-neutral-900 shadow-2xl flex items-center justify-center relative overflow-hidden transition-transform duration-500 ${
-                isPlaying ? 'animate-spin-slow' : ''
-              }`}>
-                <div className="absolute inset-3 rounded-full border border-neutral-800/80 pointer-events-none" />
-                <div className="absolute inset-8 rounded-full border border-neutral-800/60 pointer-events-none" />
-                <div className="absolute inset-14 rounded-full border border-neutral-800/40 pointer-events-none" />
-                <div className="absolute inset-20 rounded-full border border-neutral-800/40 pointer-events-none" />
+              All
+            </button>
 
-                {currentTrack.artwork ? (
-                  <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full overflow-hidden border-2 border-white/20 shadow-inner relative">
-                    <img 
-                      src={currentTrack.artwork} 
-                      alt={currentTrack.title}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/20" />
-                    <div className="absolute inset-0 m-auto w-8 h-8 rounded-full bg-neutral-950 border-2 border-neutral-800 flex items-center justify-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm" />
+            <button
+              onClick={() => { setActiveTab('playlists'); setSelectedPlaylistView(null); }}
+              className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap ${
+                activeTab === 'playlists'
+                  ? 'bg-white text-black shadow-md font-bold'
+                  : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+              }`}
+            >
+              Playlists
+            </button>
+
+            <button
+              onClick={() => {
+                const likedSongsList = getPlaylistSongs({ id: 'pl-liked' });
+                setSelectedPlaylistView({
+                  id: 'pl-liked',
+                  title: 'Liked Songs',
+                  description: 'All your favorite favorited tracks',
+                  cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+                  gradient: 'from-[#1ed760] to-emerald-950',
+                  badge: 'Favorites',
+                  isLikedCollection: true,
+                  songs: likedSongsList
+                });
+                setActiveTab('playlists');
+              }}
+              className="px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap bg-[#242424] text-white hover:bg-[#2a2a2a] flex items-center gap-1.5"
+            >
+              <Heart className="w-3 h-3 text-[#1ed760] fill-[#1ed760]" />
+              <span>Liked Songs ({likedSongIds.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('trending')}
+              className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap ${
+                activeTab === 'trending'
+                  ? 'bg-white text-black shadow-md font-bold'
+                  : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+              }`}
+            >
+              Trending Hits
+            </button>
+
+            <button
+              onClick={() => setActiveTab('phone')}
+              className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap ${
+                activeTab === 'phone'
+                  ? 'bg-white text-black shadow-md font-bold'
+                  : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+              }`}
+            >
+              Phone Storage
+            </button>
+
+            {searchResults.length > 0 && (
+              <button
+                onClick={() => setActiveTab('search')}
+                className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap ${
+                  activeTab === 'search'
+                    ? 'bg-white text-black shadow-md font-bold'
+                    : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+                }`}
+              >
+                Search Results ({searchResults.length})
+              </button>
+            )}
+          </div>
+
+          {/* Main Scrollable Content */}
+          <div
+            ref={listScrollRef}
+            onScroll={handleContainerScroll}
+            className="flex-1 overflow-y-auto px-4 sm:px-8 pt-2 pb-28 space-y-6"
+          >
+            {/* TAB 0: Spotify Home Feed */}
+            {activeTab === 'playlist' && (
+              <div className="space-y-6">
+                
+                {/* Spotify Greeting & 6-Pack Quick Access Grid */}
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-3">
+                    {getGreeting()}
+                  </h1>
+
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+                    {/* Quick Card 1: Liked Songs */}
+                    <div
+                      onClick={() => {
+                        const likedSongsList = getPlaylistSongs({ id: 'pl-liked' });
+                        setSelectedPlaylistView({
+                          id: 'pl-liked',
+                          title: 'Liked Songs',
+                          description: 'All your favorite favorited tracks',
+                          cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+                          gradient: 'from-[#1ed760] to-emerald-950',
+                          badge: 'Favorites',
+                          isLikedCollection: true,
+                          songs: likedSongsList
+                        });
+                        setActiveTab('playlists');
+                      }}
+                      className="group flex items-center bg-[#282828]/60 hover:bg-[#282828] rounded-[4px] overflow-hidden transition duration-200 cursor-pointer shadow-sm relative pr-2"
+                    >
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-tr from-[#1ed760] to-emerald-900 flex items-center justify-center text-white shrink-0 shadow">
+                        <Heart className="w-6 h-6 fill-current" />
+                      </div>
+                      <span className="font-bold text-xs sm:text-sm text-white px-3 truncate flex-1">Liked Songs</span>
+                      <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#1ed760] text-black shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-200 shrink-0">
+                        <Play className="w-4 h-4 fill-current ml-0.5" />
+                      </button>
                     </div>
+
+                    {/* Quick Cards 2-5: Curated Playlists */}
+                    {CURATED_PLAYLISTS.slice(0, 5).map((pl) => (
+                      <div
+                        key={pl.id}
+                        onClick={() => {
+                          const plSongs = getPlaylistSongs(pl);
+                          setSelectedPlaylistView({ ...pl, songs: plSongs });
+                          setActiveTab('playlists');
+                        }}
+                        className="group flex items-center bg-[#282828]/60 hover:bg-[#282828] rounded-[4px] overflow-hidden transition duration-200 cursor-pointer shadow-sm relative pr-2"
+                      >
+                        <img
+                          src={pl.cover}
+                          alt={pl.title}
+                          className="w-12 h-12 sm:w-16 sm:h-16 object-cover shrink-0 shadow"
+                        />
+                        <span className="font-bold text-xs sm:text-sm text-white px-3 truncate flex-1">{pl.title}</span>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playPlaylistAll(pl);
+                          }}
+                          className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#1ed760] text-black shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-200 shrink-0"
+                        >
+                          <Play className="w-4 h-4 fill-current ml-0.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
+                </div>
+
+                {/* Section: Made For You (Spotify Curated Cards) */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Made For You</h2>
+                    <button 
+                      onClick={() => { setActiveTab('playlists'); setSelectedPlaylistView(null); }}
+                      className="text-xs text-[#b3b3b3] hover:text-white font-bold hover:underline"
+                    >
+                      Show all
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4">
+                    {CURATED_PLAYLISTS.map((pl) => (
+                      <div
+                        key={pl.id}
+                        onClick={() => {
+                          const plSongs = getPlaylistSongs(pl);
+                          setSelectedPlaylistView({ ...pl, songs: plSongs });
+                          setActiveTab('playlists');
+                        }}
+                        className="bg-[#181818] hover:bg-[#282828] p-3 sm:p-3.5 rounded-lg transition-all duration-300 group cursor-pointer relative"
+                      >
+                        <div className="relative aspect-square w-full rounded-md overflow-hidden shadow-lg mb-2.5 bg-[#282828]">
+                          <img
+                            src={pl.cover}
+                            alt={pl.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playPlaylistAll(pl);
+                            }}
+                            className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1ed760] text-black shadow-2xl flex items-center justify-center opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105 transition-all duration-200"
+                            title="Play Playlist"
+                          >
+                            <Play className="w-4 h-4 fill-current ml-0.5" />
+                          </button>
+                        </div>
+                        <p className="font-bold text-xs sm:text-sm text-white truncate group-hover:text-[#1ed760] transition">{pl.title}</p>
+                        <p className="text-[11px] text-[#b3b3b3] line-clamp-1 mt-0.5">{pl.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section: Today's Biggest Hits / All Songs Spotify Table */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Today's Biggest Hits</h2>
+                      <p className="text-xs text-[#b3b3b3]">Endless non-stop streaming</p>
+                    </div>
+                    <span className="text-xs text-[#b3b3b3] font-mono">{tracks.length} tracks</span>
+                  </div>
+
+                  {/* Spotify Tracklist Table Header */}
+                  <div className="grid grid-cols-12 text-[11px] font-semibold text-[#b3b3b3] px-3 py-2 border-b border-[#282828] uppercase tracking-wider">
+                    <span className="col-span-1 text-center">#</span>
+                    <span className="col-span-7 sm:col-span-6">Title</span>
+                    <span className="hidden sm:block col-span-3">Album</span>
+                    <span className="col-span-4 sm:col-span-2 text-right">Time</span>
+                  </div>
+
+                  {/* Track Rows */}
+                  <div className="divide-y divide-transparent mt-1 space-y-0.5">
+                    {tracks.map((track, idx) => {
+                      const isCurrent = idx === currentTrackIndex;
+                      const isTrackLiked = likedSongIds.includes(track.id);
+
+                      return (
+                        <div
+                          key={track.id || idx}
+                          onClick={() => {
+                            setCurrentTrackIndex(idx);
+                            setIsPlaying(true);
+                          }}
+                          className={`grid grid-cols-12 items-center px-3 py-2 rounded-md transition cursor-pointer group ${
+                            isCurrent
+                              ? 'bg-[#2a2a2a] text-[#1ed760]'
+                              : 'hover:bg-[#2a2a2a]/70 text-[#b3b3b3]'
+                          }`}
+                        >
+                          {/* Col 1: Index / Play Icon / Playing Equalizer */}
+                          <div className="col-span-1 flex items-center justify-center text-xs font-mono">
+                            {isCurrent && isPlaying ? (
+                              <div className="flex items-end gap-0.5 h-3">
+                                <span className="w-0.5 h-full bg-[#1ed760] animate-bounce" />
+                                <span className="w-0.5 h-2 bg-[#1ed760] animate-bounce delay-75" />
+                                <span className="w-0.5 h-3 bg-[#1ed760] animate-bounce delay-150" />
+                              </div>
+                            ) : (
+                              <>
+                                <span className="group-hover:hidden text-[#b3b3b3]">{idx + 1}</span>
+                                <Play className="w-3.5 h-3.5 fill-current text-white hidden group-hover:block ml-0.5" />
+                              </>
+                            )}
+                          </div>
+
+                          {/* Col 2: Cover + Title & Artist */}
+                          <div className="col-span-7 sm:col-span-6 flex items-center gap-3 min-w-0 pr-2">
+                            <img
+                              src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                              alt={track.title}
+                              className="w-10 h-10 rounded object-cover shrink-0 shadow"
+                            />
+                            <div className="min-w-0">
+                              <p className={`text-xs sm:text-sm font-semibold truncate ${isCurrent ? 'text-[#1ed760]' : 'text-white group-hover:underline'}`}>
+                                {track.title}
+                              </p>
+                              <p className="text-[11px] text-[#b3b3b3] truncate group-hover:text-white">
+                                {track.artist}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Col 3: Album */}
+                          <div className="hidden sm:block col-span-3 text-xs text-[#b3b3b3] truncate pr-2">
+                            {track.album || (track.isLocal ? 'Phone Storage' : 'Single')}
+                          </div>
+
+                          {/* Col 4: Heart, Plus & Duration */}
+                          <div className="col-span-4 sm:col-span-2 flex items-center justify-end gap-2 text-xs">
+                            {/* Favorite Heart */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleLikeTrack(track);
+                              }}
+                              className={`p-1.5 rounded-full transition ${
+                                isTrackLiked 
+                                  ? 'text-[#1ed760] opacity-100' 
+                                  : 'text-[#b3b3b3] hover:text-white opacity-0 group-hover:opacity-100'
+                              }`}
+                              title="Save to Liked Songs"
+                            >
+                              <Heart className={`w-4 h-4 ${isTrackLiked ? 'fill-current' : ''}`} />
+                            </button>
+
+                            {/* Add to Playlist */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAddToPlaylistTrack(track);
+                              }}
+                              className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full transition opacity-0 group-hover:opacity-100"
+                              title="Add to Playlist"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+
+                            {/* Duration */}
+                            <span className="font-mono text-[#b3b3b3] w-10 text-right">
+                              {track.durationText || '3:30'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Infinite Scroll Sentinel & Loader */}
+                  <div ref={sentinelRef} className="py-6 text-center">
+                    {isLoadingMore ? (
+                      <div className="flex items-center justify-center gap-2 text-xs text-[#1ed760] font-medium py-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#1ed760]" />
+                        <span>Loading more tracks...</span>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-[#757575] py-2 flex items-center justify-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#1ed760]" />
+                        <span>Scroll for endless music flow</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB: Playlists */}
+            {activeTab === 'playlists' && (
+              <div className="space-y-6 pb-6">
+                {!selectedPlaylistView ? (
+                  <>
+                    {/* Playlists Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Your Library</h1>
+                        <p className="text-xs text-[#b3b3b3] mt-0.5">Playlists, collections & saved music</p>
+                      </div>
+                      <button
+                        onClick={() => setShowCreatePlaylistModal(true)}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs shadow-md transition active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Create Playlist</span>
+                      </button>
+                    </div>
+
+                    {/* Liked Songs Hero Banner */}
+                    <div
+                      onClick={() => {
+                        const likedSongsList = getPlaylistSongs({ id: 'pl-liked' });
+                        setSelectedPlaylistView({
+                          id: 'pl-liked',
+                          title: 'Liked Songs',
+                          description: 'All your favorite favorited tracks',
+                          cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+                          gradient: 'from-[#1ed760] to-emerald-950',
+                          badge: 'Favorites',
+                          isLikedCollection: true,
+                          songs: likedSongsList
+                        });
+                      }}
+                      className="p-5 sm:p-6 rounded-lg bg-gradient-to-br from-[#1ed760] via-emerald-800 to-[#181818] transition cursor-pointer flex flex-col justify-between group shadow-xl active:scale-[0.99] min-h-[140px] relative overflow-hidden"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-black/30 flex items-center justify-center text-white shrink-0">
+                          <Heart className="w-6 h-6 fill-white" />
+                        </div>
+                        <div>
+                          <p className="text-lg sm:text-xl font-extrabold text-white">Liked Songs</p>
+                          <p className="text-xs text-white/80">{likedSongIds.length} liked songs</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-white/70">Automatic Collection</span>
+                        <div className="w-11 h-11 rounded-full bg-black text-[#1ed760] flex items-center justify-center shadow-xl group-hover:scale-105 transition">
+                          <Play className="w-5 h-5 fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Curated Playlists Section */}
+                    <div className="space-y-3">
+                      <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Curated By Spotify</h2>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                        {CURATED_PLAYLISTS.map((pl) => {
+                          const plSongs = getPlaylistSongs(pl);
+                          return (
+                            <div
+                              key={pl.id}
+                              onClick={() => setSelectedPlaylistView({ ...pl, songs: plSongs })}
+                              className="bg-[#181818] hover:bg-[#282828] p-3 sm:p-3.5 rounded-lg transition-all duration-300 group cursor-pointer relative"
+                            >
+                              <div className="relative aspect-square w-full rounded-md overflow-hidden shadow-lg mb-2.5 bg-[#282828]">
+                                <img
+                                  src={pl.cover}
+                                  alt={pl.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                />
+                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[9px] font-bold text-white uppercase tracking-wider">
+                                  {pl.badge}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    playPlaylistAll(pl);
+                                  }}
+                                  className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1ed760] text-black shadow-2xl flex items-center justify-center opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105 transition-all duration-200"
+                                  title="Play Playlist"
+                                >
+                                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                                </button>
+                              </div>
+                              <p className="font-bold text-xs sm:text-sm text-white truncate group-hover:text-[#1ed760] transition">{pl.title}</p>
+                              <p className="text-[11px] text-[#b3b3b3] line-clamp-1 mt-0.5">{plSongs.length} Tracks</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Custom User Playlists Section */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Custom Playlists</h2>
+                        <span className="text-xs text-[#b3b3b3] font-mono">{customPlaylists.length} created</span>
+                      </div>
+
+                      {customPlaylists.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+                          {customPlaylists.map((pl) => (
+                            <div
+                              key={pl.id}
+                              onClick={() => setSelectedPlaylistView(pl)}
+                              className="bg-[#181818] hover:bg-[#282828] p-3 sm:p-3.5 rounded-lg transition-all duration-300 group cursor-pointer relative"
+                            >
+                              <div className="relative aspect-square w-full rounded-md overflow-hidden bg-[#242424] flex items-center justify-center text-[#b3b3b3] group-hover:text-[#1ed760] mb-2.5 shadow-inner">
+                                <ListMusic className="w-10 h-10" />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    playPlaylistAll(pl);
+                                  }}
+                                  className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-[#1ed760] text-black shadow-2xl flex items-center justify-center opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 hover:scale-105 transition-all duration-200"
+                                  title="Play Playlist"
+                                >
+                                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                                </button>
+                              </div>
+                              <p className="font-bold text-xs sm:text-sm text-white truncate group-hover:text-[#1ed760] transition">{pl.title}</p>
+                              <p className="text-[11px] text-[#b3b3b3] truncate mt-0.5">{pl.songs?.length || 0} Tracks</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => setShowCreatePlaylistModal(true)}
+                          className="p-8 rounded-xl border border-dashed border-[#3e3e3e] hover:border-[#1ed760] bg-[#181818]/60 text-center cursor-pointer transition group"
+                        >
+                          <Plus className="w-8 h-8 text-[#b3b3b3] group-hover:text-[#1ed760] mx-auto mb-2 transition" />
+                          <p className="text-sm font-bold text-white">Create your first playlist</p>
+                          <p className="text-xs text-[#b3b3b3] mt-1">It's easy, we'll help you collect your favorite songs.</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 ) : (
-                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 p-1 shadow-inner flex items-center justify-center">
-                    <div className="w-10 h-10 rounded-full bg-neutral-950 border-2 border-neutral-800 flex items-center justify-center">
-                      <div className="w-3 h-3 rounded-full bg-amber-400 shadow-sm" />
+                  /* Detail View of Selected Playlist (Spotify Album View) */
+                  <div className="space-y-6 animate-in fade-in duration-200">
+                    <button
+                      onClick={() => setSelectedPlaylistView(null)}
+                      className="flex items-center gap-2 text-xs text-[#b3b3b3] hover:text-white font-bold transition cursor-pointer py-1"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Back to Library</span>
+                    </button>
+
+                    {/* Spotify Album Header Banner */}
+                    <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 pb-2">
+                      <img
+                        src={selectedPlaylistView.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
+                        alt={selectedPlaylistView.title}
+                        className="w-36 h-36 sm:w-52 sm:h-52 rounded-md object-cover shadow-2xl shrink-0"
+                      />
+                      <div className="space-y-2">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#b3b3b3]">
+                          Playlist
+                        </span>
+                        <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
+                          {selectedPlaylistView.title}
+                        </h1>
+                        <p className="text-xs sm:text-sm text-[#b3b3b3] line-clamp-2">
+                          {selectedPlaylistView.description}
+                        </p>
+                        <p className="text-xs text-white font-semibold flex items-center gap-1.5 pt-1">
+                          <span className="text-[#1ed760]">Spotify</span> • <span>{getPlaylistSongs(selectedPlaylistView).length} songs</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Action Bar (Giant Spotify Green Play Button) */}
+                    <div className="flex items-center gap-4 py-2 border-b border-[#282828]">
+                      <button
+                        onClick={() => playPlaylistAll(selectedPlaylistView)}
+                        disabled={getPlaylistSongs(selectedPlaylistView).length === 0}
+                        className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#1ed760] hover:scale-105 active:scale-95 text-black flex items-center justify-center shadow-2xl disabled:opacity-40 transition cursor-pointer"
+                        title="Play All"
+                      >
+                        <Play className="w-6 h-6 fill-current ml-0.5" />
+                      </button>
+
+                      {selectedPlaylistView.isCustom && (
+                        <button
+                          onClick={(e) => handleDeleteCustomPlaylist(selectedPlaylistView.id, e)}
+                          className="p-2.5 text-[#b3b3b3] hover:text-rose-400 hover:bg-[#282828] rounded-full transition cursor-pointer"
+                          title="Delete Playlist"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Tracklist Inside Playlist */}
+                    <div className="divide-y divide-transparent space-y-0.5">
+                      {getPlaylistSongs(selectedPlaylistView).map((track, idx) => {
+                        const isCurrent = track.id === currentTrack.id;
+                        return (
+                          <div
+                            key={track.id || idx}
+                            onClick={() => playTrackNow(track)}
+                            className={`grid grid-cols-12 items-center px-3 py-2 rounded-md transition cursor-pointer group ${
+                              isCurrent ? 'bg-[#2a2a2a] text-[#1ed760]' : 'hover:bg-[#2a2a2a]/70 text-[#b3b3b3]'
+                            }`}
+                          >
+                            <div className="col-span-1 flex items-center justify-center text-xs font-mono">
+                              {isCurrent && isPlaying ? (
+                                <div className="flex items-end gap-0.5 h-3">
+                                  <span className="w-0.5 h-full bg-[#1ed760] animate-bounce" />
+                                  <span className="w-0.5 h-2 bg-[#1ed760] animate-bounce delay-75" />
+                                  <span className="w-0.5 h-3 bg-[#1ed760] animate-bounce delay-150" />
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="group-hover:hidden text-[#b3b3b3]">{idx + 1}</span>
+                                  <Play className="w-3.5 h-3.5 fill-current text-white hidden group-hover:block ml-0.5" />
+                                </>
+                              )}
+                            </div>
+
+                            <div className="col-span-8 sm:col-span-7 flex items-center gap-3 min-w-0 pr-2">
+                              <img
+                                src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                                alt={track.title}
+                                className="w-10 h-10 rounded object-cover shrink-0 shadow"
+                              />
+                              <div className="min-w-0">
+                                <p className={`text-xs sm:text-sm font-semibold truncate ${isCurrent ? 'text-[#1ed760]' : 'text-white group-hover:underline'}`}>
+                                  {track.title}
+                                </p>
+                                <p className="text-[11px] text-[#b3b3b3] truncate group-hover:text-white">
+                                  {track.artist}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="col-span-3 sm:col-span-4 flex items-center justify-end gap-2 text-xs">
+                              {selectedPlaylistView.isCustom && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleRemoveSongFromPlaylist(selectedPlaylistView.id, track.id, e)}
+                                  className="p-1.5 text-[#b3b3b3] hover:text-rose-400 rounded-full transition"
+                                  title="Remove from playlist"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <span className="font-mono text-[#b3b3b3]">
+                                {track.durationText || '3:30'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {getPlaylistSongs(selectedPlaylistView).length === 0 && (
+                        <div className="text-center py-16 text-[#b3b3b3] text-xs">
+                          <ListMusic className="w-10 h-10 mx-auto mb-2 text-[#4d4d4d]" />
+                          <p className="font-bold text-white text-sm">It's a bit empty here</p>
+                          <p className="text-[#b3b3b3] mt-1">Search for songs or tap '+' in All Songs to add them to this playlist.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
+            )}
+
+            {/* TAB 1: Search Results */}
+            {activeTab === 'search' && (
+              <div className="space-y-4">
+                <h2 className="text-lg sm:text-xl font-bold text-white">Search Results</h2>
+                <div className="divide-y divide-transparent space-y-0.5">
+                  {searchResults.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      onClick={() => playTrackNow(item)}
+                      className="grid grid-cols-12 items-center px-3 py-2 rounded-md hover:bg-[#2a2a2a]/70 cursor-pointer transition group text-[#b3b3b3]"
+                    >
+                      <div className="col-span-1 text-center font-mono text-xs text-[#b3b3b3]">
+                        {idx + 1}
+                      </div>
+                      <div className="col-span-9 sm:col-span-8 flex items-center gap-3 min-w-0 pr-2">
+                        <img
+                          src={item.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                          alt={item.title}
+                          className="w-10 h-10 rounded object-cover shrink-0 shadow"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:underline">{item.title}</p>
+                          <p className="text-[11px] text-[#b3b3b3] truncate">{item.artist}</p>
+                        </div>
+                      </div>
+                      <div className="col-span-2 sm:col-span-3 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAddToPlaylistTrack(item);
+                          }}
+                          className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full transition"
+                          title="Add to Playlist"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <div className="w-8 h-8 rounded-full bg-[#1ed760] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {searchResults.length === 0 && !isSearching && (
+                    <div className="text-center py-16 text-[#b3b3b3] text-xs">
+                      <Search className="w-10 h-10 mx-auto mb-2 text-[#4d4d4d]" />
+                      <p className="font-bold text-white text-sm">Play what you love</p>
+                      <p className="text-[#b3b3b3] mt-1">Search for artists, songs, podcasts, or YouTube links.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Trending Hits */}
+            {activeTab === 'trending' && (
+              <div className="space-y-4">
+                <h2 className="text-lg sm:text-xl font-bold text-white">Trending Hits Now</h2>
+                <div className="divide-y divide-transparent space-y-0.5">
+                  {FEATURED_ONLINE_TRACKS.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      onClick={() => playTrackNow(item)}
+                      className="grid grid-cols-12 items-center px-3 py-2 rounded-md hover:bg-[#2a2a2a]/70 cursor-pointer transition group text-[#b3b3b3]"
+                    >
+                      <div className="col-span-1 text-center font-mono text-xs text-[#b3b3b3]">
+                        {idx + 1}
+                      </div>
+                      <div className="col-span-9 sm:col-span-8 flex items-center gap-3 min-w-0 pr-2">
+                        <img
+                          src={item.artwork}
+                          alt={item.title}
+                          className="w-10 h-10 rounded object-cover shrink-0 shadow"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:underline">{item.title}</p>
+                          <p className="text-[11px] text-[#b3b3b3] truncate">{item.artist}</p>
+                        </div>
+                      </div>
+                      <div className="col-span-2 sm:col-span-3 flex items-center justify-end gap-2">
+                        <div className="w-8 h-8 rounded-full bg-[#1ed760] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: Phone Storage */}
+            {activeTab === 'phone' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold text-white">Phone Local Audio</h2>
+                    <p className="text-xs text-[#b3b3b3]">Listen to downloaded MP3 files offline</p>
+                  </div>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-bold text-xs flex items-center gap-2 shadow transition active:scale-95 cursor-pointer"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                    <span>Import Audio Files</span>
+                  </button>
+                </div>
+
+                <div className="divide-y divide-transparent space-y-0.5">
+                  {tracks.filter(t => t.isLocal).map((track, idx) => (
+                    <div
+                      key={track.id}
+                      onClick={() => playTrackNow(track)}
+                      className="grid grid-cols-12 items-center px-3 py-2 rounded-md hover:bg-[#2a2a2a]/70 cursor-pointer transition group text-[#b3b3b3]"
+                    >
+                      <div className="col-span-1 text-center font-mono text-xs text-[#b3b3b3]">
+                        {idx + 1}
+                      </div>
+                      <div className="col-span-9 sm:col-span-8 min-w-0 pr-2">
+                        <p className="font-semibold text-xs sm:text-sm text-white truncate group-hover:underline">{track.title}</p>
+                        <p className="text-[11px] text-[#b3b3b3]">{track.artist}</p>
+                      </div>
+                      <div className="col-span-2 sm:col-span-3 flex items-center justify-end">
+                        <div className="w-8 h-8 rounded-full bg-[#1ed760] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {tracks.filter(t => t.isLocal).length === 0 && (
+                    <div className="text-center py-16 text-[#b3b3b3] text-xs">
+                      <Smartphone className="w-10 h-10 mx-auto mb-2 text-[#4d4d4d]" />
+                      <p className="font-bold text-white text-sm">No local tracks imported</p>
+                      <p className="text-[#b3b3b3] mt-1">Tap 'Import Audio Files' above to load your offline songs.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Spotify Fixed Bottom Player Bar (Classic 3-column Spotify Player) */}
+          <div className="fixed bottom-0 inset-x-0 z-40 bg-[#181818] border-t border-[#282828] px-3 sm:px-6 py-2 sm:py-3 shadow-2xl flex items-center justify-between gap-3 sm:gap-6 h-20 sm:h-22 select-none">
+            
+            {/* Column 1 (Left): Currently Playing Song Info */}
+            <div className="flex items-center gap-3 min-w-0 w-[45%] sm:w-[30%]">
+              <div 
+                onClick={() => setViewMode('nowPlaying')}
+                className="relative shrink-0 cursor-pointer group"
+                title="Open Now Playing View"
+              >
+                <img
+                  src={currentTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                  alt={currentTrack.title}
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded object-cover shadow"
+                />
+              </div>
+
+              <div className="min-w-0 pr-1">
+                <p 
+                  onClick={() => setViewMode('nowPlaying')}
+                  className="text-xs sm:text-sm font-semibold text-white truncate hover:underline cursor-pointer"
+                >
+                  {currentTrack.title}
+                </p>
+                <p 
+                  onClick={() => setViewMode('nowPlaying')}
+                  className="text-[11px] text-[#b3b3b3] truncate hover:underline cursor-pointer"
+                >
+                  {currentTrack.artist}
+                </p>
+              </div>
+
+              {/* Like Button */}
+              <button
+                onClick={handleHeartClick}
+                className={`p-1.5 rounded-full transition shrink-0 ${
+                  isLiked || likedSongIds.includes(currentTrack.id)
+                    ? 'text-[#1ed760]'
+                    : 'text-[#b3b3b3] hover:text-white'
+                }`}
+                title="Save to Liked Songs (Tap 3x to unlock chat)"
+              >
+                <Heart className={`w-4 h-4 ${isLiked || likedSongIds.includes(currentTrack.id) ? 'fill-current' : ''}`} />
+              </button>
+            </div>
+
+            {/* Column 2 (Center): Playback Controls & Timeline Scrubber */}
+            <div className="flex flex-col items-center justify-center flex-1 max-w-lg w-[45%]">
+              {/* Controls Row */}
+              <div className="flex items-center gap-3 sm:gap-5 mb-1.5">
+                <button
+                  onClick={() => setIsShuffle(s => !s)}
+                  className={`p-1 rounded-full transition ${isShuffle ? 'text-[#1ed760]' : 'text-[#b3b3b3] hover:text-white'}`}
+                  title="Shuffle"
+                >
+                  <Shuffle className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={handlePrevTrack}
+                  className="text-[#b3b3b3] hover:text-white transition active:scale-90 cursor-pointer p-1"
+                  title="Previous Track"
+                >
+                  <SkipBack className="w-5 h-5 fill-current" />
+                </button>
+
+                <button
+                  onClick={togglePlay}
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition shadow cursor-pointer"
+                  title={isPlaying ? "Pause" : "Play"}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4 h-4 fill-current" />
+                  ) : (
+                    <Play className="w-4 h-4 fill-current ml-0.5" />
+                  )}
+                </button>
+
+                <button
+                  onClick={handleNextTrack}
+                  className="text-[#b3b3b3] hover:text-white transition active:scale-90 cursor-pointer p-1"
+                  title="Next Track"
+                >
+                  <SkipForward className="w-5 h-5 fill-current" />
+                </button>
+
+                <button
+                  onClick={() => setIsRepeat(r => !r)}
+                  className={`p-1 rounded-full transition ${isRepeat ? 'text-[#1ed760]' : 'text-[#b3b3b3] hover:text-white'}`}
+                  title="Repeat"
+                >
+                  <Repeat className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Progress Scrub Bar */}
+              <div className="w-full flex items-center gap-2">
+                <span className="text-[11px] font-mono text-[#b3b3b3] w-9 text-right shrink-0">
+                  {formatTime(currentTime)}
+                </span>
+                <div 
+                  onClick={handleSeek}
+                  className="relative flex-1 h-1 hover:h-2 bg-[#4d4d4d] rounded-full cursor-pointer group transition-all duration-150"
+                >
+                  <div 
+                    className="h-full bg-[#1ed760] rounded-full transition-all duration-100 relative"
+                    style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                  >
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white opacity-0 group-hover:opacity-100 shadow transition-opacity" />
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono text-[#b3b3b3] w-9 text-left shrink-0">
+                  {formatTime(duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* Column 3 (Right): Volume & Utility Buttons */}
+            <div className="hidden sm:flex items-center justify-end gap-3 w-[25%]">
+              <button
+                onClick={handleEqualizerClick}
+                className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition cursor-pointer"
+                title="Sound Equalizer"
+              >
+                <Sliders className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-2 max-w-[130px] w-full">
+                <button
+                  onClick={() => setIsMuted(m => !m)}
+                  className="text-[#b3b3b3] hover:text-white transition"
+                  title={isMuted ? "Unmute" : "Mute"}
+                >
+                  {isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    setVolume(parseInt(e.target.value, 10));
+                    if (isMuted) setIsMuted(false);
+                  }}
+                  className="w-full h-1 bg-[#4d4d4d] rounded-lg appearance-none cursor-pointer accent-[#1ed760]"
+                />
+              </div>
+
+              <button
+                onClick={() => setViewMode('nowPlaying')}
+                className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition"
+                title="Expand Full Screen"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Mobile Expand Button (visible only on xs screens) */}
+            <div className="sm:hidden flex items-center gap-1">
+              <button
+                onClick={() => setViewMode('nowPlaying')}
+                className="p-2 text-[#b3b3b3] hover:text-white"
+                title="Open Full Screen"
+              >
+                <ChevronUp className="w-5 h-5" />
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* =========================================================================
+          VIEW 2: Spotify Full "Now Playing" Screen (Expands on Cover / Tap)
+          ========================================================================= */}
+      {viewMode === 'nowPlaying' && (
+        <div className="flex-1 flex flex-col justify-between w-full max-w-lg mx-auto h-full p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
+          
+          {/* Top Bar */}
+          <div className="flex items-center justify-between w-full pt-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className="p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#282828] transition cursor-pointer"
+              title="Return to Songs List"
+            >
+              <ChevronDown className="w-6 h-6" />
+            </button>
+
+            <div className="text-center">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#b3b3b3] block">
+                Playing from playlist
+              </span>
+              <span className="text-xs font-bold text-white truncate max-w-[200px] block">
+                {selectedPlaylistView?.title || "Today's Top Hits"}
+              </span>
+            </div>
+
+            {/* Action Controls */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {currentTrack.isYoutube && (
+                <button
+                  onClick={() => setShowVideoMode(!showVideoMode)}
+                  className={`p-2 rounded-full border transition active:scale-90 ${
+                    showVideoMode ? 'bg-[#1ed760] border-[#1ed760] text-black' : 'bg-[#282828] border-transparent text-[#b3b3b3] hover:text-white'
+                  }`}
+                  title="Toggle YouTube Video View"
+                >
+                  <Video className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Equalizer (Secret Code Door) */}
+              <button
+                onClick={handleEqualizerClick}
+                title="Audio Equalizer"
+                className="p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#282828] transition"
+              >
+                <Sliders className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Center Album Art & Live Waveform */}
+          <div className="flex flex-col items-center justify-center my-auto w-full py-4">
+            <div 
+              onClick={handleCoverTap}
+              className="relative group cursor-pointer"
+              title="Triple-tap cover to unlock secret vault"
+            >
+              {/* Spotify Modern Square Canvas / Vinyl Art */}
+              <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#282828] group-hover:scale-[1.02] transition-transform duration-300">
+                <img 
+                  src={currentTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'} 
+                  alt={currentTrack.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+              </div>
 
               {/* Equalizer Live Visualizer Waveform */}
               {isPlaying && (
-                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/10 shadow-lg">
-                  <div className="w-1 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1 h-5 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1 h-7 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                  <div className="w-1 h-4 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
-                  <div className="w-1 h-6 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-[#282828] shadow-xl">
+                  <div className="w-1 h-3 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1 h-5 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1 h-7 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="w-1 h-4 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '450ms' }} />
+                  <div className="w-1 h-6 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '200ms' }} />
                 </div>
               )}
             </div>
 
             {/* Track Title & Artist */}
-            <div className="w-full flex items-center justify-between mt-7 px-2">
+            <div className="w-full flex items-center justify-between mt-8 px-2">
               <div className="min-w-0 pr-4">
-                <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight truncate">
+                <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
                   {currentTrack.title}
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-400 mt-0.5 truncate flex items-center gap-1.5">
-                  {currentTrack.isYoutube ? (
-                    <span className="px-1.5 py-0.2 rounded bg-red-600/30 text-red-300 text-[10px] font-bold border border-red-500/40 shrink-0">
-                      YOUTUBE FULL
-                    </span>
-                  ) : currentTrack.isOnline ? (
-                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 shrink-0">
-                      ONLINE STREAM
-                    </span>
-                  ) : currentTrack.isLocal ? (
-                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30 shrink-0">
-                      PHONE STORAGE
-                    </span>
-                  ) : null}
-                  <span className="truncate">{currentTrack.artist}</span>
+                <p className="text-sm text-[#b3b3b3] mt-1 truncate">
+                  {currentTrack.artist}
                 </p>
               </div>
 
               <button
                 onClick={handleHeartClick}
-                className="p-2 text-slate-400 hover:text-rose-400 rounded-full transition active:scale-125"
+                className={`p-2 rounded-full transition active:scale-125 ${
+                  isLiked || likedSongIds.includes(currentTrack.id)
+                    ? 'text-[#1ed760]'
+                    : 'text-[#b3b3b3] hover:text-white'
+                }`}
                 title="Save to Favorites (Tap 3 times to unlock chat)"
               >
-                <Heart className={`w-5 h-5 ${isLiked ? 'fill-rose-500 text-rose-500' : ''}`} />
+                <Heart className={`w-6 h-6 ${isLiked || likedSongIds.includes(currentTrack.id) ? 'fill-current' : ''}`} />
               </button>
             </div>
           </div>
 
           {/* Bottom Controls Bar */}
-          <div className="w-full space-y-4 pb-2">
+          <div className="w-full space-y-4 pb-4">
             {/* Progress Bar & Timestamps */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div 
                 onClick={handleSeek}
-                className="relative w-full h-2 bg-white/10 hover:bg-white/20 rounded-full overflow-hidden cursor-pointer group transition"
+                className="relative w-full h-1.5 hover:h-2.5 bg-[#4d4d4d] rounded-full cursor-pointer group transition-all duration-150"
               >
                 <div 
-                  className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 rounded-full transition-all duration-150"
+                  className="h-full bg-white group-hover:bg-[#1ed760] rounded-full transition-all duration-100 relative"
                   style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-                />
+                >
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white opacity-0 group-hover:opacity-100 shadow" />
+                </div>
               </div>
-              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <div className="flex items-center justify-between text-[11px] text-[#b3b3b3] font-mono">
                 <span>{formatTime(currentTime)}</span>
                 <span>{formatTime(duration)}</span>
               </div>
@@ -2181,40 +2440,40 @@ export default function StealthMusicPlayer({
               <button
                 onClick={() => setIsShuffle(s => !s)}
                 className={`p-2 rounded-full transition ${
-                  isShuffle ? 'text-purple-400' : 'text-slate-400 hover:text-white'
+                  isShuffle ? 'text-[#1ed760]' : 'text-[#b3b3b3] hover:text-white'
                 }`}
                 title="Shuffle"
               >
-                <Shuffle className="w-4 h-4" />
+                <Shuffle className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6">
                 <button
                   onClick={handlePrevTrack}
-                  className="p-2 text-slate-300 hover:text-white transition active:scale-90 cursor-pointer"
+                  className="p-2 text-[#b3b3b3] hover:text-white transition active:scale-90 cursor-pointer"
                   title="Previous Track"
                 >
-                  <SkipBack className="w-6 h-6 fill-current" />
+                  <SkipBack className="w-7 h-7 fill-current" />
                 </button>
 
                 <button
                   onClick={togglePlay}
-                  className="w-14 h-14 rounded-full bg-white text-slate-950 flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition cursor-pointer"
+                  className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition cursor-pointer"
                   title={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
-                    <Pause className="w-6 h-6 fill-current" />
+                    <Pause className="w-7 h-7 fill-current" />
                   ) : (
-                    <Play className="w-6 h-6 fill-current translate-x-0.5" />
+                    <Play className="w-7 h-7 fill-current translate-x-0.5" />
                   )}
                 </button>
 
                 <button
                   onClick={handleNextTrack}
-                  className="p-2 text-slate-300 hover:text-white transition active:scale-90 cursor-pointer"
+                  className="p-2 text-[#b3b3b3] hover:text-white transition active:scale-90 cursor-pointer"
                   title="Next Track"
                 >
-                  <SkipForward className="w-6 h-6 fill-current" />
+                  <SkipForward className="w-7 h-7 fill-current" />
                 </button>
               </div>
 
@@ -2222,25 +2481,17 @@ export default function StealthMusicPlayer({
                 <button
                   onClick={() => setIsRepeat(r => !r)}
                   className={`p-2 rounded-full transition ${
-                    isRepeat ? 'text-purple-400' : 'text-slate-400 hover:text-white'
+                    isRepeat ? 'text-[#1ed760]' : 'text-[#b3b3b3] hover:text-white'
                   }`}
                   title="Repeat"
                 >
-                  <Repeat className="w-4 h-4" />
-                </button>
-
-                <button
-                  onClick={() => setViewMode('list')}
-                  className="p-2 text-purple-300 hover:text-white rounded-full transition cursor-pointer"
-                  title="Show Song List"
-                >
-                  <List className="w-4 h-4" />
+                  <Repeat className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Volume Slider Bar */}
-            <div className="flex items-center gap-3 px-3 pt-1 text-slate-400">
+            <div className="flex items-center gap-3 px-3 pt-2 text-[#b3b3b3]">
               <button 
                 onClick={() => setIsMuted(m => !m)}
                 className="hover:text-white transition"
@@ -2256,7 +2507,7 @@ export default function StealthMusicPlayer({
                   setVolume(parseInt(e.target.value, 10));
                   if (isMuted) setIsMuted(false);
                 }}
-                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                className="w-full h-1 bg-[#4d4d4d] rounded-lg appearance-none cursor-pointer accent-[#1ed760]"
               />
             </div>
 
@@ -2268,30 +2519,30 @@ export default function StealthMusicPlayer({
       {/* First Time Security Passcode Setup Modal */}
       {showSetupPinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5">
+          <div className="w-full max-w-sm bg-[#282828] border border-[#3e3e3e] rounded-2xl p-6 shadow-2xl space-y-5 text-white">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm tracking-wide">
+              <div className="flex items-center gap-2 text-[#1ed760] font-bold text-sm tracking-wide">
                 <KeyRound className="w-5 h-5" />
-                <span>Security PIN Setup (पासवर्ड बनाएं)</span>
+                <span>Security PIN Setup</span>
               </div>
               <button
                 onClick={() => setShowSetupPinModal(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1 text-[#b3b3b3] hover:text-white rounded-lg hover:bg-[#333] transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className="text-xs text-[#b3b3b3] leading-relaxed">
               Set your personal PINs for disguise unlocking. You can set a real PIN and an optional decoy PIN.
             </p>
 
             <form onSubmit={handleSetupPinSubmit} className="space-y-4">
               {/* Secret PIN (Primary) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Secret PIN (असली पासवर्ड) <span className="text-red-400">*</span></span>
-                  <span className="text-[10px] text-purple-400 font-normal">Opens Real Chat</span>
+                <label className="text-xs font-semibold text-white flex items-center justify-between">
+                  <span>Secret PIN (Real) <span className="text-red-400">*</span></span>
+                  <span className="text-[10px] text-[#1ed760]">Opens Real Chat</span>
                 </label>
                 <div className="relative">
                   <input
@@ -2301,23 +2552,23 @@ export default function StealthMusicPlayer({
                     placeholder="e.g. 1234"
                     maxLength={8}
                     autoFocus
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-sm text-white font-mono tracking-widest focus:outline-none pr-10"
+                    className="w-full px-3.5 py-2.5 bg-[#181818] border border-[#3e3e3e] focus:border-[#1ed760] rounded-xl text-sm text-white font-mono tracking-widest focus:outline-none pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowSetupSecretEye(!showSetupSecretEye)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white transition"
                   >
                     {showSetupSecretEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
-              {/* Decoy PIN (Optional / Secondary) */}
+              {/* Decoy PIN */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Decoy PIN (नकली / डिकॉय पिन)</span>
-                  <span className="text-[10px] text-amber-400 font-normal">Opens Fake Notes</span>
+                <label className="text-xs font-semibold text-white flex items-center justify-between">
+                  <span>Decoy PIN (Optional)</span>
+                  <span className="text-[10px] text-amber-400">Opens Fake Notes</span>
                 </label>
                 <div className="relative">
                   <input
@@ -2326,23 +2577,20 @@ export default function StealthMusicPlayer({
                     onChange={(e) => { setSetupDecoyPin(e.target.value.replace(/\D/g, '').slice(0, 8)); setSetupError(''); }}
                     placeholder="Optional (e.g. 9999)"
                     maxLength={8}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl text-sm text-white font-mono tracking-widest focus:outline-none pr-10"
+                    className="w-full px-3.5 py-2.5 bg-[#181818] border border-[#3e3e3e] focus:border-amber-500 rounded-xl text-sm text-white font-mono tracking-widest focus:outline-none pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowSetupDecoyEye(!showSetupDecoyEye)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white transition"
                   >
                     {showSetupDecoyEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-500">
-                  Dono PIN same nahi hone chahiye. Agar khali chhodenge to decoy 9999 rahega.
-                </p>
               </div>
 
               {setupError && (
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs animate-shake">
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{setupError}</span>
                 </div>
@@ -2352,13 +2600,13 @@ export default function StealthMusicPlayer({
                 <button
                   type="button"
                   onClick={() => setShowSetupPinModal(false)}
-                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                  className="flex-1 py-2.5 bg-[#333] hover:bg-[#3e3e3e] text-white rounded-full text-xs font-bold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/30"
+                  className="flex-1 py-2.5 bg-[#1ed760] hover:bg-[#1db954] text-black rounded-full text-xs font-bold transition shadow-lg shadow-[#1ed760]/20"
                 >
                   Save & Open
                 </button>
@@ -2371,22 +2619,22 @@ export default function StealthMusicPlayer({
       {/* Secret Code Dialog (Disguised as Audio Equalizer Preset) */}
       {showCodeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-xs bg-[#282828] border border-[#3e3e3e] rounded-2xl p-5 shadow-2xl space-y-4 text-white">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-purple-400 font-bold text-xs tracking-wider uppercase">
+              <div className="flex items-center gap-2 text-[#1ed760] font-bold text-xs tracking-wider uppercase">
                 <Sliders className="w-4 h-4" />
                 <span>EQ Sound Profile</span>
               </div>
               <button
                 onClick={() => setShowCodeModal(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1 text-[#b3b3b3] hover:text-white rounded-lg hover:bg-[#333] transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Enter customized acoustic preset code or studio key:
+            <p className="text-xs text-[#b3b3b3]">
+              Enter customized acoustic preset code:
             </p>
 
             <form onSubmit={handleCodeSubmit} className="space-y-3">
@@ -2398,19 +2646,19 @@ export default function StealthMusicPlayer({
                   placeholder="Enter preset PIN..."
                   autoFocus
                   maxLength={8}
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-sm text-white font-mono text-center tracking-widest focus:outline-none pr-9"
+                  className="w-full px-3.5 py-2.5 bg-[#181818] border border-[#3e3e3e] focus:border-[#1ed760] rounded-xl text-sm text-white font-mono text-center tracking-widest focus:outline-none pr-9"
                 />
                 <button
                   type="button"
                   onClick={() => setShowCodeEye(!showCodeEye)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white transition"
                 >
                   {showCodeEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
 
               {codeError && (
-                <p className="text-[11px] text-amber-400 text-center font-medium animate-shake">
+                <p className="text-[11px] text-amber-400 text-center font-medium">
                   {codeError}
                 </p>
               )}
@@ -2419,13 +2667,13 @@ export default function StealthMusicPlayer({
                 <button
                   type="button"
                   onClick={() => setShowCodeModal(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                  className="flex-1 py-2 bg-[#333] hover:bg-[#3e3e3e] text-white rounded-full text-xs font-bold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/30"
+                  className="flex-1 py-2 bg-[#1ed760] hover:bg-[#1db954] text-black rounded-full text-xs font-bold transition shadow-lg shadow-[#1ed760]/20"
                 >
                   Apply EQ
                 </button>
@@ -2435,21 +2683,21 @@ export default function StealthMusicPlayer({
         </div>
       )}
 
-      {/* Secret Camouflage Help Guide */}
+      {/* Help Guide */}
       {showHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-2xl">
-            <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+          <div className="w-full max-w-xs bg-[#282828] border border-[#3e3e3e] rounded-2xl p-5 space-y-4 shadow-2xl text-white">
+            <div className="flex items-center gap-2 text-[#1ed760] font-bold text-sm">
               <Music className="w-4 h-4" />
-              <span>Real Online & YouTube Player</span>
+              <span>Spotify Music Player</span>
             </div>
             
-            <div className="text-xs text-slate-300 space-y-2 leading-relaxed">
-              <p>This player streams real full songs from YouTube & Online Search and plays phone storage downloads.</p>
+            <div className="text-xs text-[#b3b3b3] space-y-2 leading-relaxed">
+              <p>Enjoy endless streaming music, curated playlists, and phone storage playback in Spotify theme.</p>
               
-              <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5 text-[11px] font-mono">
-                <p className="text-purple-300">⚡ <strong>How to unlock secret chat:</strong></p>
-                <p>• <strong>Triple-tap</strong> the rotating Vinyl Disc</p>
+              <div className="p-3 rounded-xl bg-[#181818] border border-[#3e3e3e] space-y-1.5 text-[11px] font-mono text-white">
+                <p className="text-[#1ed760]">⚡ <strong>Unlock chat vault:</strong></p>
+                <p>• <strong>Triple-tap</strong> the album cover</p>
                 <p>• Or tap the <strong>Heart ❤️</strong> icon 3 times</p>
                 <p>• Or tap <strong>EQ icon</strong> and enter PIN <span className="text-amber-400">{secretPin}</span></p>
                 <p className="text-cyan-300 pt-1">• <strong>Decoy Mode:</strong> EQ PIN <span className="text-cyan-400">{decoyPin}</span></p>
@@ -2458,7 +2706,7 @@ export default function StealthMusicPlayer({
 
             <button
               onClick={() => setShowHelpModal(false)}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-white transition"
+              className="w-full py-2.5 bg-white hover:bg-slate-200 text-black font-bold rounded-full text-xs transition"
             >
               Close
             </button>
@@ -2466,18 +2714,18 @@ export default function StealthMusicPlayer({
         </div>
       )}
 
-      {/* Create New Playlist Modal */}
+      {/* Create New Playlist Modal (Spotify Style) */}
       {showCreatePlaylistModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm bg-[#282828] border border-[#3e3e3e] rounded-2xl p-6 shadow-2xl space-y-4 text-white">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+              <div className="flex items-center gap-2 text-[#1ed760] font-bold text-sm">
                 <ListMusic className="w-5 h-5" />
-                <span>Create New Playlist</span>
+                <span>Create Playlist</span>
               </div>
               <button
                 onClick={() => setShowCreatePlaylistModal(false)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1 text-[#b3b3b3] hover:text-white rounded-lg hover:bg-[#333] transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2485,26 +2733,26 @@ export default function StealthMusicPlayer({
 
             <form onSubmit={handleCreatePlaylist} className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Playlist Name</label>
+                <label className="text-xs font-semibold text-[#b3b3b3]">Name</label>
                 <input
                   type="text"
                   required
                   value={newPlaylistName}
                   onChange={(e) => setNewPlaylistName(e.target.value)}
-                  placeholder="e.g. My Favorites, Workout Vibes, Late Night"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-xs text-white focus:outline-none"
+                  placeholder="My Playlist #1"
+                  className="w-full px-3.5 py-2.5 bg-[#181818] border border-[#3e3e3e] focus:border-[#1ed760] rounded-xl text-xs text-white focus:outline-none"
                   autoFocus
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Description (Optional)</label>
+                <label className="text-xs font-semibold text-[#b3b3b3]">Description (Optional)</label>
                 <input
                   type="text"
                   value={newPlaylistDesc}
                   onChange={(e) => setNewPlaylistDesc(e.target.value)}
-                  placeholder="e.g. Top songs to vibe with"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-xs text-white focus:outline-none"
+                  placeholder="Add an optional description"
+                  className="w-full px-3.5 py-2.5 bg-[#181818] border border-[#3e3e3e] focus:border-[#1ed760] rounded-xl text-xs text-white focus:outline-none"
                 />
               </div>
 
@@ -2512,14 +2760,14 @@ export default function StealthMusicPlayer({
                 <button
                   type="button"
                   onClick={() => setShowCreatePlaylistModal(false)}
-                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                  className="flex-1 py-2 bg-[#333] hover:bg-[#3e3e3e] text-white rounded-full text-xs font-bold transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={!newPlaylistName.trim()}
-                  className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/30 cursor-pointer"
+                  className="flex-1 py-2 bg-[#1ed760] hover:bg-[#1db954] disabled:opacity-50 text-black rounded-full text-xs font-bold transition shadow-lg shadow-[#1ed760]/20 cursor-pointer"
                 >
                   Create
                 </button>
@@ -2529,33 +2777,33 @@ export default function StealthMusicPlayer({
         </div>
       )}
 
-      {/* Add Song to Playlist Modal */}
+      {/* Add Song to Playlist Modal (Spotify Style) */}
       {addToPlaylistTrack && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-sm bg-[#282828] border border-[#3e3e3e] rounded-2xl p-5 shadow-2xl space-y-4 text-white">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+              <div className="flex items-center gap-2 text-[#1ed760] font-bold text-sm">
                 <Plus className="w-5 h-5" />
-                <span>Add to Playlist</span>
+                <span>Add to playlist</span>
               </div>
               <button
                 onClick={() => setAddToPlaylistTrack(null)}
-                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-1 text-[#b3b3b3] hover:text-white rounded-lg hover:bg-[#333] transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Song Preview */}
-            <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-950 border border-slate-800">
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#181818] border border-[#3e3e3e]">
               <img
                 src={addToPlaylistTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
                 alt={addToPlaylistTrack.title}
-                className="w-11 h-11 rounded-xl object-cover shrink-0 border border-white/10"
+                className="w-11 h-11 rounded object-cover shrink-0"
               />
               <div className="min-w-0">
                 <p className="text-xs font-bold text-white truncate">{addToPlaylistTrack.title}</p>
-                <p className="text-[10px] text-slate-400 truncate">{addToPlaylistTrack.artist}</p>
+                <p className="text-[10px] text-[#b3b3b3] truncate">{addToPlaylistTrack.artist}</p>
               </div>
             </div>
 
@@ -2563,20 +2811,20 @@ export default function StealthMusicPlayer({
             <button
               type="button"
               onClick={() => toggleLikeTrack(addToPlaylistTrack)}
-              className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-rose-950/60 to-purple-950/40 border border-rose-500/30 hover:border-rose-400 transition cursor-pointer"
+              className="w-full flex items-center justify-between p-3 rounded-xl bg-[#181818] border border-[#3e3e3e] hover:border-[#1ed760] transition cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
-                <Heart className={`w-4 h-4 ${likedSongIds.includes(addToPlaylistTrack.id) ? 'fill-rose-500 text-rose-500' : 'text-rose-400'}`} />
+                <Heart className={`w-4 h-4 ${likedSongIds.includes(addToPlaylistTrack.id) ? 'fill-[#1ed760] text-[#1ed760]' : 'text-[#b3b3b3]'}`} />
                 <span className="text-xs font-semibold text-white">Liked Songs</span>
               </div>
-              <span className="text-[10px] font-bold text-rose-400">
-                {likedSongIds.includes(addToPlaylistTrack.id) ? 'Favorited ✓' : '+ Add'}
+              <span className="text-[10px] font-bold text-[#1ed760]">
+                {likedSongIds.includes(addToPlaylistTrack.id) ? 'Added ✓' : '+ Add'}
               </span>
             </button>
 
             {/* List of Custom Playlists */}
             <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-              <p className="text-[10px] uppercase font-bold text-slate-400 px-1">Your Custom Playlists</p>
+              <p className="text-[10px] uppercase font-bold text-[#b3b3b3] px-1">Your Playlists</p>
               {customPlaylists.length > 0 ? (
                 customPlaylists.map((pl) => {
                   const alreadyInPlaylist = (pl.songs || []).some(s => s.id === addToPlaylistTrack.id);
@@ -2585,20 +2833,20 @@ export default function StealthMusicPlayer({
                       key={pl.id}
                       type="button"
                       onClick={() => handleAddSongToPlaylist(pl.id, addToPlaylistTrack)}
-                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/40 transition cursor-pointer text-left"
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#181818] hover:bg-[#333] border border-[#3e3e3e] hover:border-[#1ed760] transition cursor-pointer text-left"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <ListMusic className="w-4 h-4 text-purple-400 shrink-0" />
+                        <ListMusic className="w-4 h-4 text-[#1ed760] shrink-0" />
                         <span className="text-xs font-medium text-white truncate">{pl.title}</span>
                       </div>
-                      <span className="text-[10px] font-semibold text-purple-400 shrink-0">
+                      <span className="text-[10px] font-semibold text-[#1ed760] shrink-0">
                         {alreadyInPlaylist ? 'Added ✓' : '+ Add'}
                       </span>
                     </button>
                   );
                 })
               ) : (
-                <p className="text-center py-4 text-[11px] text-slate-500">
+                <p className="text-center py-4 text-[11px] text-[#b3b3b3]">
                   No custom playlists yet. Create one below!
                 </p>
               )}
@@ -2610,7 +2858,7 @@ export default function StealthMusicPlayer({
               onClick={() => {
                 setShowCreatePlaylistModal(true);
               }}
-              className="w-full py-2.5 rounded-xl border border-dashed border-purple-500/50 hover:bg-purple-950/20 text-purple-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="w-full py-2.5 rounded-full border border-dashed border-[#3e3e3e] hover:border-[#1ed760] text-[#1ed760] font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create New Playlist</span>
