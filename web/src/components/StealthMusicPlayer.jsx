@@ -5,7 +5,8 @@ import {
   Sparkles, Shield, X, Lock, Check, FolderPlus, List, 
   HardDrive, Smartphone, Music2, Plus, Search, 
   Globe, Flame, ExternalLink, Loader2, Video, Eye, EyeOff,
-  Headphones, ChevronDown, ChevronUp, RadioTower, KeyRound, AlertCircle, Download
+  Headphones, ChevronDown, ChevronUp, RadioTower, KeyRound, AlertCircle, Download,
+  ListMusic, ArrowLeft, Trash2
 } from 'lucide-react';
 
 const FEATURED_ONLINE_TRACKS = [
@@ -282,6 +283,45 @@ function extractYouTubeId(url) {
 // Inaudible 1-second silent WAV base64 loop to prevent mobile browsers from suspending background audio thread
 const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
+const CURATED_PLAYLISTS = [
+  {
+    id: 'pl-romantic',
+    title: "Romantic Melodies",
+    description: "Heartfelt love songs by Arijit Singh, Mithoon, Atif Aslam & Jasleen Royal",
+    cover: "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
+    gradient: "from-rose-600 to-pink-900",
+    badge: "Romantic",
+    songIds: ['track-rjkrTnma', 'track-qZtKBMZ_', 'track-NIidiD9g', 'track-aRZbUYD7', 'track-mPTrDSun', 'track-4mHUvJ4u', 'track-VQp1eXug']
+  },
+  {
+    id: 'pl-punjabi',
+    title: "Punjabi Bangers",
+    description: "High-energy beats by Sidhu Moose Wala, AP Dhillon & Diljit Dosanjh",
+    cover: "https://c.saavncdn.com/609/Moosetape-Punjabi-2021-20260626155141-500x500.jpg",
+    gradient: "from-amber-600 to-orange-900",
+    badge: "Punjabi",
+    songIds: ['track-H2r9PnvA', 'track-M7k5t7vw', 'track-xzUVX40K', 'track-faloMmjX']
+  },
+  {
+    id: 'pl-lofi',
+    title: "Lofi Chill & Study",
+    description: "Calm 24/7 background beats to relax, study and focus",
+    cover: "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80",
+    gradient: "from-purple-600 to-indigo-950",
+    badge: "Chill",
+    songIds: ['track-lofi-stream', 'track-qZtKBMZ_', 'track-1e0En7YX', 'track-NIidiD9g']
+  },
+  {
+    id: 'pl-bollywood',
+    title: "Bollywood Evergreen & Party",
+    description: "Iconic memorable hits by KK, A.R. Rahman, Anirudh & Pritam",
+    cover: "https://c.saavncdn.com/801/Jannat-Hindi-2008-20190629135803-500x500.jpg",
+    gradient: "from-cyan-600 to-blue-900",
+    badge: "Classics",
+    songIds: ['track-VQp1eXug', 'track-dF_dPijA', 'track-faloMmjX', 'track-aRZbUYD7']
+  }
+];
+
 export default function StealthMusicPlayer({
   onUnlock,
   secretPin = '1234',
@@ -308,8 +348,31 @@ export default function StealthMusicPlayer({
   const sentinelRef = useRef(null);
   const listScrollRef = useRef(null);
 
+  // Playlist Management States
+  const [customPlaylists, setCustomPlaylists] = useState(() => {
+    try {
+      const saved = localStorage.getItem('secret_bubble_user_playlists');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [likedSongIds, setLikedSongIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('secret_bubble_liked_song_ids');
+      return saved ? JSON.parse(saved) : ['track-rjkrTnma', 'track-aRZbUYD7'];
+    } catch {
+      return ['track-rjkrTnma', 'track-aRZbUYD7'];
+    }
+  });
+  const [selectedPlaylistView, setSelectedPlaylistView] = useState(null); // null | playlist object
+  const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [newPlaylistDesc, setNewPlaylistDesc] = useState('');
+  const [addToPlaylistTrack, setAddToPlaylistTrack] = useState(null); // track object to add to playlist
+
   // Online Search states
-  const [activeTab, setActiveTab] = useState('playlist'); // 'playlist' | 'search' | 'trending' | 'phone'
+  const [activeTab, setActiveTab] = useState('playlist'); // 'playlist' | 'playlists' | 'search' | 'trending' | 'phone'
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -798,6 +861,122 @@ export default function StealthMusicPlayer({
     setIsPlaying(true);
   };
 
+  // Playlist Handlers & Helpers
+  const saveCustomPlaylists = (updated) => {
+    setCustomPlaylists(updated);
+    try {
+      localStorage.setItem('secret_bubble_user_playlists', JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  const handleCreatePlaylist = (e) => {
+    e?.preventDefault();
+    const name = newPlaylistName.trim();
+    if (!name) return;
+
+    const newPl = {
+      id: `custom-pl-${Date.now()}`,
+      title: name,
+      description: newPlaylistDesc.trim() || 'Custom playlist created by you',
+      cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
+      gradient: 'from-purple-600 via-indigo-600 to-cyan-600',
+      isCustom: true,
+      createdAt: Date.now(),
+      songs: []
+    };
+
+    const updated = [newPl, ...customPlaylists];
+    saveCustomPlaylists(updated);
+    setNewPlaylistName('');
+    setNewPlaylistDesc('');
+    setShowCreatePlaylistModal(false);
+    setSelectedPlaylistView(newPl);
+  };
+
+  const handleAddSongToPlaylist = (playlistId, track) => {
+    const updated = customPlaylists.map(pl => {
+      if (pl.id === playlistId) {
+        const alreadyHas = (pl.songs || []).some(s => s.id === track.id);
+        if (alreadyHas) return pl;
+        return {
+          ...pl,
+          songs: [...(pl.songs || []), track]
+        };
+      }
+      return pl;
+    });
+    saveCustomPlaylists(updated);
+    setAddToPlaylistTrack(null);
+  };
+
+  const handleRemoveSongFromPlaylist = (playlistId, songId, e) => {
+    e?.stopPropagation();
+    const updated = customPlaylists.map(pl => {
+      if (pl.id === playlistId) {
+        return {
+          ...pl,
+          songs: (pl.songs || []).filter(s => s.id !== songId)
+        };
+      }
+      return pl;
+    });
+    saveCustomPlaylists(updated);
+    if (selectedPlaylistView?.id === playlistId) {
+      setSelectedPlaylistView(prev => ({
+        ...prev,
+        songs: (prev.songs || []).filter(s => s.id !== songId)
+      }));
+    }
+  };
+
+  const handleDeleteCustomPlaylist = (playlistId, e) => {
+    e?.stopPropagation();
+    const updated = customPlaylists.filter(pl => pl.id !== playlistId);
+    saveCustomPlaylists(updated);
+    setSelectedPlaylistView(null);
+  };
+
+  const toggleLikeTrack = (track) => {
+    setLikedSongIds(prev => {
+      const isCurrentlyLiked = prev.includes(track.id);
+      const next = isCurrentlyLiked ? prev.filter(id => id !== track.id) : [...prev, track.id];
+      try {
+        localStorage.setItem('secret_bubble_liked_song_ids', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const getPlaylistSongs = (playlist) => {
+    if (!playlist) return [];
+    if (playlist.id === 'pl-liked') {
+      const allKnown = [...tracks, ...FEATURED_ONLINE_TRACKS, ...BACKUP_STREAM_POOL];
+      const seen = new Set();
+      const likedList = [];
+      for (const t of allKnown) {
+        if (likedSongIds.includes(t.id) && !seen.has(t.id)) {
+          seen.add(t.id);
+          likedList.push(t);
+        }
+      }
+      return likedList;
+    }
+    if (playlist.isCustom) {
+      return playlist.songs || [];
+    }
+    const allKnown = [...tracks, ...FEATURED_ONLINE_TRACKS, ...BACKUP_STREAM_POOL];
+    return (playlist.songIds || []).map(id => allKnown.find(t => t.id === id)).filter(Boolean);
+  };
+
+  const playPlaylistAll = (playlist) => {
+    const playlistSongs = getPlaylistSongs(playlist);
+    if (!playlistSongs || playlistSongs.length === 0) return;
+
+    setTracks(playlistSongs);
+    setCurrentTrackIndex(0);
+    setIsPlaying(true);
+  };
+
   // Infinite Non-Stop Music Loading (scrolling adds new hits continuously)
   const isLoadingRef = useRef(false);
 
@@ -1230,7 +1409,7 @@ export default function StealthMusicPlayer({
           {/* Navigation Category Tabs */}
           <div className="flex gap-1.5 py-2 border-b border-white/10 shrink-0 overflow-x-auto no-scrollbar">
             <button
-              onClick={() => setActiveTab('playlist')}
+              onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
               className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                 activeTab === 'playlist'
                   ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
@@ -1239,6 +1418,18 @@ export default function StealthMusicPlayer({
             >
               <List className="w-3.5 h-3.5" />
               <span>All Songs ({tracks.length})</span>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('playlists'); setSelectedPlaylistView(null); }}
+              className={`py-1.5 px-3 text-xs font-semibold rounded-xl transition flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                activeTab === 'playlists'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                  : 'bg-slate-800/70 text-slate-400 hover:text-white'
+              }`}
+            >
+              <ListMusic className="w-3.5 h-3.5 text-pink-400" />
+              <span>Playlists</span>
             </button>
 
             <button
@@ -1341,7 +1532,33 @@ export default function StealthMusicPlayer({
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Add to Playlist button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAddToPlaylistTrack(track);
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-purple-300 hover:bg-white/5 rounded-lg transition"
+                          title="Add to Playlist"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Favorite / Heart button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLikeTrack(track);
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-white/5 rounded-lg transition"
+                          title="Favorite / Like"
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${likedSongIds.includes(track.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
+                        </button>
+
                         {isCurrent && isPlaying ? (
                           <div className="flex items-end gap-0.5 h-3 px-1">
                             <span className="w-0.5 h-full bg-purple-400 animate-bounce" />
@@ -1372,6 +1589,239 @@ export default function StealthMusicPlayer({
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* TAB: Playlists */}
+            {activeTab === 'playlists' && (
+              <div className="space-y-4 pb-6">
+                {!selectedPlaylistView ? (
+                  <>
+                    {/* Playlists Top Bar */}
+                    <div className="flex items-center justify-between pt-1">
+                      <div>
+                        <h2 className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+                          <ListMusic className="w-4 h-4 text-purple-400" />
+                          <span>Music Playlists</span>
+                        </h2>
+                        <p className="text-[10px] text-slate-400">Curated collections & custom playlists</p>
+                      </div>
+                      <button
+                        onClick={() => setShowCreatePlaylistModal(true)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-[11px] shadow-md shadow-purple-600/30 transition active:scale-95 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Create Playlist</span>
+                      </button>
+                    </div>
+
+                    {/* Special Hero Card: Liked Songs */}
+                    <div
+                      onClick={() => {
+                        const likedSongsList = getPlaylistSongs({ id: 'pl-liked' });
+                        setSelectedPlaylistView({
+                          id: 'pl-liked',
+                          title: 'Liked Songs',
+                          description: 'All your favorite favorited tracks',
+                          cover: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+                          gradient: 'from-rose-600 to-pink-900',
+                          badge: 'Favorites',
+                          isLikedCollection: true,
+                          songs: likedSongsList
+                        });
+                      }}
+                      className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/70 via-purple-950/60 to-slate-900/80 border border-rose-500/40 hover:border-rose-400 transition cursor-pointer flex items-center justify-between group shadow-lg active:scale-[0.99]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-rose-600/40 shrink-0">
+                          <Heart className="w-6 h-6 fill-current" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white group-hover:text-rose-300 transition">Liked Songs</p>
+                          <p className="text-[10px] text-slate-400">{likedSongIds.length} tracks favorited</p>
+                        </div>
+                      </div>
+                      <div className="p-2 rounded-full bg-white/10 text-rose-300 group-hover:bg-rose-600 group-hover:text-white transition">
+                        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                      </div>
+                    </div>
+
+                    {/* Section: Curated Playlists */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Curated Playlists</p>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {CURATED_PLAYLISTS.map((pl) => {
+                          const plSongs = getPlaylistSongs(pl);
+                          return (
+                            <div
+                              key={pl.id}
+                              onClick={() => setSelectedPlaylistView({ ...pl, songs: plSongs })}
+                              className="group relative rounded-2xl overflow-hidden border border-white/10 hover:border-purple-500/50 bg-slate-950/60 cursor-pointer transition shadow-md hover:shadow-purple-950/40 active:scale-[0.98]"
+                            >
+                              <div className="aspect-square w-full relative overflow-hidden bg-slate-900">
+                                <img
+                                  src={pl.cover}
+                                  alt={pl.title}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                />
+                                <div className={`absolute inset-0 bg-gradient-to-t ${pl.gradient} opacity-40 group-hover:opacity-20 transition`} />
+                                <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-[9px] font-bold text-white uppercase tracking-wider">
+                                  {pl.badge}
+                                </span>
+                                <div className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition">
+                                  <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                                </div>
+                              </div>
+                              <div className="p-2.5">
+                                <p className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition">{pl.title}</p>
+                                <p className="text-[10px] text-slate-400 line-clamp-1">{plSongs.length} Songs</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Section: Custom User Playlists */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Custom Playlists</p>
+                        <span className="text-[10px] text-slate-500">{customPlaylists.length} created</span>
+                      </div>
+
+                      {customPlaylists.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {customPlaylists.map((pl) => (
+                            <div
+                              key={pl.id}
+                              onClick={() => setSelectedPlaylistView(pl)}
+                              className="group rounded-2xl p-2.5 border border-white/10 hover:border-purple-500/50 bg-slate-950/60 cursor-pointer transition shadow-md active:scale-[0.98]"
+                            >
+                              <div className="aspect-square w-full rounded-xl overflow-hidden bg-gradient-to-tr from-purple-700 via-indigo-700 to-cyan-600 flex items-center justify-center text-white mb-2 shadow-inner">
+                                <ListMusic className="w-8 h-8 opacity-80" />
+                              </div>
+                              <p className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition">{pl.title}</p>
+                              <p className="text-[10px] text-slate-400 truncate">{pl.songs?.length || 0} Songs</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => setShowCreatePlaylistModal(true)}
+                          className="p-5 rounded-2xl border border-dashed border-slate-700/80 hover:border-purple-500/50 bg-slate-950/40 text-center cursor-pointer transition"
+                        >
+                          <Plus className="w-6 h-6 text-purple-400 mx-auto mb-1.5" />
+                          <p className="text-xs font-bold text-white">Create Your First Playlist</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Collect your favorite gym, chill, or roadtrip tracks</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* Detail View of Selected Playlist */
+                  <div className="space-y-3 animate-in fade-in duration-200">
+                    <button
+                      onClick={() => setSelectedPlaylistView(null)}
+                      className="flex items-center gap-1.5 text-xs text-purple-400 hover:text-purple-300 font-semibold transition cursor-pointer py-1"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Back to All Playlists</span>
+                    </button>
+
+                    <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-purple-950/80 via-slate-950 to-slate-900 border border-purple-500/30 flex items-center justify-between gap-3 shadow-xl">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={selectedPlaylistView.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
+                          alt={selectedPlaylistView.title}
+                          className="w-14 h-14 rounded-xl object-cover border border-white/10 shadow-lg shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-bold text-white truncate">{selectedPlaylistView.title}</h3>
+                          <p className="text-[10px] text-slate-400 line-clamp-1">{selectedPlaylistView.description}</p>
+                          <p className="text-[10px] text-purple-400 font-semibold mt-0.5">
+                            {getPlaylistSongs(selectedPlaylistView).length} tracks
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => playPlaylistAll(selectedPlaylistView)}
+                          disabled={getPlaylistSongs(selectedPlaylistView).length === 0}
+                          className="flex items-center gap-1 px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-bold text-xs shadow-md shadow-purple-600/30 transition active:scale-95 cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Play All</span>
+                        </button>
+                        {selectedPlaylistView.isCustom && (
+                          <button
+                            onClick={(e) => handleDeleteCustomPlaylist(selectedPlaylistView.id, e)}
+                            className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 rounded-xl transition cursor-pointer"
+                            title="Delete Playlist"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {getPlaylistSongs(selectedPlaylistView).map((track, idx) => {
+                        const isCurrent = track.id === currentTrack.id;
+                        return (
+                          <div
+                            key={track.id || idx}
+                            onClick={() => playTrackNow(track)}
+                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition cursor-pointer active:scale-[0.99] group ${
+                              isCurrent
+                                ? 'bg-purple-900/40 border-purple-500/60 shadow-lg shadow-purple-950/40'
+                                : 'bg-slate-950/60 border-slate-800/80 hover:bg-slate-800/60 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0 pr-2">
+                              <span className={`text-xs font-mono w-4 text-center shrink-0 ${isCurrent ? 'text-purple-400 font-bold' : 'text-slate-500'}`}>
+                                {isCurrent ? '▶' : idx + 1}
+                              </span>
+                              <img
+                                src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                                alt={track.title}
+                                className="w-10 h-10 rounded-xl object-cover shrink-0 border border-white/10"
+                              />
+                              <div className="min-w-0">
+                                <p className={`text-xs font-bold truncate ${isCurrent ? 'text-purple-200' : 'text-white'}`}>{track.title}</p>
+                                <p className="text-[10px] text-slate-400 truncate">{track.artist}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {selectedPlaylistView.isCustom && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleRemoveSongFromPlaylist(selectedPlaylistView.id, track.id, e)}
+                                  className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition"
+                                  title="Remove from playlist"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <div className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-purple-300 group-hover:bg-purple-600/30 transition">
+                                <Play className="w-3 h-3 fill-current ml-0.5" />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {getPlaylistSongs(selectedPlaylistView).length === 0 && (
+                        <div className="text-center py-12 text-slate-500 text-xs">
+                          <ListMusic className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                          <p className="font-semibold text-slate-400">No songs in this playlist yet</p>
+                          <p className="text-[11px] text-slate-500 mt-1">Tap the '+' button on any song to add it here.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2011,6 +2461,159 @@ export default function StealthMusicPlayer({
               className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-semibold text-white transition"
             >
               Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create New Playlist Modal */}
+      {showCreatePlaylistModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+                <ListMusic className="w-5 h-5" />
+                <span>Create New Playlist</span>
+              </div>
+              <button
+                onClick={() => setShowCreatePlaylistModal(false)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePlaylist} className="space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Playlist Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  placeholder="e.g. My Favorites, Workout Vibes, Late Night"
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-xs text-white focus:outline-none"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Description (Optional)</label>
+                <input
+                  type="text"
+                  value={newPlaylistDesc}
+                  onChange={(e) => setNewPlaylistDesc(e.target.value)}
+                  placeholder="e.g. Top songs to vibe with"
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl text-xs text-white focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePlaylistModal(false)}
+                  className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newPlaylistName.trim()}
+                  className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-purple-600/30 cursor-pointer"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Song to Playlist Modal */}
+      {addToPlaylistTrack && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-purple-400 font-bold text-sm">
+                <Plus className="w-5 h-5" />
+                <span>Add to Playlist</span>
+              </div>
+              <button
+                onClick={() => setAddToPlaylistTrack(null)}
+                className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Song Preview */}
+            <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-slate-950 border border-slate-800">
+              <img
+                src={addToPlaylistTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&q=80'}
+                alt={addToPlaylistTrack.title}
+                className="w-11 h-11 rounded-xl object-cover shrink-0 border border-white/10"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate">{addToPlaylistTrack.title}</p>
+                <p className="text-[10px] text-slate-400 truncate">{addToPlaylistTrack.artist}</p>
+              </div>
+            </div>
+
+            {/* 1-Tap Toggle: Liked Songs */}
+            <button
+              type="button"
+              onClick={() => toggleLikeTrack(addToPlaylistTrack)}
+              className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-rose-950/60 to-purple-950/40 border border-rose-500/30 hover:border-rose-400 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <Heart className={`w-4 h-4 ${likedSongIds.includes(addToPlaylistTrack.id) ? 'fill-rose-500 text-rose-500' : 'text-rose-400'}`} />
+                <span className="text-xs font-semibold text-white">Liked Songs</span>
+              </div>
+              <span className="text-[10px] font-bold text-rose-400">
+                {likedSongIds.includes(addToPlaylistTrack.id) ? 'Favorited ✓' : '+ Add'}
+              </span>
+            </button>
+
+            {/* List of Custom Playlists */}
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              <p className="text-[10px] uppercase font-bold text-slate-400 px-1">Your Custom Playlists</p>
+              {customPlaylists.length > 0 ? (
+                customPlaylists.map((pl) => {
+                  const alreadyInPlaylist = (pl.songs || []).some(s => s.id === addToPlaylistTrack.id);
+                  return (
+                    <button
+                      key={pl.id}
+                      type="button"
+                      onClick={() => handleAddSongToPlaylist(pl.id, addToPlaylistTrack)}
+                      className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/40 transition cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <ListMusic className="w-4 h-4 text-purple-400 shrink-0" />
+                        <span className="text-xs font-medium text-white truncate">{pl.title}</span>
+                      </div>
+                      <span className="text-[10px] font-semibold text-purple-400 shrink-0">
+                        {alreadyInPlaylist ? 'Added ✓' : '+ Add'}
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="text-center py-4 text-[11px] text-slate-500">
+                  No custom playlists yet. Create one below!
+                </p>
+              )}
+            </div>
+
+            {/* Quick Create New Playlist Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreatePlaylistModal(true);
+              }}
+              className="w-full py-2.5 rounded-xl border border-dashed border-purple-500/50 hover:bg-purple-950/20 text-purple-300 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create New Playlist</span>
             </button>
           </div>
         </div>
