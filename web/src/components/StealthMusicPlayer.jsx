@@ -697,13 +697,20 @@ export default function StealthMusicPlayer({
   };
 
   // =========================================================================
-  // Unified Full-Song Search (Direct Background Audio Streams & YouTube Fallback)
   // =========================================================================
-  const handleSearchSubmit = async (e) => {
-    e?.preventDefault();
-    const query = searchQuery.trim();
+  // Unified Full-Song Search (Render Backend, Local, YouTube, & Catalog Fallback)
+  // =========================================================================
+  const executeSearch = async (searchTerm) => {
+    const query = (searchTerm !== undefined ? searchTerm : searchQuery).trim();
     if (!query) return;
 
+    if (searchTerm !== undefined) {
+      setSearchQuery(searchTerm);
+    }
+
+    // Switch view to Search tab immediately
+    setActiveTab('search');
+    setSelectedPlaylistView(null);
     setIsSearching(true);
     setSearchError('');
     setSearchResults([]);
@@ -748,49 +755,68 @@ export default function StealthMusicPlayer({
       }
     }
 
-    // 2. Full-Length Direct Audio Song Search via Backend API
-    try {
-      const apiBase = getBackendApiUrl();
-      let backendData = null;
+    const fullSongResults = [];
+    const lowerQuery = query.toLowerCase();
 
+    // 2. Fetch from backend endpoints (Local dev, Vercel relative, or Render backend)
+    const candidateEndpoints = [];
+    const localBase = getBackendApiUrl();
+    if (localBase) {
+      candidateEndpoints.push(`${localBase}/api/music/search?q=${encodeURIComponent(query)}`);
+    }
+    candidateEndpoints.push(`/api/music/search?q=${encodeURIComponent(query)}`);
+    candidateEndpoints.push(`https://secret-bubble-backend.onrender.com/api/music/search?q=${encodeURIComponent(query)}`);
+
+    for (const url of candidateEndpoints) {
       try {
-        const res = await fetch(`${apiBase}/api/music/search?q=${encodeURIComponent(query)}`);
-        if (res.ok) backendData = await res.json();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && Array.isArray(data.results) && data.results.length > 0) {
+            data.results.forEach(item => {
+              fullSongResults.push({
+                id: item.id || `track-${item.youtubeId || Math.random()}`,
+                title: item.title,
+                artist: item.artist,
+                album: item.album || "Full Song",
+                duration: item.duration || 240,
+                durationText: item.durationText || "Full Song",
+                artwork: item.artwork,
+                url: item.url || null,
+                youtubeId: item.youtubeId || null,
+                isAudioStream: Boolean(item.url),
+                isYoutube: !item.url && Boolean(item.youtubeId),
+                color: "from-purple-950/50 via-slate-950 to-slate-950"
+              });
+            });
+            break; // Got valid results from online backend
+          }
+        }
       } catch (err) {
-        try {
-          const res = await fetch(`/api/music/search?q=${encodeURIComponent(query)}`);
-          if (res.ok) backendData = await res.json();
-        } catch (e) {}
+        // Fallback to next candidate endpoint
       }
+    }
 
-      const fullSongResults = [];
+    // 3. Fallback to YouTube search endpoint if 0 results
+    if (fullSongResults.length === 0) {
+      const ytEndpoints = [
+        ...(localBase ? [`${localBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`] : []),
+        `/api/music/youtube-search?q=${encodeURIComponent(query)}`,
+        `https://secret-bubble-backend.onrender.com/api/music/youtube-search?q=${encodeURIComponent(query)}`
+      ];
 
-      if (backendData?.success && Array.isArray(backendData.results) && backendData.results.length > 0) {
-        backendData.results.forEach(item => {
-          fullSongResults.push({
-            id: item.id || `track-${item.youtubeId || Math.random()}`,
-            title: item.title,
-            artist: item.artist,
-            album: item.album || "Full Song",
-            duration: item.duration || 240,
-            durationText: item.durationText || "Full Song",
-            artwork: item.artwork,
-            url: item.url || null,
-            youtubeId: item.youtubeId || null,
-            isAudioStream: Boolean(item.url),
-            isYoutube: !item.url && Boolean(item.youtubeId),
-            color: "from-purple-950/50 via-slate-950 to-slate-950"
-          });
-        });
-      }
-
-      // 3. Fallback: If 0 results, query YouTube search fallback
-      if (fullSongResults.length === 0) {
+      for (const ytUrl of ytEndpoints) {
         try {
-          const ytRes = await fetch(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
+          const ytRes = await fetch(ytUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (ytRes.ok) {
             const ytData = await ytRes.json();
-            if (ytData?.success && Array.isArray(ytData.results)) {
+            if (ytData?.success && Array.isArray(ytData.results) && ytData.results.length > 0) {
               ytData.results.forEach(item => {
                 fullSongResults.push({
                   id: item.id || `yt-${item.youtubeId}`,
@@ -805,21 +831,40 @@ export default function StealthMusicPlayer({
                   color: "from-red-950/50 via-slate-950 to-slate-950"
                 });
               });
+              break;
             }
           }
         } catch (e) {}
       }
-
-      if (fullSongResults.length > 0) {
-        setSearchResults(fullSongResults);
-      } else {
-        setSearchError('No songs found. Try another song title or artist name.');
-      }
-    } catch (err) {
-      setSearchError('Network error. Please check your internet connection.');
-    } finally {
-      setIsSearching(false);
     }
+
+    // 4. In-Memory Catalog Substring Match Fallback (Guaranteed to return results for matching popular artists/songs)
+    const catalogPool = [...FEATURED_ONLINE_TRACKS, ...BACKUP_STREAM_POOL, ...tracks];
+    const seenIds = new Set(fullSongResults.map(r => r.id));
+    const matchedLocal = catalogPool.filter(song => {
+      if (seenIds.has(song.id)) return false;
+      const t = (song.title || '').toLowerCase();
+      const a = (song.artist || '').toLowerCase();
+      const alb = (song.album || '').toLowerCase();
+      return t.includes(lowerQuery) || a.includes(lowerQuery) || alb.includes(lowerQuery) || lowerQuery.includes(t) || lowerQuery.includes(a);
+    });
+
+    matchedLocal.forEach(song => {
+      seenIds.add(song.id);
+      fullSongResults.push(song);
+    });
+
+    if (fullSongResults.length > 0) {
+      setSearchResults(fullSongResults);
+    } else {
+      setSearchError(`No songs found for "${query}". Try searching for Arijit Singh, Sidhu Moose Wala, Kesariya, or another artist.`);
+    }
+    setIsSearching(false);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e?.preventDefault();
+    executeSearch();
   };
 
   const playTrackNow = (track) => {
@@ -1303,41 +1348,66 @@ export default function StealthMusicPlayer({
       {viewMode === 'list' && (
         <div className="flex-1 flex flex-col w-full h-full overflow-hidden pb-20">
           
-          {/* Spotify Top Header */}
+          {/* Top Header with User Branding */}
           <div className="bg-[#121212]/95 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3 border-b border-[#242424]/80 flex items-center justify-between gap-3 shrink-0">
-            {/* Spotify Brand Logo */}
-            <div className="flex items-center gap-2.5 shrink-0 cursor-pointer" onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}>
-              <div className="w-8 h-8 rounded-full bg-[#1ed760] flex items-center justify-center text-black shadow-lg shadow-[#1ed760]/20">
-                <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.508 17.308c-.22.36-.684.475-1.044.255-2.862-1.748-6.463-2.144-10.707-1.173-.412.094-.823-.162-.917-.574-.094-.412.162-.823.574-.917 4.646-1.062 8.627-.615 11.84 1.365.36.22.474.684.254 1.044zm1.47-3.262c-.276.449-.865.594-1.314.318-3.276-2.013-8.27-2.597-12.145-1.421-.504.153-1.036-.134-1.189-.638-.153-.504.134-1.036.638-1.189 4.432-1.345 9.94-.7 13.692 1.616.449.276.594.865.318 1.314zm.126-3.41c-3.928-2.332-10.407-2.547-14.17-1.404-.602.183-1.24-.165-1.423-.767-.183-.602.165-1.24.767-1.423 4.331-1.314 11.488-1.062 15.992 1.613.541.321.717 1.026.396 1.567-.321.541-1.026.717-1.562.414z"/>
-                </svg>
+            {/* User App Brand Logo & Name */}
+            <div 
+              className="flex items-center gap-2.5 shrink-0 cursor-pointer group" 
+              onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
+              title="Secret-Bubble Music Lounge"
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition">
+                <img 
+                  src="/app-logo.png" 
+                  alt="Secret-Bubble" 
+                  className="w-full h-full object-cover rounded-[10px]" 
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.nextElementSibling) {
+                      e.currentTarget.nextElementSibling.style.display = 'flex';
+                    }
+                  }} 
+                />
+                <div style={{ display: 'none' }} className="w-full h-full items-center justify-center font-black text-white text-xs bg-gradient-to-tr from-indigo-600 to-[#1ed760]">
+                  SB
+                </div>
               </div>
-              <div className="hidden sm:block">
-                <span className="text-base font-extrabold text-white tracking-tight">Spotify</span>
-                <span className="text-[10px] text-[#1ed760] font-bold block -mt-1 tracking-wider uppercase">Music Lounge</span>
+              <div className="hidden sm:block text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base font-extrabold text-white tracking-tight leading-none">Secret-Bubble</span>
+                  <span className="w-2 h-2 rounded-full bg-[#1ed760] animate-pulse" />
+                </div>
+                <span className="text-[10px] text-[#1ed760] font-bold block mt-0.5 tracking-wider uppercase">Music Lounge</span>
               </div>
             </div>
 
-            {/* Spotify Centered Pill Search Input */}
+            {/* Centered Pill Search Bar with Dedicated Search Button */}
             <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-auto">
-              <div className="relative w-full">
+              <div className="relative w-full flex items-center">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="What do you want to play?"
-                  className="w-full pl-9 pr-8 py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-white rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
+                  placeholder="Search songs, artists or paste YouTube URL..."
+                  className="w-full pl-9 pr-20 py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-[#1ed760] rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
                 />
                 <Search className="w-4 h-4 text-[#b3b3b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-0.5"
+                    className="absolute right-16 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-0.5"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+                <button
+                  type="submit"
+                  disabled={!searchQuery.trim() || isSearching}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer shadow flex items-center gap-1"
+                >
+                  {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
+                </button>
               </div>
             </form>
 
@@ -1346,7 +1416,7 @@ export default function StealthMusicPlayer({
               {onOpenInstall && (
                 <button
                   onClick={onOpenInstall}
-                  title="Install Spotify App"
+                  title="Install Secret-Bubble App"
                   className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs shadow transition active:scale-95 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1386,7 +1456,7 @@ export default function StealthMusicPlayer({
             </div>
           </div>
 
-          {/* Spotify Filter Chips Row */}
+          {/* Filter Chips Row */}
           <div className="px-4 sm:px-8 py-2.5 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 bg-[#121212]">
             <button
               onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
@@ -1453,18 +1523,17 @@ export default function StealthMusicPlayer({
               Phone Storage
             </button>
 
-            {searchResults.length > 0 && (
-              <button
-                onClick={() => setActiveTab('search')}
-                className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap ${
-                  activeTab === 'search'
-                    ? 'bg-white text-black shadow-md font-bold'
-                    : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
-                }`}
-              >
-                Search Results ({searchResults.length})
-              </button>
-            )}
+            <button
+              onClick={() => { setActiveTab('search'); setSelectedPlaylistView(null); }}
+              className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap flex items-center gap-1.5 ${
+                activeTab === 'search'
+                  ? 'bg-white text-black shadow-md font-bold'
+                  : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+              }`}
+            >
+              <Search className="w-3 h-3" />
+              <span>Search{searchResults.length > 0 ? ` (${searchResults.length})` : ''}</span>
+            </button>
           </div>
 
           {/* Main Scrollable Content */}
@@ -1782,7 +1851,7 @@ export default function StealthMusicPlayer({
 
                     {/* Curated Playlists Section */}
                     <div className="space-y-3">
-                      <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Curated By Spotify</h2>
+                      <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">Curated For You</h2>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                         {CURATED_PLAYLISTS.map((pl) => {
                           const plSongs = getPlaylistSongs(pl);
@@ -1866,7 +1935,7 @@ export default function StealthMusicPlayer({
                     </div>
                   </>
                 ) : (
-                  /* Detail View of Selected Playlist (Spotify Album View) */
+                  /* Detail View of Selected Playlist */
                   <div className="space-y-6 animate-in fade-in duration-200">
                     <button
                       onClick={() => setSelectedPlaylistView(null)}
@@ -1876,7 +1945,7 @@ export default function StealthMusicPlayer({
                       <span>Back to Library</span>
                     </button>
 
-                    {/* Spotify Album Header Banner */}
+                    {/* Playlist Header Banner */}
                     <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 pb-2">
                       <img
                         src={selectedPlaylistView.cover || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80'}
@@ -1894,7 +1963,7 @@ export default function StealthMusicPlayer({
                           {selectedPlaylistView.description}
                         </p>
                         <p className="text-xs text-white font-semibold flex items-center gap-1.5 pt-1">
-                          <span className="text-[#1ed760]">Spotify</span> • <span>{getPlaylistSongs(selectedPlaylistView).length} songs</span>
+                          <span className="text-[#1ed760]">Secret-Bubble</span> • <span>{getPlaylistSongs(selectedPlaylistView).length} songs</span>
                         </p>
                       </div>
                     </div>
@@ -1998,8 +2067,52 @@ export default function StealthMusicPlayer({
 
             {/* TAB 1: Search Results */}
             {activeTab === 'search' && (
-              <div className="space-y-4">
-                <h2 className="text-lg sm:text-xl font-bold text-white">Search Results</h2>
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                    {searchQuery ? `Search Results for "${searchQuery}"` : 'Search Songs & Artists'}
+                  </h2>
+                  {searchResults.length > 0 && (
+                    <span className="text-xs text-[#b3b3b3] font-medium">{searchResults.length} tracks found</span>
+                  )}
+                </div>
+
+                {/* Popular Instant Search Chips */}
+                <div className="space-y-2">
+                  <p className="text-[11px] font-bold text-[#b3b3b3] uppercase tracking-wider">Quick Suggestions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['Arijit Singh', 'Kesariya', 'Chaleya', 'Sidhu Moose Wala', 'Diljit Dosanjh', 'Apna Bana Le', 'Romantic Melodies', 'Lofi Hindi'].map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => executeSearch(tag)}
+                        className="px-3 py-1.5 rounded-full bg-[#242424] hover:bg-[#1ed760] hover:text-black text-white text-xs font-semibold transition cursor-pointer border border-white/5 shadow-sm active:scale-95"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Loading Spinner */}
+                {isSearching && (
+                  <div className="flex flex-col items-center justify-center py-14 gap-3 bg-[#181818]/60 rounded-xl border border-white/5">
+                    <Loader2 className="w-8 h-8 text-[#1ed760] animate-spin" />
+                    <p className="text-sm font-semibold text-white">Searching songs & music streams...</p>
+                    <p className="text-xs text-[#b3b3b3]">Connecting to high-fidelity audio catalog</p>
+                  </div>
+                )}
+
+                {/* Search Error Notice */}
+                {searchError && !isSearching && (
+                  <div className="bg-rose-950/40 border border-rose-800/40 rounded-xl p-4 text-center my-3">
+                    <AlertCircle className="w-5 h-5 text-rose-400 mx-auto mb-1.5" />
+                    <p className="text-xs font-semibold text-rose-200">{searchError}</p>
+                    <p className="text-[11px] text-[#b3b3b3] mt-1">Try tapping any of the quick suggestions above.</p>
+                  </div>
+                )}
+
+                {/* Results List */}
                 <div className="divide-y divide-transparent space-y-0.5">
                   {searchResults.map((item, idx) => (
                     <div
@@ -2017,7 +2130,7 @@ export default function StealthMusicPlayer({
                           className="w-10 h-10 rounded object-cover shrink-0 shadow"
                         />
                         <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:underline">{item.title}</p>
+                          <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:text-[#1ed760] transition">{item.title}</p>
                           <p className="text-[11px] text-[#b3b3b3] truncate">{item.artist}</p>
                         </div>
                       </div>
@@ -2028,22 +2141,23 @@ export default function StealthMusicPlayer({
                             e.stopPropagation();
                             setAddToPlaylistTrack(item);
                           }}
-                          className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full transition"
+                          className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full transition cursor-pointer"
                           title="Add to Playlist"
                         >
                           <Plus className="w-4 h-4" />
                         </button>
-                        <div className="w-8 h-8 rounded-full bg-[#1ed760] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">
+                        <div className="w-8 h-8 rounded-full bg-[#1ed760] text-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow cursor-pointer">
                           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                         </div>
                       </div>
                     </div>
                   ))}
-                  {searchResults.length === 0 && !isSearching && (
-                    <div className="text-center py-16 text-[#b3b3b3] text-xs">
+
+                  {searchResults.length === 0 && !isSearching && !searchError && (
+                    <div className="text-center py-16 text-[#b3b3b3] text-xs bg-[#181818]/40 rounded-xl border border-white/5">
                       <Search className="w-10 h-10 mx-auto mb-2 text-[#4d4d4d]" />
                       <p className="font-bold text-white text-sm">Play what you love</p>
-                      <p className="text-[#b3b3b3] mt-1">Search for artists, songs, podcasts, or YouTube links.</p>
+                      <p className="text-[#b3b3b3] mt-1">Search for your favorite songs, artists, or paste any YouTube URL above.</p>
                     </div>
                   )}
                 </div>
@@ -2689,11 +2803,11 @@ export default function StealthMusicPlayer({
           <div className="w-full max-w-xs bg-[#282828] border border-[#3e3e3e] rounded-2xl p-5 space-y-4 shadow-2xl text-white">
             <div className="flex items-center gap-2 text-[#1ed760] font-bold text-sm">
               <Music className="w-4 h-4" />
-              <span>Spotify Music Player</span>
+              <span>Secret-Bubble Music</span>
             </div>
             
             <div className="text-xs text-[#b3b3b3] space-y-2 leading-relaxed">
-              <p>Enjoy endless streaming music, curated playlists, and phone storage playback in Spotify theme.</p>
+              <p>Enjoy high-fidelity streaming music, curated playlists, and phone storage playback in a dark audio lounge.</p>
               
               <div className="p-3 rounded-xl bg-[#181818] border border-[#3e3e3e] space-y-1.5 text-[11px] font-mono text-white">
                 <p className="text-[#1ed760]">⚡ <strong>Unlock chat vault:</strong></p>
