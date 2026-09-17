@@ -33,12 +33,15 @@ jobs:
         working-directory: ./web
         run: npm run build
 
-      - name: Sync Capacitor Android
-        working-directory: ./web
-        run: npm run cap:sync
-
       - name: Make Gradlew Executable
         run: chmod +x ./web/android/gradlew
+
+      - name: Sync Capacitor Android
+        working-directory: ./web
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: npm run cap:sync
 
       - name: Build Debug APK with Gradle
         working-directory: ./web/android
