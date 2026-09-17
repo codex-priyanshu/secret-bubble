@@ -225,7 +225,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
             </button>
 
             <a
-              href="https://github.com/codex-priyanshu/secret-bubble/releases/download/android-latest/Secret-Bubble.apk"
+              href="https://github.com/codex-priyanshu/secret-bubble/actions/workflows/build-apk.yml"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white text-xs font-bold border border-emerald-500/30 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
