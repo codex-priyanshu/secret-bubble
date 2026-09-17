@@ -221,8 +221,18 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
               className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30 transition active:scale-95 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>Download / Install App (डाउनलोड करें)</span>
+              <span>Instant Web Install (1-क्लिक इनस्टॉल)</span>
             </button>
+
+            <a
+              href="https://github.com/codex-priyanshu/secret-bubble/releases/download/android-latest/Secret-Bubble.apk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white text-xs font-bold border border-emerald-500/30 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Download Android APK File (.apk डाउनलोड करें)</span>
+            </a>
 
             <button
               onClick={handleDismiss}
