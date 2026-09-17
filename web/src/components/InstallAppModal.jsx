@@ -1,19 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Shield, Music, Sparkles, CheckCircle2, Share, PlusSquare, Smartphone, ArrowRight, ExternalLink } from 'lucide-react';
 
-export default function InstallAppModal({ isOpen, onClose }) {
+export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return (
+        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        (window.matchMedia && window.matchMedia('(display-mode: minimal-ui)').matches) ||
+        (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) ||
+        (window.navigator && window.navigator.standalone === true) ||
+        (document.referrer && document.referrer.includes('android-app://'))
+      );
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
-    // Check if app is already running in standalone mode
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (isStandalone) {
-      setIsInstalled(true);
-      return;
-    }
+    // Check if app is already running in standalone mode or marked installed
+    try {
+      const standalone =
+        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+        (window.matchMedia && window.matchMedia('(display-mode: minimal-ui)').matches) ||
+        (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) ||
+        (window.navigator && window.navigator.standalone === true) ||
+        (document.referrer && document.referrer.includes('android-app://'));
+
+      if (standalone) {
+        setIsInstalled(true);
+        return;
+      }
+    } catch {}
 
     // Detect iOS
     const userAgent = window.navigator.userAgent.toLowerCase();
@@ -28,18 +51,44 @@ export default function InstallAppModal({ isOpen, onClose }) {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    window.addEventListener('appinstalled', () => {
+    const handleAppInstalled = () => {
+      try {
+        localStorage.setItem('secret_bubble_app_installed', 'true');
+        localStorage.setItem('secret_bubble_install_dismissed', 'true');
+      } catch {}
       setIsInstalled(true);
       setDeferredPrompt(null);
+      if (onInstalled) onInstalled();
       if (onClose) onClose();
-    });
+    };
+
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [onClose]);
+  }, [onClose, onInstalled]);
 
   if (!isOpen || isInstalled) return null;
+
+  const markAlreadyInstalled = () => {
+    try {
+      localStorage.setItem('secret_bubble_app_installed', 'true');
+      localStorage.setItem('secret_bubble_install_dismissed', 'true');
+    } catch {}
+    setIsInstalled(true);
+    if (onInstalled) onInstalled();
+    if (onClose) onClose();
+  };
+
+  const handleDismiss = () => {
+    try {
+      localStorage.setItem('secret_bubble_install_dismissed', 'true');
+      sessionStorage.setItem('secret_bubble_install_dismissed', 'true');
+    } catch {}
+    if (onClose) onClose();
+  };
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
@@ -47,8 +96,7 @@ export default function InstallAppModal({ isOpen, onClose }) {
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
-          setDeferredPrompt(null);
-          onClose();
+          markAlreadyInstalled();
         }
       } catch (err) {
         console.warn('Install prompt error:', err);
@@ -71,7 +119,7 @@ export default function InstallAppModal({ isOpen, onClose }) {
 
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={handleDismiss}
           className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
           title="Dismiss"
         >
@@ -155,6 +203,14 @@ export default function InstallAppModal({ isOpen, onClose }) {
                   <li>App icon will appear on your phone home screen!</li>
                 </ol>
               )}
+              <button
+                type="button"
+                onClick={markAlreadyInstalled}
+                className="w-full mt-2 py-1.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Added to Home Screen (मैंने इनस्टॉल कर लिया है)</span>
+              </button>
             </div>
           )}
 
@@ -169,10 +225,18 @@ export default function InstallAppModal({ isOpen, onClose }) {
             </button>
 
             <button
-              onClick={onClose}
-              className="w-full py-2.5 px-4 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-semibold transition cursor-pointer"
+              onClick={handleDismiss}
+              className="w-full py-2 px-4 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-semibold transition cursor-pointer"
             >
               Continue in Browser (ब्राउज़र में चलाएं)
+            </button>
+
+            <button
+              type="button"
+              onClick={markAlreadyInstalled}
+              className="w-full py-1 text-[11px] text-slate-400 hover:text-emerald-400 font-medium transition cursor-pointer underline underline-offset-4"
+            >
+              Already Installed? Don't show again (पहले से इनस्टॉल है)
             </button>
           </div>
 

@@ -78,21 +78,55 @@ export default function App() {
     }
   });
   const [isDecoySession, setIsDecoySession] = useState(false);
-  const [showInstallModal, setShowInstallModal] = useState(() => {
+  
+  // Robust check if app is already installed or running as standalone PWA
+  const [isAppInstalled, setIsAppInstalled] = useState(() => {
     try {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-      if (isStandalone) return false;
-      return sessionStorage.getItem('secret_bubble_install_dismissed') !== 'true';
+      if (typeof window === 'undefined') return false;
+      if (localStorage.getItem('secret_bubble_app_installed') === 'true') return true;
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (window.matchMedia && window.matchMedia('(display-mode: minimal-ui)').matches) return true;
+      if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
+      if (window.navigator && window.navigator.standalone === true) return true;
+      if (document.referrer && document.referrer.includes('android-app://')) return true;
+      return false;
     } catch {
-      return true;
+      return false;
     }
   });
+
+  // Never auto-popup install dialog on fresh open if already installed or dismissed
+  const [showInstallModal, setShowInstallModal] = useState(false);
+
+  useEffect(() => {
+    const handleAppInstalled = () => {
+      try {
+        localStorage.setItem('secret_bubble_app_installed', 'true');
+        localStorage.setItem('secret_bubble_install_dismissed', 'true');
+      } catch {}
+      setIsAppInstalled(true);
+      setShowInstallModal(false);
+    };
+
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => window.removeEventListener('appinstalled', handleAppInstalled);
+  }, []);
 
   const handleCloseInstallModal = () => {
     setShowInstallModal(false);
     try {
+      localStorage.setItem('secret_bubble_install_dismissed', 'true');
       sessionStorage.setItem('secret_bubble_install_dismissed', 'true');
     } catch {}
+  };
+
+  const handleAppMarkedInstalled = () => {
+    try {
+      localStorage.setItem('secret_bubble_app_installed', 'true');
+      localStorage.setItem('secret_bubble_install_dismissed', 'true');
+    } catch {}
+    setIsAppInstalled(true);
+    setShowInstallModal(false);
   };
 
   const [currentUser, setCurrentUser] = useState(() => {
@@ -750,7 +784,7 @@ export default function App() {
           secretPin={settings.stealthPin || '1234'}
           decoyPin={settings.decoyPin || '9999'}
           backendUrl={getBackendUrl()}
-          onOpenInstall={() => setShowInstallModal(true)}
+          onOpenInstall={isAppInstalled ? null : () => setShowInstallModal(true)}
           onUnlock={(isDecoy) => {
             setIsStealthMode(false);
             setIsDecoySession(Boolean(isDecoy));
@@ -761,8 +795,9 @@ export default function App() {
           }}
         />
         <InstallAppModal
-          isOpen={showInstallModal}
+          isOpen={!isAppInstalled && showInstallModal}
           onClose={handleCloseInstallModal}
+          onInstalled={handleAppMarkedInstalled}
         />
       </>
     );
@@ -779,8 +814,9 @@ export default function App() {
           backendUrl={backendUrl}
         />
         <InstallAppModal
-          isOpen={showInstallModal}
+          isOpen={!isAppInstalled && showInstallModal}
           onClose={handleCloseInstallModal}
+          onInstalled={handleAppMarkedInstalled}
         />
       </>
     );
@@ -849,7 +885,7 @@ export default function App() {
             onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             onRefreshUsers={fetchUsers}
-            onOpenInstall={() => setShowInstallModal(true)}
+            onOpenInstall={isAppInstalled ? null : () => setShowInstallModal(true)}
             unreadCounts={unreadCounts}
           />
         </div>
@@ -872,7 +908,7 @@ export default function App() {
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
-            onOpenInstall={() => setShowInstallModal(true)}
+            onOpenInstall={isAppInstalled ? null : () => setShowInstallModal(true)}
             onToggleStealth={() => {
               setIsStealthMode(true);
               try {
@@ -1000,8 +1036,9 @@ export default function App() {
 
       {/* PWA Download / Install App Modal */}
       <InstallAppModal
-        isOpen={showInstallModal}
+        isOpen={!isAppInstalled && showInstallModal}
         onClose={handleCloseInstallModal}
+        onInstalled={handleAppMarkedInstalled}
       />
 
     </div>
