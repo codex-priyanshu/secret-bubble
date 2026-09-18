@@ -304,7 +304,7 @@ export default function MessageItem({
                   ? message.text 
                   : (message.text && !message.text.startsWith('[🔒') 
                       ? message.text 
-                      : 'Yeh message password se protected hai padhne ke liye tap karke unlock kare')}
+                      : 'This message is password-protected. Tap to unlock and read.')}
               </p>
             </div>
 

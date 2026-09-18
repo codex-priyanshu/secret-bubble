@@ -170,7 +170,7 @@ export default function PrivacySettingsModal({
                   <Lock className="w-4 h-4 text-amber-400" />
                   <div>
                     <span className="text-xs font-semibold text-white">Secrets & Confidential 🔒</span>
-                    <p className="text-[11px] text-slate-400">"Kisi ko mat batana", confidential statements</p>
+                    <p className="text-[11px] text-slate-400">"Keep it secret", confidential statements</p>
                   </div>
                 </div>
                 <input

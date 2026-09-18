@@ -167,7 +167,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
               <div className="p-1 rounded-lg bg-purple-600/20 text-purple-400 shrink-0">
                 <Music className="w-3.5 h-3.5" />
               </div>
-              <span><strong>Full Offline & Background Music</strong> (Screen off par bhi chalega)</span>
+              <span><strong>Full Offline & Background Music</strong> (Plays even with screen turned off)</span>
             </div>
             <div className="flex items-center gap-2.5 text-slate-300">
               <div className="p-1 rounded-lg bg-cyan-600/20 text-cyan-400 shrink-0">
@@ -209,7 +209,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
                 className="w-full mt-2 py-1.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-[11px] border border-emerald-500/30 transition flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Added to Home Screen (मैंने इनस्टॉल कर लिया है)</span>
+                <span>Added to Home Screen</span>
               </button>
             </div>
           )}
@@ -223,7 +223,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
               className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/30 transition active:scale-95 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>Direct Download APK (.apk डाउनलोड करें)</span>
+              <span>Direct Download Native Android APK</span>
             </a>
 
             <button
@@ -231,7 +231,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
             >
               <Smartphone className="w-3.5 h-3.5 text-purple-200" />
-              <span>Fast Web Install (1-क्लिक PWA)</span>
+              <span>Fast Web App Install (1-Click PWA)</span>
             </button>
 
             <a
@@ -244,18 +244,18 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
               <ExternalLink className="w-3 h-3" />
             </a>
 
-            <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 text-left space-y-1">
-              <p className="font-semibold text-slate-300">📌 APK Install Guide (आसान तरीका):</p>
-              <p>1. Direct Download APK par click karein & GitHub Artifacts se download karein.</p>
-              <p>2. Zip extract karke <code className="text-emerald-400">Secret-Bubble.apk</code> par tap karein.</p>
-              <p>3. "Install" karein aur phone me bina browser ke chalayein!</p>
+            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 text-left space-y-1">
+              <p className="font-semibold text-slate-200">📌 Android Installation Guide:</p>
+              <p>1. Click <strong>"Direct Download Native Android APK"</strong> to download the build zip.</p>
+              <p>2. Extract the zip file to find <code className="text-emerald-400">Secret-Bubble.apk</code>.</p>
+              <p>3. Tap the APK file, select <strong>"Install"</strong>, and launch natively!</p>
             </div>
 
             <button
               onClick={handleDismiss}
               className="w-full py-2 px-4 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-semibold transition cursor-pointer"
             >
-              Continue in Browser (ब्राउज़र में चलाएं)
+              Continue in Browser
             </button>
 
             <button
@@ -263,7 +263,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
               onClick={markAlreadyInstalled}
               className="w-full py-1 text-[11px] text-slate-400 hover:text-emerald-400 font-medium transition cursor-pointer underline underline-offset-4"
             >
-              Already Installed? Don't show again (पहले से इनस्टॉल है)
+              Already Installed? Don't show again
             </button>
           </div>
 
