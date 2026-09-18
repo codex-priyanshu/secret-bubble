@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Shield, Lock, User, UserPlus, LogIn, ArrowRight, Globe, KeyRound, Camera, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Shield, Lock, User, UserPlus, LogIn, ArrowRight, Globe, KeyRound, Camera, Eye, EyeOff, Sparkles, Download } from 'lucide-react';
 
 const PRESET_AVATARS = [
   'https://api.dicebear.com/7.x/bottts/svg?seed=Felix',
@@ -9,7 +9,7 @@ const PRESET_AVATARS = [
   'https://api.dicebear.com/7.x/bottts/svg?seed=Sam'
 ];
 
-export default function LoginPage({ onLoginSuccess, backendUrl }) {
+export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState(() => {
     try {
@@ -388,8 +388,20 @@ export default function LoginPage({ onLoginSuccess, backendUrl }) {
           </button>
         </form>
 
+        {/* Download Android APK / Install App Button */}
+        {onOpenInstall && (
+          <button
+            type="button"
+            onClick={onOpenInstall}
+            className="w-full mt-3 py-2.5 px-3 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm active:scale-95"
+          >
+            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Download Android APK / Install App</span>
+          </button>
+        )}
+
         {/* Telegram Privacy Footer */}
-        <div className="mt-6 pt-4 border-t border-slate-800/80 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+        <div className="mt-5 pt-4 border-t border-slate-800/80 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
           <Globe className="w-3.5 h-3.5 text-purple-400" />
           <span>Biometric Protection • No Phone Number Required</span>
         </div>

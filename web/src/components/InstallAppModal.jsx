@@ -70,7 +70,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
     };
   }, [onClose, onInstalled]);
 
-  if (!isOpen || isInstalled) return null;
+  if (!isOpen) return null;
 
   const markAlreadyInstalled = () => {
     try {
@@ -216,23 +216,40 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
 
           {/* Action Buttons */}
           <div className="w-full space-y-2 pt-1">
-            <button
-              onClick={handleInstallClick}
-              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-purple-600/30 transition active:scale-95 cursor-pointer"
+            <a
+              href="https://github.com/codex-priyanshu/secret-bubble/actions/runs/35248701193"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/30 transition active:scale-95 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>Instant Web Install (1-क्लिक इनस्टॉल)</span>
+              <span>Direct Download APK (.apk डाउनलोड करें)</span>
+            </a>
+
+            <button
+              onClick={handleInstallClick}
+              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-purple-200" />
+              <span>Fast Web Install (1-क्लिक PWA)</span>
             </button>
 
             <a
               href="https://github.com/codex-priyanshu/secret-bubble/actions/workflows/build-apk.yml"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white text-xs font-bold border border-emerald-500/30 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
+              className="w-full py-1.5 text-[11px] text-slate-400 hover:text-cyan-300 flex items-center justify-center gap-1 transition"
             >
-              <Download className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Download Android APK File (.apk डाउनलोड करें)</span>
+              <span>View All APK Releases & Builds</span>
+              <ExternalLink className="w-3 h-3" />
             </a>
+
+            <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 text-left space-y-1">
+              <p className="font-semibold text-slate-300">📌 APK Install Guide (आसान तरीका):</p>
+              <p>1. Direct Download APK par click karein & GitHub Artifacts se download karein.</p>
+              <p>2. Zip extract karke <code className="text-emerald-400">Secret-Bubble.apk</code> par tap karein.</p>
+              <p>3. "Install" karein aur phone me bina browser ke chalayein!</p>
+            </div>
 
             <button
               onClick={handleDismiss}

@@ -784,7 +784,7 @@ export default function App() {
           secretPin={settings.stealthPin || '1234'}
           decoyPin={settings.decoyPin || '9999'}
           backendUrl={getBackendUrl()}
-          onOpenInstall={isAppInstalled ? null : () => setShowInstallModal(true)}
+          onOpenInstall={() => setShowInstallModal(true)}
           onUnlock={(isDecoy) => {
             setIsStealthMode(false);
             setIsDecoySession(Boolean(isDecoy));
@@ -795,7 +795,7 @@ export default function App() {
           }}
         />
         <InstallAppModal
-          isOpen={!isAppInstalled && showInstallModal}
+          isOpen={showInstallModal}
           onClose={handleCloseInstallModal}
           onInstalled={handleAppMarkedInstalled}
         />
@@ -812,9 +812,10 @@ export default function App() {
             if (token) setAuthToken(token);
           }}
           backendUrl={backendUrl}
+          onOpenInstall={() => setShowInstallModal(true)}
         />
         <InstallAppModal
-          isOpen={!isAppInstalled && showInstallModal}
+          isOpen={showInstallModal}
           onClose={handleCloseInstallModal}
           onInstalled={handleAppMarkedInstalled}
         />
@@ -885,7 +886,7 @@ export default function App() {
             onOpenCreateGroup={() => setIsCreateGroupOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             onRefreshUsers={fetchUsers}
-            onOpenInstall={isAppInstalled ? null : () => setShowInstallModal(true)}
+            onOpenInstall={() => setShowInstallModal(true)}
             unreadCounts={unreadCounts}
           />
         </div>
@@ -908,7 +909,7 @@ export default function App() {
             onOpenProfile={() => setIsProfileOpen(true)}
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
-            onOpenInstall={isAppInstalled ? null : () => setShowInstallModal(true)}
+            onOpenInstall={() => setShowInstallModal(true)}
             onToggleStealth={() => {
               setIsStealthMode(true);
               try {
@@ -1036,7 +1037,7 @@ export default function App() {
 
       {/* PWA Download / Install App Modal */}
       <InstallAppModal
-        isOpen={!isAppInstalled && showInstallModal}
+        isOpen={showInstallModal}
         onClose={handleCloseInstallModal}
         onInstalled={handleAppMarkedInstalled}
       />
