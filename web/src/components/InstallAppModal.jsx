@@ -217,7 +217,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
           {/* Action Buttons */}
           <div className="w-full space-y-2 pt-1">
             <a
-              href="https://github.com/codex-priyanshu/secret-bubble/actions/runs/35248701193"
+              href="https://github.com/codex-priyanshu/secret-bubble/actions/runs/35374747330"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 hover:from-emerald-500 hover:to-cyan-400 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/30 transition active:scale-95 cursor-pointer"
