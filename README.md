@@ -3,7 +3,7 @@
 # 🛡️ Secret-Bubble (Music Disguise & Telegram Pro E2EE Vault)
 ### Standalone Native Android APK • Spotify-Grade Music Lounge • Telegram-Style Realtime Chat • Biometric Shield • Meta AI Bot
 
-[![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(10.6%20MB)-00C853?style=for-the-badge&logo=android&logoColor=white)](https://github.com/codex-priyanshu/secret-bubble/actions/runs/35374747330)
+[![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(10.6%20MB)-00C853?style=for-the-badge&logo=android&logoColor=white)](https://github.com/codex-priyanshu/secret-bubble/releases/download/v1.0.0/Secret-Bubble.apk)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/codex-priyanshu/secret-bubble/build-apk.yml?branch=main&label=APK%20Build&logo=github&style=for-the-badge)](https://github.com/codex-priyanshu/secret-bubble/actions/workflows/build-apk.yml)
 [![Live Web Demo](https://img.shields.io/badge/Live-Web%20App-7928CA?style=for-the-badge&logo=vercel&logoColor=white)](https://secret-bubble.vercel.app/)
 
@@ -19,9 +19,9 @@
 
 Secret-Bubble is available as a standalone **native Android `.apk`** file. You do not need to use a browser — install it directly onto your Android device and run it as an independent application.
 
-### 📥 Direct Download Links:
-* **🚀 [Download Latest Android APK (Artifact Build)](https://github.com/codex-priyanshu/secret-bubble/actions/runs/35374747330)** *(10.6 MB - Standalone Native Android APK)*
-* **📦 [View All APK Builds & Releases](https://github.com/codex-priyanshu/secret-bubble/actions/workflows/build-apk.yml)**
+### 📥 Direct 1-Click Download Link:
+* **⚡ [Direct Download Secret-Bubble.apk (1-Click)](https://github.com/codex-priyanshu/secret-bubble/releases/download/v1.0.0/Secret-Bubble.apk)** *(10.6 MB - Raw .apk file starts downloading immediately)*
+* **📦 [GitHub Actions Build Artifacts (Alternative)](https://github.com/codex-priyanshu/secret-bubble/actions/runs/35374747330)**
 
 ---
 
@@ -29,7 +29,7 @@ Secret-Bubble is available as a standalone **native Android `.apk`** file. You d
 
 | Step | Action | Details |
 | :--- | :--- | :--- |
-| **Step 1: Download** | Open the **[Download Latest Android APK](https://github.com/codex-priyanshu/secret-bubble/actions/runs/35374747330)** link. | Scroll to the **Artifacts** section at the bottom of the page and click **`Secret-Bubble-Android-APK`** to download the archive file. |
+| **Step 1: Download** | Click **[Direct Download Secret-Bubble.apk](https://github.com/codex-priyanshu/secret-bubble/releases/download/v1.0.0/Secret-Bubble.apk)**. | Your phone browser will immediately start downloading `Secret-Bubble.apk` directly into your Downloads folder. |
 | **Step 2: Extract** | Extract the downloaded archive on your phone. | Open the zip file in your phone's File Manager / Downloads folder to extract **`Secret-Bubble.apk`**. |
 | **Step 3: Install** | Tap `Secret-Bubble.apk` and tap **Install**. | If prompted by Android security settings, toggle **Allow from this source** to proceed with installation. |
 | **Step 4: Launch** | Launch Secret-Bubble from your home screen. | The app will open directly in full-screen native mode with background audio support and offline storage. |
