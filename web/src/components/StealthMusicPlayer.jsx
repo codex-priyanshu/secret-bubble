@@ -1382,15 +1382,20 @@ export default function StealthMusicPlayer({
           {/* Top Header with User Branding */}
           <div className="bg-[#121212]/95 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3 border-b border-[#242424]/80 flex items-center justify-between gap-3 shrink-0">
             {/* User App Brand Logo & Name */}
-            <div 
-              className="flex items-center gap-2.5 shrink-0 cursor-pointer group" 
+            <button 
+              type="button"
+              className="flex items-center gap-2 shrink-0 cursor-pointer group bg-transparent border-0 p-0 text-left" 
               onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
               title="Secret-Bubble Music Lounge"
+              aria-label="Secret-Bubble Music Lounge Home"
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition">
                 <img 
-                  src="/app-logo.png" 
-                  alt="Secret-Bubble" 
+                  src="/app-logo-sm.png" 
+                  alt="Secret-Bubble Logo" 
+                  width="36"
+                  height="36"
+                  loading="eager"
                   className="w-full h-full object-cover rounded-[10px]" 
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -1410,24 +1415,26 @@ export default function StealthMusicPlayer({
                 </div>
                 <span className="text-[10px] text-[#1ed760] font-bold block mt-0.5 tracking-wider uppercase">Music Lounge</span>
               </div>
-            </div>
+            </button>
 
             {/* Centered Pill Search Bar with Dedicated Search Button */}
-            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md mx-auto">
+            <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0 max-w-md mx-1 sm:mx-3">
               <div className="relative w-full flex items-center">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search songs, artists or paste YouTube URL..."
-                  className="w-full pl-9 pr-20 py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-[#1ed760] rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
+                  placeholder="Search songs or artists..."
+                  aria-label="Search songs or artists"
+                  className="w-full pl-8 sm:pl-9 pr-9 sm:pr-20 py-1.5 sm:py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-[#1ed760] rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
                 />
-                <Search className="w-4 h-4 text-[#b3b3b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#b3b3b3] absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-16 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-0.5"
+                    aria-label="Clear search text"
+                    className="absolute right-8 sm:right-16 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-0.5"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1435,20 +1442,29 @@ export default function StealthMusicPlayer({
                 <button
                   type="submit"
                   disabled={!searchQuery.trim() || isSearching}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer shadow flex items-center gap-1"
+                  aria-label="Submit search"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer shadow flex items-center justify-center"
                 >
-                  {isSearching ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
+                  {isSearching ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <span className="hidden sm:inline">Search</span>
+                      <Search className="w-3.5 h-3.5 sm:hidden" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>
 
             {/* Right Action Icons */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {onOpenInstall && (
                 <button
                   onClick={onOpenInstall}
                   title="Install Secret-Bubble App"
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs shadow transition active:scale-95 cursor-pointer"
+                  aria-label="Install Secret-Bubble App"
+                  className="p-1.5 sm:px-3 sm:py-1.5 rounded-full bg-white hover:bg-slate-200 text-black font-bold text-xs shadow transition active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span className="hidden md:inline">Install App</span>
@@ -1458,12 +1474,13 @@ export default function StealthMusicPlayer({
               {currentTrack.isYoutube && (
                 <button
                   onClick={() => setShowVideoMode(!showVideoMode)}
-                  className={`p-2 rounded-full border transition active:scale-90 ${
+                  className={`p-1.5 sm:p-2 rounded-full border transition active:scale-90 shrink-0 ${
                     showVideoMode ? 'bg-[#1ed760] border-[#1ed760] text-black' : 'bg-[#242424] border-transparent text-white hover:bg-[#2a2a2a]'
                   }`}
                   title="Toggle YouTube Video View"
+                  aria-label="Toggle YouTube Video View"
                 >
-                  <Video className="w-4 h-4" />
+                  <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               )}
 
@@ -1471,18 +1488,21 @@ export default function StealthMusicPlayer({
               <button
                 onClick={handleEqualizerClick}
                 title="Audio Equalizer"
-                className="p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
+                aria-label="Audio Equalizer"
+                className="p-1.5 sm:p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer shrink-0"
               >
-                <Sliders className="w-4 h-4" />
+                <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
 
               {/* Discrete Help */}
               <button
                 onClick={() => setShowHelpModal(true)}
-                title="Info"
-                className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full transition text-[11px]"
+                title="App Info & Help"
+                aria-label="App Info and Help"
+                className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition text-xs shrink-0 flex items-center justify-center"
               >
-                Help
+                <span className="hidden sm:inline text-[11px]">Help</span>
+                <span className="sm:hidden text-[10px] font-bold w-4 h-4 rounded-full border border-[#555] flex items-center justify-center leading-none">?</span>
               </button>
             </div>
           </div>

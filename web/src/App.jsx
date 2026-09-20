@@ -1,21 +1,23 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { io } from 'socket.io-client';
 import { Shield, Lock, Globe, EyeOff, Bot, Sparkles } from 'lucide-react';
-import ChatHeader from './components/ChatHeader';
-import MessageItem from './components/MessageItem';
-import ChatInput from './components/ChatInput';
-import BiometricModal from './components/BiometricModal';
-import PrivacySettingsModal from './components/PrivacySettingsModal';
-import ProfileModal from './components/ProfileModal';
-import UserSidebar from './components/UserSidebar';
-import LoginPage from './components/LoginPage';
-import AppLockModal from './components/AppLockModal';
-import AiTrainingModal from './components/AiTrainingModal';
-import CreateGroupModal from './components/CreateGroupModal';
-import { useBiometrics } from './hooks/useBiometrics';
 import StealthMusicPlayer from './components/StealthMusicPlayer';
-import InstallAppModal from './components/InstallAppModal';
+import LoginPage from './components/LoginPage';
+import { useBiometrics } from './hooks/useBiometrics';
 import { decryptE2EE, isE2EEEncrypted } from './utils/e2eeCrypto';
+
+// Code-split heavy modals and chat components for fast initial load
+const ChatHeader = lazy(() => import('./components/ChatHeader'));
+const MessageItem = lazy(() => import('./components/MessageItem'));
+const ChatInput = lazy(() => import('./components/ChatInput'));
+const UserSidebar = lazy(() => import('./components/UserSidebar'));
+const BiometricModal = lazy(() => import('./components/BiometricModal'));
+const PrivacySettingsModal = lazy(() => import('./components/PrivacySettingsModal'));
+const ProfileModal = lazy(() => import('./components/ProfileModal'));
+const AppLockModal = lazy(() => import('./components/AppLockModal'));
+const AiTrainingModal = lazy(() => import('./components/AiTrainingModal'));
+const CreateGroupModal = lazy(() => import('./components/CreateGroupModal'));
+const InstallAppModal = lazy(() => import('./components/InstallAppModal'));
 
 const getBackendUrl = () => {
   if (import.meta.env?.VITE_BACKEND_URL) {
@@ -811,11 +813,13 @@ export default function App() {
             } catch {}
           }}
         />
-        <InstallAppModal
-          isOpen={showInstallModal}
-          onClose={handleCloseInstallModal}
-          onInstalled={handleAppMarkedInstalled}
-        />
+        <Suspense fallback={null}>
+          <InstallAppModal
+            isOpen={showInstallModal}
+            onClose={handleCloseInstallModal}
+            onInstalled={handleAppMarkedInstalled}
+          />
+        </Suspense>
       </>
     );
   }
@@ -831,11 +835,13 @@ export default function App() {
           backendUrl={backendUrl}
           onOpenInstall={() => setShowInstallModal(true)}
         />
-        <InstallAppModal
-          isOpen={showInstallModal}
-          onClose={handleCloseInstallModal}
-          onInstalled={handleAppMarkedInstalled}
-        />
+        <Suspense fallback={null}>
+          <InstallAppModal
+            isOpen={showInstallModal}
+            onClose={handleCloseInstallModal}
+            onInstalled={handleAppMarkedInstalled}
+          />
+        </Suspense>
       </>
     );
   }
@@ -884,7 +890,8 @@ export default function App() {
       )}
 
       {/* Main Telegram App Container */}
-      <div className="flex-1 w-full max-w-6xl mx-auto bg-slate-900 border-0 md:border md:border-slate-800 md:rounded-3xl shadow-2xl overflow-hidden flex h-full relative">
+      <Suspense fallback={<div className="flex-1 flex items-center justify-center bg-slate-950"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
+        <div className="flex-1 w-full max-w-6xl mx-auto bg-slate-900 border-0 md:border md:border-slate-800 md:rounded-3xl shadow-2xl overflow-hidden flex h-full relative">
         
         {/* Left Telegram Chat List Sidebar */}
         <div className={`fixed inset-y-0 left-0 z-30 md:static md:flex md:w-80 bg-slate-900 transform transition-transform duration-300 ease-in-out ${
@@ -1052,12 +1059,13 @@ export default function App() {
         onGroupCreated={handleGroupCreated}
       />
 
-      {/* PWA Download / Install App Modal */}
-      <InstallAppModal
-        isOpen={showInstallModal}
-        onClose={handleCloseInstallModal}
-        onInstalled={handleAppMarkedInstalled}
-      />
+        {/* PWA Download / Install App Modal */}
+        <InstallAppModal
+          isOpen={showInstallModal}
+          onClose={handleCloseInstallModal}
+          onInstalled={handleAppMarkedInstalled}
+        />
+      </Suspense>
 
     </div>
   );
