@@ -245,9 +245,9 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
 
             <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 text-left space-y-1">
               <p className="font-semibold text-slate-200">📌 Android Installation Guide:</p>
-              <p>1. Click <strong>"Direct Download Native Android APK"</strong> to download the build zip.</p>
-              <p>2. Extract the zip file to find <code className="text-emerald-400">Secret-Bubble.apk</code>.</p>
-              <p>3. Tap the APK file, select <strong>"Install"</strong>, and launch natively!</p>
+              <p>1. Tap <strong>"Direct 1-Click Download APK"</strong> above to download <code className="text-emerald-400">Secret-Bubble.apk</code> directly.</p>
+              <p>2. Open your notification bar or phone Downloads folder and tap the APK file.</p>
+              <p>3. Tap <strong>"Install"</strong> (allow unknown sources if prompted) and launch natively!</p>
             </div>
 
             <button

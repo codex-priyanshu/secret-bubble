@@ -527,11 +527,25 @@ export default function StealthMusicPlayer({
   const getBackendApiUrl = useCallback(() => {
     if (backendUrl) return backendUrl.replace(/\/$/, '');
     if (import.meta.env?.VITE_BACKEND_URL) return import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '');
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname || 'localhost';
-      return `http://${hostname}:5000`;
+    
+    const isNativeApp = typeof window !== 'undefined' && (
+      Boolean(window.Capacitor?.isNativePlatform?.()) ||
+      Boolean(window.Capacitor) ||
+      window.location?.protocol === 'capacitor:' ||
+      (window.location?.hostname === 'localhost' && !window.location?.port && !import.meta.env.DEV)
+    );
+
+    if (isNativeApp) {
+      return 'https://secret-bubble-backend.onrender.com';
     }
-    return '';
+
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const hostname = window.location.hostname || 'localhost';
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+        return `http://${hostname}:5000`;
+      }
+    }
+    return 'https://secret-bubble-backend.onrender.com';
   }, [backendUrl]);
 
   // Handle Real Audio / YouTube Playback
@@ -764,8 +778,19 @@ export default function StealthMusicPlayer({
     if (localBase) {
       candidateEndpoints.push(`${localBase}/api/music/search?q=${encodeURIComponent(query)}`);
     }
-    candidateEndpoints.push(`/api/music/search?q=${encodeURIComponent(query)}`);
-    candidateEndpoints.push(`https://secret-bubble-backend.onrender.com/api/music/search?q=${encodeURIComponent(query)}`);
+    const isCapacitor = typeof window !== 'undefined' && (
+      Boolean(window.Capacitor?.isNativePlatform?.()) ||
+      Boolean(window.Capacitor) ||
+      window.location?.protocol === 'capacitor:' ||
+      (window.location?.hostname === 'localhost' && !window.location?.port)
+    );
+    if (!isCapacitor) {
+      candidateEndpoints.push(`/api/music/search?q=${encodeURIComponent(query)}`);
+    }
+    const defaultCloud = `https://secret-bubble-backend.onrender.com/api/music/search?q=${encodeURIComponent(query)}`;
+    if (!candidateEndpoints.includes(defaultCloud)) {
+      candidateEndpoints.push(defaultCloud);
+    }
 
     for (const url of candidateEndpoints) {
       try {
@@ -802,11 +827,17 @@ export default function StealthMusicPlayer({
 
     // 3. Fallback to YouTube search endpoint if 0 results
     if (fullSongResults.length === 0) {
-      const ytEndpoints = [
-        ...(localBase ? [`${localBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`] : []),
-        `/api/music/youtube-search?q=${encodeURIComponent(query)}`,
-        `https://secret-bubble-backend.onrender.com/api/music/youtube-search?q=${encodeURIComponent(query)}`
-      ];
+      const ytEndpoints = [];
+      if (localBase) {
+        ytEndpoints.push(`${localBase}/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+      }
+      if (!isCapacitor) {
+        ytEndpoints.push(`/api/music/youtube-search?q=${encodeURIComponent(query)}`);
+      }
+      const defaultYt = `https://secret-bubble-backend.onrender.com/api/music/youtube-search?q=${encodeURIComponent(query)}`;
+      if (!ytEndpoints.includes(defaultYt)) {
+        ytEndpoints.push(defaultYt);
+      }
 
       for (const ytUrl of ytEndpoints) {
         try {

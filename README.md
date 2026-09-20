@@ -29,10 +29,10 @@ Secret-Bubble is available as a standalone **native Android `.apk`** file. You d
 
 | Step | Action | Details |
 | :--- | :--- | :--- |
-| **Step 1: Download** | Click **[Direct Download Secret-Bubble.apk](https://github.com/codex-priyanshu/secret-bubble/releases/download/v1.0.0/Secret-Bubble.apk)**. | Your phone browser will immediately start downloading `Secret-Bubble.apk` directly into your Downloads folder. |
-| **Step 2: Extract** | Extract the downloaded archive on your phone. | Open the zip file in your phone's File Manager / Downloads folder to extract **`Secret-Bubble.apk`**. |
-| **Step 3: Install** | Tap `Secret-Bubble.apk` and tap **Install**. | If prompted by Android security settings, toggle **Allow from this source** to proceed with installation. |
-| **Step 4: Launch** | Launch Secret-Bubble from your home screen. | The app will open directly in full-screen native mode with background audio support and offline storage. |
+| **Step 1: Download** | Click **[Direct Download Secret-Bubble.apk](https://github.com/codex-priyanshu/secret-bubble/releases/download/v1.0.0/Secret-Bubble.apk)**. | Your phone browser will immediately start downloading `Secret-Bubble.apk` directly into your Downloads folder (no zip archive needed). |
+| **Step 2: Open File** | Tap `Secret-Bubble.apk` from your notification bar. | Or open your phone's **Downloads** folder and tap **`Secret-Bubble.apk`**. |
+| **Step 3: Install** | Tap **Install** on your phone screen. | If prompted by Android security settings, toggle **Allow from this source** to complete installation. |
+| **Step 4: Launch** | Tap the Secret Bubble icon on your home screen! | The app opens directly with full-screen native performance, custom app logo, and background playback. |
 
 ---
 

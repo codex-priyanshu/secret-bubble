@@ -21,10 +21,27 @@ const getBackendUrl = () => {
   if (import.meta.env?.VITE_BACKEND_URL) {
     return import.meta.env.VITE_BACKEND_URL;
   }
-  const hostname = window.location.hostname || 'localhost';
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
-    return `http://${hostname}:5000`;
+  
+  // Detect if running inside Android/iOS Capacitor native app
+  const isNativeApp = typeof window !== 'undefined' && (
+    Boolean(window.Capacitor?.isNativePlatform?.()) ||
+    Boolean(window.Capacitor) ||
+    window.location?.protocol === 'capacitor:' ||
+    (window.location?.hostname === 'localhost' && !window.location?.port && !import.meta.env.DEV)
+  );
+
+  if (isNativeApp) {
+    return 'https://secret-bubble-backend.onrender.com';
   }
+
+  // Only use local machine port 5000 in Vite development server mode
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const hostname = window.location.hostname || 'localhost';
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+      return `http://${hostname}:5000`;
+    }
+  }
+
   return 'https://secret-bubble-backend.onrender.com';
 };
 
