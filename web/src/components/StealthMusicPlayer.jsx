@@ -19,6 +19,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:28",
     url: "https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4",
     artwork: "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
+    youtubeId: "BddP6PYo2gs",
+    year: 2022,
     isAudioStream: true,
     color: "from-amber-950/60 via-slate-950 to-slate-950"
   },
@@ -31,6 +33,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "3:20",
     url: "https://aac.saavncdn.com/047/d1366530468931703ac909e82a3ee788_320.mp4",
     artwork: "https://c.saavncdn.com/047/Jawan-Hindi-2023-20230921190854-500x500.jpg",
+    youtubeId: "VAdGW7QDJzc",
+    year: 2023,
     isAudioStream: true,
     color: "from-rose-950/60 via-slate-950 to-slate-950"
   },
@@ -43,6 +47,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:21",
     url: "https://aac.saavncdn.com/815/483a6e118e8108cbb3e5cd8701674f32_320.mp4",
     artwork: "https://c.saavncdn.com/815/Bhediya-Hindi-2023-20230927155213-500x500.jpg",
+    youtubeId: "ElZfdU54Cp8",
+    year: 2022,
     isAudioStream: true,
     color: "from-indigo-950/60 via-slate-950 to-slate-950"
   },
@@ -55,6 +61,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:30",
     url: "https://aac.saavncdn.com/609/852628435c98083dfe217c1cfa731bb5_320.mp4",
     artwork: "https://c.saavncdn.com/609/Moosetape-Punjabi-2021-20260626155141-500x500.jpg",
+    youtubeId: "n_FCrCQ6-9U",
+    year: 2021,
     isAudioStream: true,
     color: "from-blue-950/60 via-slate-950 to-slate-950"
   },
@@ -67,6 +75,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "3:14",
     url: "https://aac.saavncdn.com/022/a192e8d320ea5630db314d04fedf0aa5_320.mp4",
     artwork: "https://c.saavncdn.com/022/Heeriye-feat-Arijit-Singh-Hindi-2023-20230928050405-500x500.jpg",
+    youtubeId: "RLzC55ai0eo",
+    year: 2023,
     isAudioStream: true,
     color: "from-teal-950/60 via-slate-950 to-slate-950"
   },
@@ -79,6 +89,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:22",
     url: "https://aac.saavncdn.com/430/5c5ea5cc00e3bff45616013226f376fe_320.mp4",
     artwork: "https://c.saavncdn.com/430/Aashiqui-2-Hindi-2013-500x500.jpg",
+    youtubeId: "Umqb9KENgmk",
+    year: 2013,
     isAudioStream: true,
     color: "from-blue-950/60 via-slate-950 to-slate-950"
   },
@@ -91,6 +103,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "3:50",
     url: "https://aac.saavncdn.com/238/35726d4394604604e961bf5b846870d0_320.mp4",
     artwork: "https://c.saavncdn.com/238/Shershaah-Original-Motion-Picture-Soundtrack--Hindi-2021-20210815181610-500x500.jpg",
+    youtubeId: "gvyUuxdRdR4",
+    year: 2021,
     isAudioStream: true,
     color: "from-pink-950/60 via-slate-950 to-slate-950"
   },
@@ -103,6 +117,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "3:10",
     url: "https://aac.saavncdn.com/209/88cd9a1cc0af8768d67272876bb09851_320.mp4",
     artwork: "https://c.saavncdn.com/209/MoonChild-Era-Punjabi-2021-20240715073449-500x500.jpg",
+    youtubeId: "m4n2_mGZ5aM",
+    year: 2021,
     isAudioStream: true,
     color: "from-amber-950/60 via-slate-950 to-slate-950"
   },
@@ -115,6 +131,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:10",
     url: "https://aac.saavncdn.com/092/81b52beea90f186f27cf5c5eead972c8_320.mp4",
     artwork: "https://c.saavncdn.com/092/ANIMAL-Hindi-2023-20260724191152-500x500.jpg",
+    youtubeId: "k4yXQkG2s1E",
+    year: 2023,
     isAudioStream: true,
     color: "from-purple-950/60 via-slate-950 to-slate-950"
   },
@@ -127,8 +145,10 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:14",
     url: "https://aac.saavncdn.com/973/76216adb3df5ef476f948891b40efb7a_320.mp4",
     artwork: "https://c.saavncdn.com/973/Brown-Munde-English-2020-20260520131422-500x500.jpg",
+    youtubeId: "VNs_cCtdbPc",
+    year: 2020,
     isAudioStream: true,
-    color: "from-orange-950/60 via-slate-950 to-slate-950"
+    color: "from-red-950/60 via-slate-950 to-slate-950"
   },
   {
     id: 'track-VQp1eXug',
@@ -139,6 +159,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "5:02",
     url: "https://aac.saavncdn.com/801/571617f7810fb699ed56bc8a7d9e40d9_320.mp4",
     artwork: "https://c.saavncdn.com/801/Jannat-Hindi-2008-20190629135803-500x500.jpg",
+    youtubeId: "5F24XG9_3lA",
+    year: 2008,
     isAudioStream: true,
     color: "from-cyan-950/60 via-slate-950 to-slate-950"
   },
@@ -151,6 +173,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:31",
     url: "https://aac.saavncdn.com/092/86b1368e104225e0bfbc69cda4ab8580_320.mp4",
     artwork: "https://c.saavncdn.com/092/ANIMAL-Hindi-2023-20260724191152-500x500.jpg",
+    youtubeId: "sAzlW4DYKUo",
+    year: 2023,
     isAudioStream: true,
     color: "from-red-950/60 via-slate-950 to-slate-950"
   },
@@ -163,6 +187,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "4:24",
     url: "https://aac.saavncdn.com/033/52742623b9d7580aef311375416f8744_320.mp4",
     artwork: "https://c.saavncdn.com/033/Jaane-Tu-Ya-Jaane-Na-Hindi-2008-20221128173303-500x500.jpg",
+    youtubeId: "h-h8jR_yUvI",
+    year: 2008,
     isAudioStream: true,
     color: "from-emerald-950/60 via-slate-950 to-slate-950"
   },
@@ -175,6 +201,8 @@ const FEATURED_ONLINE_TRACKS = [
     durationText: "2:00:00",
     url: "https://play.streamafrica.net/lofiradio",
     artwork: "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80",
+    youtubeId: "jfKfPfyJRdk",
+    year: 2024,
     isAudioStream: true,
     color: "from-purple-950/60 via-slate-950 to-slate-950"
   }
@@ -341,6 +369,9 @@ export default function StealthMusicPlayer({
   const [volume, setVolume] = useState(90);
   const [viewMode, setViewMode] = useState('list'); // 'list' (default on launch) | 'nowPlaying'
   const [showVideoMode, setShowVideoMode] = useState(false);
+  const [canvasMode, setCanvasMode] = useState('canvas'); // 'canvas' | 'cover'
+  const [backgroundVideoEnabled, setBackgroundVideoEnabled] = useState(true);
+  const [isLoadingCanvas, setIsLoadingCanvas] = useState(false);
 
   // Infinite non-stop streaming & feed states
   const [feedPage, setFeedPage] = useState(1);
@@ -547,6 +578,42 @@ export default function StealthMusicPlayer({
     }
     return 'https://secret-bubble-backend.onrender.com';
   }, [backendUrl]);
+
+  // Automatically fetch video canvas for audio tracks
+  const fetchVideoCanvasForTrack = useCallback(async (track) => {
+    if (!track || track.youtubeId || isLoadingCanvas) return;
+    setIsLoadingCanvas(true);
+    try {
+      const q = `${track.title} ${track.artist}`;
+      const apiBase = getBackendApiUrl();
+      const endpoints = [];
+      if (apiBase) endpoints.push(`${apiBase}/api/music/youtube-search?q=${encodeURIComponent(q)}`);
+      endpoints.push(`https://secret-bubble-backend.onrender.com/api/music/youtube-search?q=${encodeURIComponent(q)}`);
+
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.results?.[0]?.youtubeId) {
+              const yId = data.results[0].youtubeId;
+              setTracks(prev => prev.map(t => t.id === track.id ? { ...t, youtubeId: yId } : t));
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+    } finally {
+      setIsLoadingCanvas(false);
+    }
+  }, [isLoadingCanvas, getBackendApiUrl]);
+
+  // Auto-fetch canvas if current track has no youtubeId
+  useEffect(() => {
+    if (currentTrack && !currentTrack.youtubeId && canvasMode === 'canvas') {
+      fetchVideoCanvasForTrack(currentTrack);
+    }
+  }, [currentTrack, canvasMode, fetchVideoCanvasForTrack]);
 
   // Handle Real Audio / YouTube Playback
   useEffect(() => {
@@ -802,6 +869,7 @@ export default function StealthMusicPlayer({
           const data = await res.json();
           if (data?.success && Array.isArray(data.results) && data.results.length > 0) {
             data.results.forEach(item => {
+              const releaseYear = item.year || parseInt(item.releaseDate?.slice(0, 4), 10) || 0;
               fullSongResults.push({
                 id: item.id || `track-${item.youtubeId || Math.random()}`,
                 title: item.title,
@@ -812,6 +880,10 @@ export default function StealthMusicPlayer({
                 artwork: item.artwork,
                 url: item.url || null,
                 youtubeId: item.youtubeId || null,
+                year: releaseYear || undefined,
+                releaseDate: item.releaseDate || null,
+                publishedTime: item.publishedTime || null,
+                recencyScore: item.recencyScore || (releaseYear ? (5000 + (releaseYear - 2000) * 100) : 500),
                 isAudioStream: Boolean(item.url),
                 isYoutube: !item.url && Boolean(item.youtubeId),
                 color: "from-purple-950/50 via-slate-950 to-slate-950"
@@ -858,6 +930,9 @@ export default function StealthMusicPlayer({
                   duration: item.duration || 240,
                   durationText: item.durationText || "Full Song",
                   artwork: item.artwork,
+                  year: item.year || undefined,
+                  publishedTime: item.publishedTime || null,
+                  recencyScore: item.recencyScore || 500,
                   isYoutube: true,
                   color: "from-red-950/50 via-slate-950 to-slate-950"
                 });
@@ -882,8 +957,15 @@ export default function StealthMusicPlayer({
 
     matchedLocal.forEach(song => {
       seenIds.add(song.id);
-      fullSongResults.push(song);
+      const songYear = song.year || 0;
+      fullSongResults.push({
+        ...song,
+        recencyScore: song.recencyScore || (songYear ? (5000 + (songYear - 2000) * 100) : 400)
+      });
     });
+
+    // Sort so newest songs appear first, followed by older songs
+    fullSongResults.sort((a, b) => (b.recencyScore || 0) - (a.recencyScore || 0));
 
     if (fullSongResults.length > 0) {
       setSearchResults(fullSongResults);
@@ -1337,10 +1419,12 @@ export default function StealthMusicPlayer({
           className={
             showVideoMode 
               ? "fixed top-14 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md p-2 animate-in zoom-in-95 duration-200" 
-              : "fixed top-0 left-0 w-2 h-2 opacity-[0.001] pointer-events-none overflow-hidden -z-50"
+              : (viewMode === 'nowPlaying' && canvasMode === 'canvas')
+                ? "fixed top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-64 h-64 sm:w-72 sm:h-72 p-0 animate-in zoom-in-95 duration-200"
+                : "fixed top-0 left-0 w-2 h-2 opacity-[0.001] pointer-events-none overflow-hidden -z-50"
           }
         >
-          <div className="relative aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black">
+          <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black">
             <iframe
               ref={iframeRef}
               key={currentTrack.youtubeId}
@@ -1377,8 +1461,22 @@ export default function StealthMusicPlayer({
           VIEW 1: Spotify Main Music Lounge & Browser
           ========================================================================= */}
       {viewMode === 'list' && (
-        <div className="flex-1 flex flex-col w-full h-full overflow-hidden pb-20">
+        <div className="flex-1 flex flex-col w-full h-full overflow-hidden pb-20 relative">
           
+          {/* Ambient Video Background Layer in List View */}
+          {backgroundVideoEnabled && isPlaying && currentTrack?.youtubeId && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 opacity-15">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&mute=1&controls=0&showinfo=0&loop=1&playlist=${currentTrack.youtubeId}&playsinline=1&modestbranding=1`}
+                title="Ambient Video Background"
+                className="w-[140%] h-[140%] -translate-x-[20%] -translate-y-[20%] object-cover filter blur-3xl scale-125 pointer-events-none"
+                tabIndex="-1"
+                aria-hidden="true"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#121212]/90 via-[#121212]/80 to-[#121212]" />
+            </div>
+          )}
+
           {/* Top Header with User Branding */}
           <div className="bg-[#121212]/95 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3 border-b border-[#242424]/80 flex items-center justify-between gap-3 shrink-0">
             {/* User App Brand Logo & Name */}
@@ -1389,7 +1487,7 @@ export default function StealthMusicPlayer({
               title="Secret-Bubble Music Lounge"
               aria-label="Secret-Bubble Music Lounge Home"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition shrink-0">
                 <img 
                   src="/app-logo-sm.png" 
                   alt="Secret-Bubble Logo" 
@@ -1398,9 +1496,17 @@ export default function StealthMusicPlayer({
                   loading="eager"
                   className="w-full h-full object-cover rounded-[10px]" 
                   onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    if (e.currentTarget.nextElementSibling) {
-                      e.currentTarget.nextElementSibling.style.display = 'flex';
+                    if (!e.currentTarget.dataset.retried) {
+                      e.currentTarget.dataset.retried = '1';
+                      e.currentTarget.src = 'app-logo-sm.png';
+                    } else if (e.currentTarget.dataset.retried === '1') {
+                      e.currentTarget.dataset.retried = '2';
+                      e.currentTarget.src = '/app-logo.png';
+                    } else {
+                      e.currentTarget.style.display = 'none';
+                      if (e.currentTarget.nextElementSibling) {
+                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                      }
                     }
                   }} 
                 />
@@ -1408,9 +1514,9 @@ export default function StealthMusicPlayer({
                   SB
                 </div>
               </div>
-              <div className="hidden sm:block text-left">
+              <div className="block text-left">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base font-extrabold text-white tracking-tight leading-none">Secret-Bubble</span>
+                  <span className="text-sm sm:text-base font-extrabold text-white tracking-tight leading-none">Secret-Bubble</span>
                   <span className="w-2 h-2 rounded-full bg-[#1ed760] animate-pulse" />
                 </div>
                 <span className="text-[10px] text-[#1ed760] font-bold block mt-0.5 tracking-wider uppercase">Music Lounge</span>
@@ -1625,7 +1731,7 @@ export default function StealthMusicPlayer({
                       <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-tr from-[#1ed760] to-emerald-900 flex items-center justify-center text-white shrink-0 shadow">
                         <Heart className="w-6 h-6 fill-current" />
                       </div>
-                      <span className="font-bold text-xs sm:text-sm text-white px-3 truncate flex-1">Liked Songs</span>
+                      <span className="font-bold text-[11px] sm:text-xs md:text-sm text-white px-2.5 sm:px-3 line-clamp-2 leading-tight flex-1">Liked Songs</span>
                       <button className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[#1ed760] text-black shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 group-hover:scale-105 transition-all duration-200 shrink-0">
                         <Play className="w-4 h-4 fill-current ml-0.5" />
                       </button>
@@ -1647,7 +1753,7 @@ export default function StealthMusicPlayer({
                           alt={pl.title}
                           className="w-12 h-12 sm:w-16 sm:h-16 object-cover shrink-0 shadow"
                         />
-                        <span className="font-bold text-xs sm:text-sm text-white px-3 truncate flex-1">{pl.title}</span>
+                        <span className="font-bold text-[11px] sm:text-xs md:text-sm text-white px-2.5 sm:px-3 line-clamp-2 leading-tight flex-1">{pl.title}</span>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2180,8 +2286,23 @@ export default function StealthMusicPlayer({
                           alt={item.title}
                           className="w-10 h-10 rounded object-cover shrink-0 shadow"
                         />
-                        <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:text-[#1ed760] transition">{item.title}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:text-[#1ed760] transition">{item.title}</p>
+                            {item.year && item.year >= 2024 ? (
+                              <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded bg-[#1ed760]/20 text-[#1ed760] border border-[#1ed760]/30 shrink-0">
+                                NEW {item.year}
+                              </span>
+                            ) : item.year ? (
+                              <span className="px-1.5 py-0.5 text-[9px] font-mono text-[#b3b3b3] rounded bg-white/5 shrink-0">
+                                {item.year}
+                              </span>
+                            ) : item.publishedTime ? (
+                              <span className="px-1.5 py-0.5 text-[9px] font-mono text-[#b3b3b3] rounded bg-white/5 shrink-0">
+                                {item.publishedTime}
+                              </span>
+                            ) : null}
+                          </div>
                           <p className="text-[11px] text-[#b3b3b3] truncate">{item.artist}</p>
                         </div>
                       </div>
@@ -2479,10 +2600,24 @@ export default function StealthMusicPlayer({
           VIEW 2: Spotify Full "Now Playing" Screen (Expands on Cover / Tap)
           ========================================================================= */}
       {viewMode === 'nowPlaying' && (
-        <div className="flex-1 flex flex-col justify-between w-full max-w-lg mx-auto h-full p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200">
+        <div className="relative flex-1 flex flex-col justify-between w-full max-w-lg mx-auto h-full p-4 sm:p-6 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
           
+          {/* Ambient Video Background Layer in Now Playing Screen */}
+          {backgroundVideoEnabled && currentTrack.youtubeId && (
+            <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10 opacity-30">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&mute=1&controls=0&showinfo=0&loop=1&playlist=${currentTrack.youtubeId}&playsinline=1&modestbranding=1`}
+                title="Ambient Video Background"
+                className="w-[160%] h-[160%] -translate-x-[30%] -translate-y-[30%] object-cover filter blur-3xl scale-125 pointer-events-none"
+                tabIndex="-1"
+                aria-hidden="true"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#121212]/80 via-[#121212]/85 to-[#121212]" />
+            </div>
+          )}
+
           {/* Top Bar */}
-          <div className="flex items-center justify-between w-full pt-1">
+          <div className="flex items-center justify-between w-full pt-1 relative z-10">
             <button
               onClick={() => setViewMode('list')}
               className="p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#282828] transition cursor-pointer"
@@ -2502,6 +2637,19 @@ export default function StealthMusicPlayer({
 
             {/* Action Controls */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Ambient Background Video Toggle */}
+              {currentTrack.youtubeId && (
+                <button
+                  onClick={() => setBackgroundVideoEnabled(b => !b)}
+                  className={`p-2 rounded-full border transition active:scale-90 ${
+                    backgroundVideoEnabled ? 'bg-[#1ed760]/20 border-[#1ed760] text-[#1ed760]' : 'bg-[#282828] border-transparent text-[#b3b3b3] hover:text-white'
+                  }`}
+                  title={backgroundVideoEnabled ? "Ambient Background Video: Active" : "Enable Ambient Background Video"}
+                >
+                  <Sparkles className="w-4 h-4" />
+                </button>
+              )}
+
               {currentTrack.isYoutube && (
                 <button
                   onClick={() => setShowVideoMode(!showVideoMode)}
@@ -2525,26 +2673,113 @@ export default function StealthMusicPlayer({
             </div>
           </div>
 
-          {/* Center Album Art & Live Waveform */}
-          <div className="flex flex-col items-center justify-center my-auto w-full py-4">
+          {/* Center Stage: Canvas / Album Art & Live Waveform */}
+          <div className="flex flex-col items-center justify-center my-auto w-full py-2 relative z-10">
+            {/* Spotify Canvas / Album Art Mode Switcher */}
+            <div className="flex items-center justify-center gap-1.5 p-1 bg-black/50 backdrop-blur-md rounded-full border border-white/10 mb-3">
+              <button
+                onClick={() => setCanvasMode('canvas')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                  canvasMode === 'canvas' ? 'bg-[#1ed760] text-black font-bold shadow' : 'text-[#b3b3b3] hover:text-white'
+                }`}
+              >
+                <Video className="w-3.5 h-3.5" />
+                <span>Video Canvas</span>
+              </button>
+              <button
+                onClick={() => setCanvasMode('cover')}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                  canvasMode === 'cover' ? 'bg-white text-black font-bold shadow' : 'text-[#b3b3b3] hover:text-white'
+                }`}
+              >
+                <Music className="w-3.5 h-3.5" />
+                <span>Album Art</span>
+              </button>
+            </div>
+
             <div 
               onClick={handleCoverTap}
               className="relative group cursor-pointer"
               title="Triple-tap cover to unlock secret vault"
             >
-              {/* Spotify Modern Square Canvas / Vinyl Art */}
-              <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#282828] group-hover:scale-[1.02] transition-transform duration-300">
-                <img 
-                  src={currentTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'} 
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-              </div>
+              {/* Video Canvas Mode */}
+              {canvasMode === 'canvas' ? (
+                currentTrack.isYoutube ? (
+                  // YouTube full-video stream is rendered via persistent iframe positioned above
+                  <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black flex items-center justify-center">
+                    <img 
+                      src={currentTrack.artwork} 
+                      alt={currentTrack.title}
+                      className="w-full h-full object-cover opacity-20 pointer-events-none"
+                    />
+                    <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[9px] font-bold text-[#1ed760] uppercase tracking-wider flex items-center gap-1 pointer-events-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1ed760] animate-pulse" />
+                      <span>Live Video</span>
+                    </div>
+                  </div>
+                ) : currentTrack.youtubeId ? (
+                  // JioSaavn / Audio stream + Silent High-Res Spotify Looping Canvas
+                  <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black group-hover:scale-[1.02] transition-transform duration-300">
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${currentTrack.youtubeId}&playsinline=1&modestbranding=1`}
+                      title="Spotify Looping Video Canvas"
+                      className="w-full h-full object-cover scale-110 pointer-events-none"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-[9px] font-bold text-[#1ed760] uppercase tracking-wider flex items-center gap-1 pointer-events-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1ed760] animate-ping" />
+                      <span>Canvas Video</span>
+                    </div>
+                  </div>
+                ) : (
+                  // Audio track with canvas match on demand
+                  <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#282828]">
+                    <img 
+                      src={currentTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'} 
+                      alt={currentTrack.title}
+                      className="w-full h-full object-cover opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fetchVideoCanvasForTrack(currentTrack);
+                      }}
+                      disabled={isLoadingCanvas}
+                      className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm gap-2 text-white hover:bg-black/70 transition p-4 cursor-pointer"
+                    >
+                      {isLoadingCanvas ? (
+                        <>
+                          <Loader2 className="w-8 h-8 text-[#1ed760] animate-spin" />
+                          <span className="text-xs font-semibold">Matching Video Canvas...</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-12 h-12 rounded-full bg-[#1ed760] text-black flex items-center justify-center shadow-lg hover:scale-105 transition">
+                            <Video className="w-6 h-6 fill-current" />
+                          </div>
+                          <span className="text-xs font-bold text-center">Load Spotify Video Canvas</span>
+                          <span className="text-[10px] text-[#b3b3b3] text-center">Stream background video for this track</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )
+              ) : (
+                // Classic High-Res Vinyl Album Art
+                <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#282828] group-hover:scale-[1.02] transition-transform duration-300">
+                  <img 
+                    src={currentTrack.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80'} 
+                    alt={currentTrack.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                </div>
+              )}
 
               {/* Equalizer Live Visualizer Waveform */}
               {isPlaying && (
-                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-[#282828] shadow-xl">
+                <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-[#282828] shadow-xl z-10">
                   <div className="w-1 h-3 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <div className="w-1 h-5 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                   <div className="w-1 h-7 bg-[#1ed760] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -2555,7 +2790,7 @@ export default function StealthMusicPlayer({
             </div>
 
             {/* Track Title & Artist */}
-            <div className="w-full flex items-center justify-between mt-8 px-2">
+            <div className="w-full flex items-center justify-between mt-6 px-2">
               <div className="min-w-0 pr-4">
                 <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
                   {currentTrack.title}

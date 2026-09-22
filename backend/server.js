@@ -1219,6 +1219,9 @@ app.get('/api/music/search', async (req, res) => {
               .replace('50x50.jpg', '500x500.jpg')
               .replace('150x150.jpg', '500x500.jpg');
 
+            const releaseYear = parseInt(details.year || s.more_info?.year || s.year, 10) || 0;
+            const releaseDate = details.release_date || s.more_info?.release_date || '';
+
             results.push({
               id: `track-${s.id}`,
               title: cleanHtml(details.song || s.title),
@@ -1228,11 +1231,16 @@ app.get('/api/music/search', async (req, res) => {
               durationText: `${min}:${sec < 10 ? '0' : ''}${sec}`,
               artwork: img,
               url: directAudio,
+              year: releaseYear,
+              releaseDate,
               isAudioStream: true
             });
           }
         }
       }
+
+      // Sort by newest release year first, followed by older songs
+      results.sort((a, b) => (b.year || 0) - (a.year || 0));
     }
 
     // If direct audio search yielded results, return immediately
@@ -1405,6 +1413,35 @@ app.get('/api/music/youtube-search', async (req, res) => {
               const bestThumb = thumbs[thumbs.length - 1]?.url || `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`;
               const title = video.title?.runs?.[0]?.text || q;
               const artist = video.ownerText?.runs?.[0]?.text || "YouTube Music";
+              const publishedText = video.publishedTimeText?.simpleText || '';
+
+              // Calculate recency ranking score so new songs appear first
+              let recencyScore = 500;
+              const titleLower = title.toLowerCase();
+              const currentYear = new Date().getFullYear();
+
+              const yearMatch = titleLower.match(/\b(202[0-9]|201[0-9]|200[0-9]|19[0-9]{2})\b/);
+              let videoYear = yearMatch ? parseInt(yearMatch[1], 10) : 0;
+
+              const pubLower = publishedText.toLowerCase();
+              if (pubLower.includes('second') || pubLower.includes('minute') || pubLower.includes('hour') || pubLower.includes('day') || pubLower.includes('week')) {
+                recencyScore = 10000;
+                if (!videoYear) videoYear = currentYear;
+              } else if (pubLower.includes('month')) {
+                const m = parseInt(pubLower.match(/\d+/)?.[0] || '1', 10);
+                recencyScore = 9000 - (m * 50);
+                if (!videoYear) videoYear = currentYear;
+              } else if (pubLower.includes('year')) {
+                const y = parseInt(pubLower.match(/\d+/)?.[0] || '1', 10);
+                recencyScore = 8000 - (y * 500);
+                if (!videoYear) videoYear = currentYear - y;
+              } else if (videoYear) {
+                recencyScore = 5000 + (videoYear - 2000) * 100;
+              }
+
+              if (titleLower.includes('latest') || titleLower.includes('new song') || titleLower.includes('trending') || titleLower.includes('2026') || titleLower.includes('2025')) {
+                recencyScore += 500;
+              }
 
               results.push({
                 id: `yt-${video.videoId}`,
@@ -1415,13 +1452,19 @@ app.get('/api/music/youtube-search', async (req, res) => {
                 artwork: bestThumb,
                 duration: secs,
                 durationText: durText || `${Math.floor(secs / 60)}:${secs % 60 < 10 ? '0' : ''}${secs % 60}`,
-                isYoutube: true
+                isYoutube: true,
+                publishedTime: publishedText,
+                year: videoYear || undefined,
+                recencyScore
               });
-              if (results.length >= 20) break;
+              if (results.length >= 25) break;
             }
           }
-          if (results.length >= 20) break;
+          if (results.length >= 25) break;
         }
+
+        // Sort so newest songs appear first, followed by older songs
+        results.sort((a, b) => (b.recencyScore || 0) - (a.recencyScore || 0));
       } catch (e) {}
     }
 
