@@ -18,6 +18,7 @@ const AppLockModal = lazy(() => import('./components/AppLockModal'));
 const AiTrainingModal = lazy(() => import('./components/AiTrainingModal'));
 const CreateGroupModal = lazy(() => import('./components/CreateGroupModal'));
 const InstallAppModal = lazy(() => import('./components/InstallAppModal'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 
 const getBackendUrl = () => {
   if (import.meta.env?.VITE_BACKEND_URL) {
@@ -185,6 +186,24 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('connecting');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.location.hash === '#admin';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#admin') {
+        setShowAdminDashboard(true);
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
   const [isAiTrainingOpen, setIsAiTrainingOpen] = useState(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -804,6 +823,8 @@ export default function App() {
           decoyPin={settings.decoyPin || '9999'}
           backendUrl={getBackendUrl()}
           onOpenInstall={() => setShowInstallModal(true)}
+          onOpenAdmin={() => setShowAdminDashboard(true)}
+          onOpenProfile={() => setIsProfileOpen(true)}
           onUnlock={(isDecoy) => {
             setIsStealthMode(false);
             setIsDecoySession(Boolean(isDecoy));
@@ -818,6 +839,21 @@ export default function App() {
             isOpen={showInstallModal}
             onClose={handleCloseInstallModal}
             onInstalled={handleAppMarkedInstalled}
+          />
+          <ProfileModal
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            currentUser={currentUser || { name: 'Music Guest', username: 'guest', id: 'guest' }}
+            onUpdateProfile={handleUpdateProfile}
+            backendUrl={backendUrl}
+          />
+          <AdminDashboard
+            isOpen={showAdminDashboard}
+            onClose={() => {
+              setShowAdminDashboard(false);
+              if (window.location.hash === '#admin') window.location.hash = '';
+            }}
+            backendUrl={backendUrl}
           />
         </Suspense>
       </>
@@ -911,6 +947,7 @@ export default function App() {
             onLockApp={() => setIsAppLocked(true)}
             onRefreshUsers={fetchUsers}
             onOpenInstall={() => setShowInstallModal(true)}
+            onOpenAdmin={() => setShowAdminDashboard(true)}
             unreadCounts={unreadCounts}
           />
         </div>
@@ -1064,6 +1101,16 @@ export default function App() {
           isOpen={showInstallModal}
           onClose={handleCloseInstallModal}
           onInstalled={handleAppMarkedInstalled}
+        />
+
+        {/* Admin Telemetry & Real-Time Dashboard */}
+        <AdminDashboard
+          isOpen={showAdminDashboard}
+          onClose={() => {
+            setShowAdminDashboard(false);
+            if (window.location.hash === '#admin') window.location.hash = '';
+          }}
+          backendUrl={backendUrl}
         />
       </Suspense>
 

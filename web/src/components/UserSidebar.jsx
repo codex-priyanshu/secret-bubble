@@ -18,6 +18,7 @@ export default function UserSidebar({
   onOpenCreateGroup,
   onRefreshUsers,
   onOpenInstall,
+  onOpenAdmin,
   unreadCounts = {}
 }) {
   const [search, setSearch] = useState('');
@@ -124,6 +125,16 @@ export default function UserSidebar({
                   >
                     <Download className="w-4 h-4 text-emerald-400" />
                     <span className="font-semibold">Install / Download App</span>
+                  </button>
+                )}
+
+                {onOpenAdmin && (
+                  <button
+                    onClick={() => { setIsMenuOpen(false); onOpenAdmin(); }}
+                    className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-emerald-300 hover:text-white flex items-center gap-2.5 transition"
+                  >
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <span className="font-semibold">Admin Dashboard</span>
                   </button>
                 )}
 

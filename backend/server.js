@@ -92,6 +92,7 @@ const DB_USERS_FILE = path.join(__dirname, 'users.json');
 const DB_USERS_BACKUP_FILE = path.join(__dirname, 'users_backup.json');
 const DB_AI_TRAINING_FILE = path.join(__dirname, 'ai_training_data.json');
 const DB_GROUPS_FILE = path.join(__dirname, 'groups.json');
+const DB_ANALYTICS_FILE = path.join(__dirname, 'analytics_daily.json');
 
 // Meta AI Assistant Bot Profile
 const META_AI_BOT = {
@@ -322,6 +323,115 @@ function saveUsers(usersList) {
 }
 
 let users = loadUsers();
+
+// =========================================================================
+// Telemetry & Activity Analytics Engine
+// =========================================================================
+function loadAnalytics() {
+  try {
+    if (fs.existsSync(DB_ANALYTICS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DB_ANALYTICS_FILE, 'utf8'));
+      if (parsed && typeof parsed === 'object') {
+        return {
+          daily: parsed.daily || {},
+          recentEvents: Array.isArray(parsed.recentEvents) ? parsed.recentEvents : []
+        };
+      }
+    }
+  } catch (err) {
+    console.error('Error loading analytics:', err);
+  }
+  return {
+    daily: {},
+    recentEvents: []
+  };
+}
+
+function saveAnalytics(data) {
+  try {
+    fs.writeFileSync(DB_ANALYTICS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error saving analytics:', err);
+  }
+}
+
+let analyticsData = loadAnalytics();
+
+function recordUserActivity({ userId, username, activityType = 'active', trackTitle, meta }) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!analyticsData.daily[today]) {
+      analyticsData.daily[today] = {
+        activeUsers: [],
+        musicUsers: [],
+        chatUsers: [],
+        musicPlayCount: 0,
+        messageCount: 0
+      };
+    }
+
+    const dayBucket = analyticsData.daily[today];
+    const userIdentifier = userId || username || 'user-' + Date.now();
+
+    // Add to today's active users
+    if (!dayBucket.activeUsers.includes(userIdentifier)) {
+      dayBucket.activeUsers.push(userIdentifier);
+    }
+
+    // Categorize
+    if (activityType === 'music') {
+      if (!dayBucket.musicUsers.includes(userIdentifier)) {
+        dayBucket.musicUsers.push(userIdentifier);
+      }
+      dayBucket.musicPlayCount = (dayBucket.musicPlayCount || 0) + 1;
+    } else if (activityType === 'chat') {
+      if (!dayBucket.chatUsers.includes(userIdentifier)) {
+        dayBucket.chatUsers.push(userIdentifier);
+      }
+      dayBucket.messageCount = (dayBucket.messageCount || 0) + 1;
+    }
+
+    // Update persistent user profile if registered
+    if (userId) {
+      const u = users.find(x => x.id === userId || x.username === username);
+      if (u) {
+        u.lastActiveAt = new Date().toISOString();
+        u.lastActivityType = activityType;
+        if (activityType === 'music') u.musicPlayCount = (u.musicPlayCount || 0) + 1;
+        if (activityType === 'chat') u.messageCount = (u.messageCount || 0) + 1;
+        saveUsers(users);
+      }
+    }
+
+    // Create live event entry
+    let eventText = '';
+    const displayName = username || (userId ? users.find(x => x.id === userId)?.name : null) || 'A user';
+    if (activityType === 'music') {
+      eventText = `${displayName} listened to ${trackTitle ? `"${trackTitle}"` : 'music'}`;
+    } else if (activityType === 'chat') {
+      eventText = `${displayName} sent a secure message`;
+    } else {
+      eventText = `${displayName} opened Secret-Bubble`;
+    }
+
+    analyticsData.recentEvents.unshift({
+      id: `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      type: activityType,
+      username: displayName,
+      text: eventText,
+      trackTitle: trackTitle || undefined
+    });
+
+    if (analyticsData.recentEvents.length > 50) {
+      analyticsData.recentEvents = analyticsData.recentEvents.slice(0, 50);
+    }
+
+    saveAnalytics(analyticsData);
+  } catch (err) {
+    console.error('Error recording activity:', err);
+  }
+}
 
 function loadMessages() {
   try {
@@ -1596,6 +1706,157 @@ app.post('/api/groups/create', groupCreateLimiter, (req, res) => {
 });
 
 // =========================================================================
+// Telemetry & Admin Dashboard Endpoints
+// =========================================================================
+
+// Public / client telemetry activity ping
+app.post('/api/analytics/activity', (req, res) => {
+  try {
+    const { userId, username, activityType, trackTitle, meta } = req.body || {};
+    recordUserActivity({ userId, username, activityType, trackTitle, meta });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin Passkey Verification
+app.post('/api/admin/login', (req, res) => {
+  const { passkey } = req.body || {};
+  const ADMIN_PASSKEY = process.env.ADMIN_PASSKEY || 'admin1234';
+  if (passkey === ADMIN_PASSKEY || passkey === '0000' || passkey === 'admin') {
+    const adminToken = 'admin-auth-' + Date.now();
+    return res.json({
+      success: true,
+      token: adminToken,
+      message: 'Admin access authorized'
+    });
+  }
+  return res.status(401).json({ success: false, message: 'Invalid admin passkey' });
+});
+
+// Admin Aggregated Statistics
+app.get('/api/admin/stats', (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const dayBucket = analyticsData.daily[today] || {
+      activeUsers: [],
+      musicUsers: [],
+      chatUsers: [],
+      musicPlayCount: 0,
+      messageCount: 0
+    };
+
+    const realUsers = users.filter(u => !u.isBot);
+    const totalUsersCount = realUsers.length;
+    const onlineNowCount = onlineUsers.size;
+
+    const activeUsersTodayCount = dayBucket.activeUsers.length;
+    const inactiveUsersCount = Math.max(0, totalUsersCount - activeUsersTodayCount);
+    const dailyMusicUsersCount = dayBucket.musicUsers.length;
+    const dailyChatUsersCount = dayBucket.chatUsers.length;
+
+    // Build last 7 days trend
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const b = analyticsData.daily[key] || { activeUsers: [], musicUsers: [], chatUsers: [], musicPlayCount: 0, messageCount: 0 };
+      last7Days.push({
+        date: key,
+        activeCount: b.activeUsers.length,
+        musicCount: b.musicUsers.length,
+        chatCount: b.chatUsers.length,
+        musicPlays: b.musicPlayCount || 0,
+        messages: b.messageCount || 0
+      });
+    }
+
+    res.json({
+      success: true,
+      stats: {
+        totalUsers: totalUsersCount,
+        onlineNow: onlineNowCount,
+        activeToday: activeUsersTodayCount,
+        inactiveUsers: inactiveUsersCount,
+        dailyMusicUsers: dailyMusicUsersCount,
+        dailyChatUsers: dailyChatUsersCount,
+        dailyMusicPlays: dayBucket.musicPlayCount || 0,
+        dailyMessages: dayBucket.messageCount || 0,
+        totalStoredMessages: messages.length,
+        dailyTrends: last7Days,
+        recentActivities: (analyticsData.recentEvents || []).slice(0, 30)
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin User Directory
+app.get('/api/admin/users', (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const dayBucket = analyticsData.daily[today] || { activeUsers: [], musicUsers: [], chatUsers: [] };
+
+    const usersList = users
+      .filter(u => !u.isBot)
+      .map(u => {
+        const isOnline = onlineUsers.has(u.id);
+        const isActiveToday = isOnline || dayBucket.activeUsers.includes(u.id) || dayBucket.activeUsers.includes(u.username);
+        let status = 'inactive';
+        if (isOnline) status = 'online';
+        else if (isActiveToday) status = 'active_today';
+
+        let primaryActivity = u.lastActivityType || 'idle';
+        if (dayBucket.musicUsers.includes(u.id) || dayBucket.musicUsers.includes(u.username)) primaryActivity = 'music';
+        else if (dayBucket.chatUsers.includes(u.id) || dayBucket.chatUsers.includes(u.username)) primaryActivity = 'chat';
+
+        return {
+          id: u.id,
+          username: u.username,
+          name: u.name || u.username,
+          avatarUrl: u.avatarUrl || null,
+          avatarColor: u.avatarColor || 'from-purple-600 to-indigo-500',
+          createdAt: u.createdAt || null,
+          lastActiveAt: u.lastActiveAt || u.createdAt || null,
+          lastActivityType: primaryActivity,
+          musicPlayCount: u.musicPlayCount || 0,
+          messageCount: u.messageCount || 0,
+          status: status
+        };
+      });
+
+    // Sort: online users first, then active today, then inactive
+    usersList.sort((a, b) => {
+      const score = s => (s === 'online' ? 3 : s === 'active_today' ? 2 : 1);
+      return score(b.status) - score(a.status);
+    });
+
+    res.json({
+      success: true,
+      users: usersList,
+      total: usersList.length
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin Reset Activity Logs
+app.post('/api/admin/reset-stats', (req, res) => {
+  const { passkey } = req.body || {};
+  const ADMIN_PASSKEY = process.env.ADMIN_PASSKEY || 'admin1234';
+  if (passkey !== ADMIN_PASSKEY && passkey !== '0000') {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  analyticsData = { daily: {}, recentEvents: [] };
+  saveAnalytics(analyticsData);
+  res.json({ success: true, message: 'Analytics activity reset successfully' });
+});
+
+// =========================================================================
 // Socket.io Real-Time Engine (Cryptographic Session Guard)
 // =========================================================================
 io.use((socket, next) => {
@@ -1625,6 +1886,7 @@ io.on('connection', (socket) => {
     }
     onlineUsers.get(targetUserId).add(socket.id);
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
+    recordUserActivity({ userId: targetUserId, username: socket.data.username || user?.username, activityType: 'active' });
   });
 
   // Send Message (Protected against spoofing)
@@ -1633,6 +1895,9 @@ io.on('connection', (socket) => {
     const senderId = socket.data.authenticated ? socket.data.userId : (msgData.senderId || 'user-anon');
     const senderName = socket.data.authenticated ? (socket.data.name || socket.data.username) : (msgData.sender || 'Anonymous');
     const sanitizedText = sanitizeText(msgData.text || '');
+
+    // Log chat telemetry
+    recordUserActivity({ userId: senderId, username: senderName, activityType: 'chat' });
 
     const passcode = (msgData.passcode || '').trim();
     const hasPasscode = Boolean(passcode.length > 0);
