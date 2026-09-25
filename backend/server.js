@@ -1294,6 +1294,62 @@ function cleanHtml(str) {
     .trim();
 }
 
+// Instant Live Search Suggestions & Autocomplete
+app.get('/api/music/suggestions', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) {
+    return res.json({
+      success: true,
+      suggestions: [
+        'Arijit Singh Hits',
+        'Sidhu Moose Wala',
+        'Kesariya Brahmastra',
+        'Chaleya Jawan',
+        'Romantic Hindi Songs',
+        'Punjabi Bangers',
+        'Bollywood Evergreen',
+        'Lofi Chill & Study'
+      ],
+      songs: []
+    });
+  }
+
+  try {
+    const promises = [
+      // 1. YouTube suggestions
+      fetch(`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => (Array.isArray(data[1]) ? data[1].slice(0, 6) : []))
+        .catch(() => []),
+      // 2. JioSaavn autocomplete songs
+      fetch(`https://www.jiosaavn.com/api.php?__call=autocomplete.get&_marker=0&query=${encodeURIComponent(q)}&ctx=android&_format=json`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      })
+        .then(r => r.json())
+        .then(data => {
+          const songs = data?.songs?.data || [];
+          return songs.slice(0, 4).map(s => ({
+            id: s.id,
+            title: decodeHtmlEntities(s.title || ''),
+            artist: decodeHtmlEntities(s.more_info?.singers || s.description || ''),
+            artwork: s.image ? s.image.replace('50x50', '150x150') : null
+          }));
+        })
+        .catch(() => [])
+    ];
+
+    const [ytSuggestions, saavnSongs] = await Promise.all(promises);
+
+    res.json({
+      success: true,
+      suggestions: ytSuggestions,
+      songs: saavnSongs
+    });
+  } catch (err) {
+    res.json({ success: true, suggestions: [], songs: [] });
+  }
+});
+
 // Unified Audio Search: Returns direct audio streams for continuous background playback
 app.get('/api/music/search', async (req, res) => {
   const q = (req.query.q || '').trim();

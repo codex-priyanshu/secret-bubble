@@ -509,6 +509,107 @@ export default function StealthMusicPlayer({
   const [searchResults, setSearchResults] = useState([]);
   const [searchError, setSearchError] = useState('');
 
+  // Live Autocomplete & Typing Suggestions States
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsList, setSuggestionsList] = useState([]);
+  const [matchingSongs, setMatchingSongs] = useState([]);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+  const searchInputRef = useRef(null);
+  const suggestionsBoxRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        suggestionsBoxRef.current && !suggestionsBoxRef.current.contains(e.target) &&
+        searchInputRef.current && !searchInputRef.current.contains(e.target)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    setShowSuggestions(true);
+
+    const clean = val.trim().toLowerCase();
+    if (!clean) {
+      setMatchingSongs([]);
+      setSuggestionsList([]);
+      return;
+    }
+
+    // 1. Instant local catalog scan (0ms latency!)
+    const catalogPool = [...FEATURED_ONLINE_TRACKS, ...BACKUP_STREAM_POOL, ...tracks];
+    const seenSongIds = new Set();
+    const localMatches = [];
+
+    for (const song of catalogPool) {
+      if (seenSongIds.has(song.id)) continue;
+      const t = (song.title || '').toLowerCase();
+      const a = (song.artist || '').toLowerCase();
+      if (t.includes(clean) || a.includes(clean)) {
+        seenSongIds.add(song.id);
+        localMatches.push(song);
+        if (localMatches.length >= 4) break;
+      }
+    }
+    setMatchingSongs(localMatches);
+
+    // 2. Debounced online suggestions fetch (160ms)
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsFetchingSuggestions(true);
+      try {
+        const apiBase = getBackendApiUrl();
+        const urls = [];
+        if (apiBase) urls.push(`${apiBase}/api/music/suggestions?q=${encodeURIComponent(clean)}`);
+        urls.push(`https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=${encodeURIComponent(clean)}`);
+
+        for (const url of urls) {
+          try {
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.suggestions && Array.isArray(data.suggestions)) {
+                setSuggestionsList(data.suggestions.slice(0, 6));
+                if (data.songs && Array.isArray(data.songs) && localMatches.length < 2) {
+                  setMatchingSongs(prev => {
+                    const combined = [...prev];
+                    for (const s of data.songs) {
+                      if (!combined.some(x => x.title?.toLowerCase() === s.title?.toLowerCase())) {
+                        combined.push({
+                          ...s,
+                          duration: 220,
+                          isYoutube: true
+                        });
+                      }
+                    }
+                    return combined.slice(0, 4);
+                  });
+                }
+                break;
+              } else if (Array.isArray(data) && Array.isArray(data[1])) {
+                setSuggestionsList(data[1].slice(0, 6));
+                break;
+              }
+            }
+          } catch (e) {}
+        }
+      } finally {
+        setIsFetchingSuggestions(false);
+      }
+    }, 160);
+  };
+
   // Secret unlock & PINs setup state
   const [isPinSetupDone, setIsPinSetupDone] = useState(() => {
     try {
@@ -1034,6 +1135,7 @@ export default function StealthMusicPlayer({
     setActiveTab('search');
     setSelectedPlaylistView(null);
     setIsSearching(true);
+    setShowSuggestions(false);
     setSearchError('');
     setSearchResults([]);
 
@@ -1802,94 +1904,265 @@ export default function StealthMusicPlayer({
             </div>
           )}
 
-          {/* Top Header with User Branding */}
-          <div className="bg-[#121212]/95 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 py-3 border-b border-[#242424]/80 flex items-center justify-between gap-3 shrink-0">
-            {/* User App Brand Logo & Name */}
-            <button 
-              type="button"
-              className="flex items-center gap-2 shrink-0 cursor-pointer group bg-transparent border-0 p-0 text-left" 
-              onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
-              title="Secret-Bubble Music Lounge"
-              aria-label="Secret-Bubble Music Lounge Home"
-            >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition shrink-0">
-                <img 
-                  src="/app-logo-sm.png" 
-                  alt="Secret-Bubble Logo" 
-                  width="36"
-                  height="36"
-                  loading="eager"
-                  className="w-full h-full object-cover rounded-[10px]" 
-                  onError={(e) => {
-                    if (!e.currentTarget.dataset.retried) {
-                      e.currentTarget.dataset.retried = '1';
-                      e.currentTarget.src = 'app-logo-sm.png';
-                    } else if (e.currentTarget.dataset.retried === '1') {
-                      e.currentTarget.dataset.retried = '2';
-                      e.currentTarget.src = '/app-logo.png';
-                    } else {
-                      e.currentTarget.style.display = 'none';
-                      if (e.currentTarget.nextElementSibling) {
-                        e.currentTarget.nextElementSibling.style.display = 'flex';
+          {/* Top Header with User Branding & Search */}
+          <div className="bg-[#121212]/95 backdrop-blur-md sticky top-0 z-30 px-3 sm:px-8 py-2.5 sm:py-3 border-b border-[#242424]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 shrink-0">
+            {/* Row 1 on Mobile / Left Column on Desktop: Brand Logo + Mobile Action Bar */}
+            <div className="flex items-center justify-between gap-2 w-full sm:w-auto">
+              {/* Brand Logo & Name */}
+              <button 
+                type="button"
+                className="flex items-center gap-2 shrink-0 cursor-pointer group bg-transparent border-0 p-0 text-left" 
+                onClick={() => { setActiveTab('playlist'); setSelectedPlaylistView(null); }}
+                title="Secret-Bubble Music Lounge"
+                aria-label="Secret-Bubble Music Lounge Home"
+              >
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-[#1ed760] p-0.5 shadow-lg shadow-[#1ed760]/20 overflow-hidden flex items-center justify-center border border-white/10 group-hover:scale-105 transition shrink-0">
+                  <img 
+                    src="/app-logo-sm.png" 
+                    alt="Secret-Bubble Logo" 
+                    width="36"
+                    height="36"
+                    loading="eager"
+                    className="w-full h-full object-cover rounded-[10px]" 
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.retried) {
+                        e.currentTarget.dataset.retried = '1';
+                        e.currentTarget.src = 'app-logo-sm.png';
+                      } else if (e.currentTarget.dataset.retried === '1') {
+                        e.currentTarget.dataset.retried = '2';
+                        e.currentTarget.src = '/app-logo.png';
+                      } else {
+                        e.currentTarget.style.display = 'none';
+                        if (e.currentTarget.nextElementSibling) {
+                          e.currentTarget.nextElementSibling.style.display = 'flex';
+                        }
                       }
-                    }
-                  }} 
-                />
-                <div style={{ display: 'none' }} className="w-full h-full items-center justify-center font-black text-white text-xs bg-gradient-to-tr from-indigo-600 to-[#1ed760]">
-                  SB
+                    }} 
+                  />
+                  <div style={{ display: 'none' }} className="w-full h-full items-center justify-center font-black text-white text-xs bg-gradient-to-tr from-indigo-600 to-[#1ed760]">
+                    SB
+                  </div>
                 </div>
-              </div>
-              <div className="block text-left">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm sm:text-base font-extrabold text-white tracking-tight leading-none">Secret-Bubble</span>
-                  <span className="w-2 h-2 rounded-full bg-[#1ed760] animate-pulse" />
+                <div className="block text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm sm:text-base font-extrabold text-white tracking-tight leading-none">Secret-Bubble</span>
+                    <span className="w-2 h-2 rounded-full bg-[#1ed760] animate-pulse" />
+                  </div>
+                  <span className="text-[10px] text-[#1ed760] font-bold block mt-0.5 tracking-wider uppercase">Music Lounge</span>
                 </div>
-                <span className="text-[10px] text-[#1ed760] font-bold block mt-0.5 tracking-wider uppercase">Music Lounge</span>
-              </div>
-            </button>
+              </button>
 
-            {/* Centered Pill Search Bar with Dedicated Search Button */}
-            <form onSubmit={handleSearchSubmit} className="flex-1 min-w-0 max-w-md mx-1 sm:mx-3">
-              <div className="relative w-full flex items-center">
+              {/* Mobile Right Action Icons (compact on mobile header row) */}
+              <div className="flex items-center gap-1 shrink-0 sm:hidden">
+                {onOpenProfile && (
+                  <button
+                    onClick={onOpenProfile}
+                    title="Profile & Settings"
+                    aria-label="Profile and Settings"
+                    className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
+                  >
+                    <User className="w-4 h-4 text-[#1ed760]" />
+                  </button>
+                )}
+
+                {onOpenInstall && (
+                  <button
+                    onClick={onOpenInstall}
+                    title="Install Secret-Bubble App"
+                    aria-label="Install Secret-Bubble App"
+                    className="p-1.5 px-2.5 rounded-full bg-white text-black font-bold text-xs shadow transition active:scale-95 cursor-pointer flex items-center gap-1"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="text-[10px]">Install</span>
+                  </button>
+                )}
+
+                {onOpenAdmin && (
+                  <button
+                    onClick={onOpenAdmin}
+                    title="Admin Dashboard"
+                    aria-label="Admin Dashboard"
+                    className="p-1.5 text-[#b3b3b3] hover:text-[#1ed760] rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
+                  >
+                    <Shield className="w-4 h-4" />
+                  </button>
+                )}
+
+                <button
+                  onClick={handleEqualizerClick}
+                  title="Audio Equalizer"
+                  aria-label="Audio Equalizer"
+                  className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
+                >
+                  <Sliders className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2 on Mobile / Center on Desktop: Full-Width Search Bar with Live Suggestions Dropdown */}
+            <div className="relative flex-1 min-w-0 max-w-lg w-full">
+              <form onSubmit={handleSearchSubmit} className="relative w-full flex items-center">
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search songs or artists..."
+                  onChange={handleSearchChange}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Search songs, artists, or albums..."
                   aria-label="Search songs or artists"
-                  className="w-full pl-8 sm:pl-9 pr-9 sm:pr-20 py-1.5 sm:py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-[#1ed760] rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
+                  className="w-full pl-9 pr-20 py-2 sm:py-2 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#242424] border border-transparent focus:border-[#1ed760] rounded-full text-xs sm:text-sm text-white placeholder-[#b3b3b3] focus:outline-none transition shadow-inner"
                 />
-                <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#b3b3b3] absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-4 h-4 text-[#b3b3b3] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => { setSearchQuery(''); setSuggestionsList([]); setMatchingSongs([]); }}
                     aria-label="Clear search text"
-                    className="absolute right-8 sm:right-16 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-0.5"
+                    className="absolute right-16 top-1/2 -translate-y-1/2 text-[#b3b3b3] hover:text-white p-1 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+
                 <button
                   type="submit"
                   disabled={!searchQuery.trim() || isSearching}
                   aria-label="Submit search"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-bold text-xs transition disabled:opacity-40 cursor-pointer shadow flex items-center justify-center"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1 sm:py-1.5 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-extrabold text-xs transition disabled:opacity-40 cursor-pointer shadow flex items-center gap-1 justify-center"
                 >
                   {isSearching ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
-                    <>
-                      <span className="hidden sm:inline">Search</span>
-                      <Search className="w-3.5 h-3.5 sm:hidden" />
-                    </>
+                    <span>Search</span>
                   )}
                 </button>
-              </div>
-            </form>
+              </form>
 
-            {/* Right Action Icons */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {/* Floating Autocomplete & Typing Suggestions Dropdown */}
+              {showSuggestions && (
+                <div 
+                  ref={suggestionsBoxRef}
+                  className="absolute left-0 right-0 top-full mt-1.5 bg-[#282828] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150 text-left max-h-[65vh] overflow-y-auto"
+                >
+                  {/* Empty state: Trending / Popular Searches */}
+                  {!searchQuery.trim() ? (
+                    <div className="p-3 space-y-2">
+                      <div className="flex items-center gap-1.5 px-2 text-[11px] font-bold text-[#1ed760] uppercase tracking-wider">
+                        <Flame className="w-3.5 h-3.5" />
+                        <span>Popular & Trending Searches</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 p-1">
+                        {[
+                          'Arijit Singh Hits',
+                          'Sidhu Moose Wala',
+                          'Kesariya Brahmastra',
+                          'Chaleya Jawan',
+                          'Romantic Hindi Songs',
+                          'Punjabi Bangers',
+                          'Lofi Chill & Study',
+                          'Bollywood Evergreen'
+                        ].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); executeSearch(tag); }}
+                            className="px-3 py-1.5 rounded-full bg-[#181818] hover:bg-[#1ed760] hover:text-black text-slate-200 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border border-white/5 active:scale-95"
+                          >
+                            <Search className="w-3 h-3 text-slate-400" />
+                            <span>{tag}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Typed state: Instant Matching Songs & Live Query Suggestions */
+                    <div className="py-2 divide-y divide-white/5">
+                      {/* Sub-section 1: Instant Matching Songs */}
+                      {matchingSongs.length > 0 && (
+                        <div className="pb-1">
+                          <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                            <span>Matching Songs</span>
+                            <span className="text-[10px] text-[#1ed760] font-normal">Tap to play</span>
+                          </div>
+                          {matchingSongs.map((track) => (
+                            <div
+                              key={track.id}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                playTrackNow(track);
+                                setShowSuggestions(false);
+                              }}
+                              className="px-3.5 py-2 hover:bg-[#333333] transition flex items-center gap-3 cursor-pointer group"
+                            >
+                              <div className="relative w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-slate-800 border border-white/5">
+                                <img
+                                  src={track.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120'}
+                                  alt={track.title}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                  <Play className="w-4 h-4 text-[#1ed760] fill-current ml-0.5" />
+                                </div>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-[#1ed760] transition">
+                                  {track.title}
+                                </p>
+                                <p className="text-[11px] text-slate-400 truncate">
+                                  {track.artist}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Sub-section 2: Suggested Queries */}
+                      {suggestionsList.length > 0 && (
+                        <div className="pt-1">
+                          <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span>Search Suggestions</span>
+                          </div>
+                          {suggestionsList.map((sug, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                executeSearch(sug);
+                              }}
+                              className="w-full text-left px-3.5 py-2 hover:bg-[#333333] transition flex items-center gap-2.5 text-xs text-slate-200 hover:text-white cursor-pointer"
+                            >
+                              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate">{sug}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Fallback if no matching songs or suggestions */}
+                      {matchingSongs.length === 0 && suggestionsList.length === 0 && (
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            executeSearch(searchQuery);
+                          }}
+                          className="w-full text-left px-3.5 py-2.5 hover:bg-[#333333] transition flex items-center gap-2.5 text-xs text-white cursor-pointer"
+                        >
+                          <Search className="w-3.5 h-3.5 text-[#1ed760] shrink-0" />
+                          <span>Search for "<strong className="text-[#1ed760]">{searchQuery}</strong>"</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Desktop-Only Action Icons */}
+            <div className="hidden sm:flex items-center gap-1 sm:gap-2 shrink-0">
               {onOpenProfile && (
                 <button
                   onClick={onOpenProfile}
