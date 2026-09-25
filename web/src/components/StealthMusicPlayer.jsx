@@ -308,8 +308,53 @@ function extractYouTubeId(url) {
   return match ? match[1] : null;
 }
 
-// Inaudible 1-second silent WAV base64 loop to prevent mobile browsers from suspending background audio thread
-const SILENT_AUDIO_URI = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+// Generates a clean inaudible PCM silent WAV loop to keep mobile OS background audio pipeline alive
+function generateSilentWavDataUri() {
+  try {
+    const sampleRate = 8000;
+    const numChannels = 1;
+    const bitsPerSample = 8;
+    const seconds = 2;
+    const numSamples = sampleRate * seconds;
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+    const blockAlign = numChannels * (bitsPerSample / 8);
+    const dataSize = numSamples * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    // RIFF identifier
+    view.setUint8(0, 0x52); view.setUint8(1, 0x49); view.setUint8(2, 0x46); view.setUint8(3, 0x46); // 'RIFF'
+    view.setUint32(4, 36 + dataSize, true);
+    view.setUint8(8, 0x57); view.setUint8(9, 0x41); view.setUint8(10, 0x56); view.setUint8(11, 0x45); // 'WAVE'
+    // format chunk
+    view.setUint8(12, 0x66); view.setUint8(13, 0x6d); view.setUint8(14, 0x74); view.setUint8(15, 0x20); // 'fmt '
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    // data chunk
+    view.setUint8(36, 0x64); view.setUint8(37, 0x61); view.setUint8(38, 0x74); view.setUint8(39, 0x61); // 'data'
+    view.setUint32(40, dataSize, true);
+
+    const bytes = new Uint8Array(buffer, 44, dataSize);
+    bytes.fill(128); // 8-bit PCM neutral zero level
+
+    let binary = '';
+    const u8 = new Uint8Array(buffer);
+    const len = u8.length;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(u8[i]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+  } catch (e) {
+    return 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+  }
+}
+
+const SILENT_AUDIO_URI = generateSilentWavDataUri();
 
 const CURATED_PLAYLISTS = [
   {
@@ -359,10 +404,63 @@ export default function StealthMusicPlayer({
   onOpenAdmin,
   onOpenProfile
 }) {
-  const [tracks, setTracks] = useState(FEATURED_ONLINE_TRACKS);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+  // Resume last session playback state
+  const [savedSession, setSavedSession] = useState(() => {
+    try {
+      const rawTrack = localStorage.getItem('secret_bubble_last_track');
+      const rawTime = localStorage.getItem('secret_bubble_last_time');
+      if (rawTrack) {
+        const parsedTrack = JSON.parse(rawTrack);
+        const parsedTime = parseFloat(rawTime) || 0;
+        return { track: parsedTrack, time: parsedTime };
+      }
+    } catch {}
+    return null;
+  });
+
+  const [hasDismissedResume, setHasDismissedResume] = useState(false);
+  const isFirstMountRef = useRef(true);
+  const lastSavedTimeRef = useRef(0);
+
+  const [tracks, setTracks] = useState(() => {
+    try {
+      const rawTrack = localStorage.getItem('secret_bubble_last_track');
+      if (rawTrack) {
+        const parsed = JSON.parse(rawTrack);
+        const idx = FEATURED_ONLINE_TRACKS.findIndex(t => t.id === parsed.id);
+        if (idx === -1) {
+          return [parsed, ...FEATURED_ONLINE_TRACKS];
+        }
+      }
+    } catch {}
+    return FEATURED_ONLINE_TRACKS;
+  });
+
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(() => {
+    try {
+      const rawTrack = localStorage.getItem('secret_bubble_last_track');
+      if (rawTrack) {
+        const parsed = JSON.parse(rawTrack);
+        const idx = FEATURED_ONLINE_TRACKS.findIndex(t => t.id === parsed.id);
+        if (idx !== -1) return idx;
+        return 0;
+      }
+    } catch {}
+    return 0;
+  });
+
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
+
+  const [currentTime, setCurrentTime] = useState(() => {
+    try {
+      const rawTime = localStorage.getItem('secret_bubble_last_time');
+      const t = parseFloat(rawTime);
+      return (t && t > 5) ? Math.floor(t) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   const [duration, setDuration] = useState(268);
   const [isLiked, setIsLiked] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -479,82 +577,195 @@ export default function StealthMusicPlayer({
     setCurrentTime(0);
   }, [tracks.length]);
 
-  // Update track duration when switching
+  // Update track duration when switching (preserve initial session timestamp on first mount)
   useEffect(() => {
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      setDuration(currentTrack.duration || 220);
+      return;
+    }
     setCurrentTime(0);
     setDuration(currentTrack.duration || 220);
   }, [currentTrackIndex, currentTrack]);
 
+  // Persist current track to local storage
+  useEffect(() => {
+    if (!currentTrack) return;
+    try {
+      localStorage.setItem('secret_bubble_last_track', JSON.stringify(currentTrack));
+    } catch {}
+  }, [currentTrack]);
+
+  // Persist playback timestamp periodically
+  useEffect(() => {
+    if (currentTime > 0 && Math.abs(currentTime - lastSavedTimeRef.current) >= 2) {
+      lastSavedTimeRef.current = currentTime;
+      try {
+        localStorage.setItem('secret_bubble_last_time', String(currentTime));
+      } catch {}
+    }
+  }, [currentTime]);
+
   // =========================================================================
   // Background Keep-Alive Audio & OS MediaSession Integration (Phone Lock Screen)
   // =========================================================================
+  // 1. Setup metadata & permanent action handlers when currentTrack changes
   useEffect(() => {
-    // 1. Maintain background media session so phone notification bar & lock screen work
-    if ('mediaSession' in navigator && currentTrack) {
-      try {
-        navigator.mediaSession.metadata = new MediaMetadata({
-          title: currentTrack.title || "Secret Music Player",
-          artist: currentTrack.artist || "Online Stream",
-          album: currentTrack.album || "Lo-Fi Audio",
-          artwork: [
-            {
-              src: currentTrack.artwork || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=512",
-              sizes: '512x512',
-              type: 'image/jpeg'
-            }
-          ]
-        });
+    if (!('mediaSession' in navigator) || !currentTrack) return;
 
-        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    try {
+      const art = currentTrack.artwork || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=512";
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.title || "Secret Music Player",
+        artist: currentTrack.artist || "Online Stream",
+        album: currentTrack.album || "Stealth Music Lounge",
+        artwork: [
+          { src: art, sizes: '96x96', type: 'image/jpeg' },
+          { src: art, sizes: '128x128', type: 'image/jpeg' },
+          { src: art, sizes: '192x192', type: 'image/jpeg' },
+          { src: art, sizes: '256x256', type: 'image/jpeg' },
+          { src: art, sizes: '384x384', type: 'image/jpeg' },
+          { src: art, sizes: '512x512', type: 'image/jpeg' }
+        ]
+      });
 
-        navigator.mediaSession.setActionHandler('play', () => setIsPlaying(true));
-        navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false));
-        navigator.mediaSession.setActionHandler('nexttrack', () => handleNextTrack());
-        navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevTrack());
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-          if (typeof details.seekTime === 'number') {
-            setCurrentTime(Math.floor(details.seekTime));
-            if (audioRef.current && currentTrack?.url) {
-              audioRef.current.currentTime = details.seekTime;
-            }
-          }
-        });
-        navigator.mediaSession.setActionHandler('seekbackward', () => {
-          if (audioRef.current && currentTrack?.url) {
-            audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
-            setCurrentTime(Math.floor(audioRef.current.currentTime));
-          }
-        });
-        navigator.mediaSession.setActionHandler('seekforward', () => {
-          if (audioRef.current && currentTrack?.url) {
-            audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
-            setCurrentTime(Math.floor(audioRef.current.currentTime));
-          }
-        });
-
-        if ('setPositionState' in navigator.mediaSession && duration > 0) {
+      navigator.mediaSession.setActionHandler('play', () => {
+        setIsPlaying(true);
+        if (currentTrack.url && audioRef.current) {
+          audioRef.current.play().catch(() => {});
+        } else if (currentTrack.isYoutube && iframeRef.current?.contentWindow) {
           try {
-            navigator.mediaSession.setPositionState({
-              duration: Math.max(1, duration),
-              playbackRate: 1,
-              position: Math.min(Math.max(0, currentTime), duration)
-            });
+            iframeRef.current.contentWindow.postMessage(
+              JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+              '*'
+            );
           } catch (e) {}
         }
+      });
+
+      navigator.mediaSession.setActionHandler('pause', () => {
+        setIsPlaying(false);
+        if (audioRef.current) audioRef.current.pause();
+        if (currentTrack.isYoutube && iframeRef.current?.contentWindow) {
+          try {
+            iframeRef.current.contentWindow.postMessage(
+              JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+              '*'
+            );
+          } catch (e) {}
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        handleNextTrack();
+      });
+
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        handlePrevTrack();
+      });
+
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (typeof details.seekTime === 'number') {
+          const seekSec = Math.floor(details.seekTime);
+          setCurrentTime(seekSec);
+          if (currentTrack.url && audioRef.current) {
+            audioRef.current.currentTime = seekSec;
+          } else if (currentTrack.isYoutube && iframeRef.current?.contentWindow) {
+            try {
+              iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'seekTo', args: [seekSec, true] }),
+                '*'
+              );
+            } catch (e) {}
+          }
+        }
+      });
+
+      navigator.mediaSession.setActionHandler('seekbackward', () => {
+        setCurrentTime(prev => {
+          const newTime = Math.max(0, prev - 10);
+          if (currentTrack.url && audioRef.current) {
+            audioRef.current.currentTime = newTime;
+          } else if (currentTrack.isYoutube && iframeRef.current?.contentWindow) {
+            try {
+              iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'seekTo', args: [newTime, true] }),
+                '*'
+              );
+            } catch (e) {}
+          }
+          return newTime;
+        });
+      });
+
+      navigator.mediaSession.setActionHandler('seekforward', () => {
+        setCurrentTime(prev => {
+          const newTime = Math.min(duration || 300, prev + 10);
+          if (currentTrack.url && audioRef.current) {
+            audioRef.current.currentTime = newTime;
+          } else if (currentTrack.isYoutube && iframeRef.current?.contentWindow) {
+            try {
+              iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'seekTo', args: [newTime, true] }),
+                '*'
+              );
+            } catch (e) {}
+          }
+          return newTime;
+        });
+      });
+
+      navigator.mediaSession.setActionHandler('stop', () => {
+        setIsPlaying(false);
+        if (audioRef.current) audioRef.current.pause();
+        if (iframeRef.current?.contentWindow) {
+          try {
+            iframeRef.current.contentWindow.postMessage(
+              JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+              '*'
+            );
+          } catch (e) {}
+        }
+      });
+    } catch (err) {
+      console.warn('MediaSession init error:', err);
+    }
+  }, [currentTrack, duration, handleNextTrack, handlePrevTrack]);
+
+  // 2. Synchronize playbackState with isPlaying
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
       } catch (e) {}
     }
+  }, [isPlaying]);
 
-    // 2. Silent keep-alive loop to prevent phone from sleeping background audio
-    const bgAudio = backgroundKeepAliveRef.current;
-    if (bgAudio) {
-      bgAudio.volume = 0.01;
-      if (isPlaying) {
-        bgAudio.play().catch(() => {});
-      } else {
-        bgAudio.pause();
-      }
+  // 3. Synchronize lock screen progress bar position
+  useEffect(() => {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession && duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(1, duration),
+          playbackRate: 1,
+          position: Math.min(Math.max(0, currentTime), duration)
+        });
+      } catch (e) {}
     }
-  }, [currentTrack, isPlaying, currentTime, duration, handleNextTrack, handlePrevTrack]);
+  }, [currentTime, duration]);
+
+  // 4. Background audio keep-alive (ensures Android OS maintains active audio pipeline for notification tray)
+  useEffect(() => {
+    const bgAudio = backgroundKeepAliveRef.current;
+    if (!bgAudio) return;
+
+    if (isPlaying) {
+      bgAudio.volume = 0.001;
+      bgAudio.play().catch(() => {});
+    } else {
+      bgAudio.pause();
+    }
+  }, [isPlaying]);
 
 
   const getBackendApiUrl = useCallback(() => {
@@ -1022,6 +1233,78 @@ export default function StealthMusicPlayer({
       return [track, ...prev];
     });
     setIsPlaying(true);
+  };
+
+  const handleResumeSession = () => {
+    if (!savedSession?.track) return;
+    const t = savedSession.track;
+    const seekSeconds = savedSession.time || 0;
+
+    logMusicTelemetry(t);
+    setTracks(prev => {
+      const idx = prev.findIndex(x => x.id === t.id);
+      if (idx !== -1) {
+        setCurrentTrackIndex(idx);
+        return prev;
+      }
+      setCurrentTrackIndex(0);
+      return [t, ...prev];
+    });
+
+    setCurrentTime(seekSeconds);
+    setIsPlaying(true);
+    setHasDismissedResume(true);
+
+    if (t.url && audioRef.current) {
+      audioRef.current.currentTime = seekSeconds;
+      audioRef.current.play().catch(() => {});
+    } else if (t.isYoutube && iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'seekTo', args: [seekSeconds, true] }),
+          '*'
+        );
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+          '*'
+        );
+      } catch (e) {}
+    }
+  };
+
+  const handleRestartSession = () => {
+    if (!savedSession?.track) return;
+    const t = savedSession.track;
+    logMusicTelemetry(t);
+    setTracks(prev => {
+      const idx = prev.findIndex(x => x.id === t.id);
+      if (idx !== -1) {
+        setCurrentTrackIndex(idx);
+        return prev;
+      }
+      setCurrentTrackIndex(0);
+      return [t, ...prev];
+    });
+
+    setCurrentTime(0);
+    setIsPlaying(true);
+    setHasDismissedResume(true);
+
+    if (t.url && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    } else if (t.isYoutube && iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'seekTo', args: [0, true] }),
+          '*'
+        );
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+          '*'
+        );
+      } catch (e) {}
+    }
   };
 
   // Import Local Songs from Phone Storage / Downloads
@@ -1767,6 +2050,68 @@ export default function StealthMusicPlayer({
             {activeTab === 'playlist' && (
               <div className="space-y-6">
                 
+                {/* Continue Listening / Resume Playback Hero Banner */}
+                {savedSession?.track && !hasDismissedResume && !isPlaying && (
+                  <div className="relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-[#181818] border border-[#1ed760]/30 shadow-2xl overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shadow-lg shrink-0 border border-slate-700 bg-slate-800">
+                        <img
+                          src={savedSession.track.artwork || "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=512"}
+                          alt={savedSession.track.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                          <Headphones className="w-5 h-5 text-white/90" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#1ed760] bg-[#1ed760]/10 px-2 py-0.5 rounded-full border border-[#1ed760]/20">
+                            Continue Listening
+                          </span>
+                          {savedSession.time > 5 && (
+                            <span className="text-[11px] text-slate-400 font-mono">
+                              at {formatTime(savedSession.time)}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-sm sm:text-base font-extrabold text-white truncate mt-1">
+                          {savedSession.track.title}
+                        </h3>
+                        <p className="text-xs text-slate-400 truncate">
+                          {savedSession.track.artist}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:self-center shrink-0">
+                      <button
+                        onClick={handleResumeSession}
+                        className="px-4 py-2 rounded-full bg-[#1ed760] hover:bg-[#1db954] text-black font-extrabold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-[#1ed760]/20 transition transform active:scale-95 cursor-pointer"
+                      >
+                        <Play className="w-4 h-4 fill-current ml-0.5" />
+                        <span>Resume</span>
+                      </button>
+
+                      <button
+                        onClick={handleRestartSession}
+                        title="Play from start"
+                        className="px-3 py-2 rounded-full bg-[#242424] hover:bg-[#2e2e2e] text-slate-300 font-semibold text-xs transition cursor-pointer"
+                      >
+                        Start Over
+                      </button>
+
+                      <button
+                        onClick={() => setHasDismissedResume(true)}
+                        title="Dismiss"
+                        className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-[#242424] transition cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Spotify Greeting & 6-Pack Quick Access Grid */}
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-3">
