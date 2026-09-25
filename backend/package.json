@@ -1,6 +1,6 @@
 {
   "name": "secure-chat-backend",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Backend for SecureChat with Selective Message Biometric Masking",
   "main": "server.js",
   "scripts": {

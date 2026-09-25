@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, 
   Repeat, Shuffle, Heart, Disc, Sliders, Music, Radio, 
@@ -396,6 +396,7 @@ const CURATED_PLAYLISTS = [
 ];
 
 export default function StealthMusicPlayer({
+  currentUser = null,
   onUnlock,
   secretPin = '1234',
   decoyPin = '9999',
@@ -497,6 +498,14 @@ export default function StealthMusicPlayer({
     }
   });
   const [selectedPlaylistView, setSelectedPlaylistView] = useState(null); // null | playlist object
+  const userVibes = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('secret_bubble_user_vibes');
+      return saved ? JSON.parse(saved) : ['bollywood', 'lofi', 'punjabi'];
+    } catch {
+      return ['bollywood', 'lofi', 'punjabi'];
+    }
+  }, []);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistDesc, setNewPlaylistDesc] = useState('');
@@ -1959,9 +1968,13 @@ export default function StealthMusicPlayer({
                     onClick={onOpenProfile}
                     title="Profile & Settings"
                     aria-label="Profile and Settings"
-                    className="p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
+                    className="p-1 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer flex items-center justify-center"
                   >
-                    <User className="w-4 h-4 text-[#1ed760]" />
+                    {currentUser?.avatarUrl ? (
+                      <img src={currentUser.avatarUrl} alt="Avatar" className="w-5 h-5 rounded-full object-cover border border-[#1ed760]" />
+                    ) : (
+                      <User className="w-4 h-4 text-[#1ed760]" />
+                    )}
                   </button>
                 )}
 
@@ -2168,9 +2181,13 @@ export default function StealthMusicPlayer({
                   onClick={onOpenProfile}
                   title="Profile & Settings"
                   aria-label="Profile and Settings"
-                  className="p-1.5 sm:p-2 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer shrink-0"
+                  className="p-1 sm:p-1.5 text-[#b3b3b3] hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer shrink-0 flex items-center justify-center"
                 >
-                  <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1ed760]" />
+                  {currentUser?.avatarUrl ? (
+                    <img src={currentUser.avatarUrl} alt="Avatar" className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-[#1ed760]" />
+                  ) : (
+                    <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1ed760]" />
+                  )}
                 </button>
               )}
 
@@ -2311,6 +2328,37 @@ export default function StealthMusicPlayer({
               <Search className="w-3 h-3" />
               <span>Search{searchResults.length > 0 ? ` (${searchResults.length})` : ''}</span>
             </button>
+
+            {/* User Personalized Vibe Chips */}
+            {userVibes.map((vibeId) => {
+              const vibeLabels = {
+                bollywood: 'Bollywood',
+                lofi: 'Lo-Fi Chill',
+                punjabi: 'Punjabi',
+                pop: 'Pop Hits',
+                phonk: 'Phonk & EDM',
+                romantic: 'Romantic'
+              };
+              const label = vibeLabels[vibeId] || vibeId;
+              const isSelected = activeTab === 'search' && searchQuery.toLowerCase().includes(label.toLowerCase());
+              return (
+                <button
+                  key={vibeId}
+                  onClick={() => {
+                    setSearchQuery(`${label} Songs`);
+                    executeSearch(`${label} Songs`);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs transition cursor-pointer font-semibold whitespace-nowrap flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-[#1ed760] text-black shadow-md font-bold'
+                      : 'bg-[#242424] text-white hover:bg-[#2a2a2a]'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3 text-[#1ed760]" />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Main Scrollable Content */}

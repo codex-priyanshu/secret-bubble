@@ -745,6 +745,7 @@ app.post('/api/ai/persona', (req, res) => {
 
 const authLoginLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 30, keyPrefix: 'auth-login' });
 const authRegisterLimiter = createRateLimiter({ windowMs: 300000, maxRequests: 25, keyPrefix: 'auth-register' });
+const authOnboardLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 40, keyPrefix: 'auth-onboard' });
 const aiTestLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 20, keyPrefix: 'ai-test' });
 
 app.post('/api/ai/test', aiTestLimiter, async (req, res) => {
@@ -907,6 +908,88 @@ app.post('/api/auth/register', authRegisterLimiter, (req, res) => {
     user: safeUser,
     token
   });
+});
+
+app.post('/api/auth/quick-onboard', authOnboardLimiter, (req, res) => {
+  try {
+    const { name, username, avatarUrl, favoriteVibes, stealthPin } = req.body;
+    users = loadUsers();
+
+    let cleanName = sanitizeText(name ? name.trim() : '');
+    if (!cleanName) cleanName = 'Music Explorer';
+
+    let cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_]/g, '');
+    if (!cleanUsername || cleanUsername.length < 3) {
+      cleanUsername = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 15) || 'user';
+      if (cleanUsername.length < 3) cleanUsername += '_music';
+    }
+
+    // Ensure username uniqueness
+    let finalUsername = cleanUsername;
+    let suffix = 1;
+    while (users.some(u => (u.username || '').toLowerCase() === finalUsername.toLowerCase())) {
+      finalUsername = `${cleanUsername.slice(0, 18)}_${Math.floor(100 + Math.random() * 900)}`;
+      suffix++;
+      if (suffix > 20) break;
+    }
+
+    const colors = [
+      'from-purple-600 to-indigo-500',
+      'from-emerald-600 to-teal-500',
+      'from-rose-600 to-pink-500',
+      'from-amber-600 to-orange-500',
+      'from-cyan-600 to-blue-500'
+    ];
+    const avatarColor = colors[Math.floor(Math.random() * colors.length)];
+
+    const newUser = {
+      id: 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      username: finalUsername,
+      name: cleanName,
+      passwordHash: hashPassword(stealthPin || '1234'),
+      avatarColor,
+      avatarUrl: avatarUrl || null,
+      favoriteVibes: Array.isArray(favoriteVibes) ? favoriteVibes : [],
+      bio: '🎵 Music listener exploring Secret-Bubble',
+      musicPlayCount: 0,
+      messageCount: 0,
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+
+    const safeUser = {
+      id: newUser.id,
+      username: newUser.username,
+      name: newUser.name,
+      avatarColor: newUser.avatarColor,
+      avatarUrl: newUser.avatarUrl,
+      bio: newUser.bio,
+      favoriteVibes: newUser.favoriteVibes,
+      isOnline: true
+    };
+
+    io.emit('user_registered', safeUser);
+    const token = generateSessionToken(safeUser);
+
+    recordUserActivity({
+      userId: safeUser.id,
+      username: safeUser.name,
+      activityType: 'active',
+      meta: { onboarded: true }
+    });
+
+    res.json({
+      success: true,
+      user: safeUser,
+      token
+    });
+  } catch (err) {
+    console.error('Quick onboard error:', err);
+    res.status(500).json({ success: false, message: 'Onboarding failed' });
+  }
 });
 
 app.post('/api/auth/login', authLoginLimiter, (req, res) => {

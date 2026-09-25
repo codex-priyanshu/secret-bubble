@@ -19,6 +19,7 @@ const AiTrainingModal = lazy(() => import('./components/AiTrainingModal'));
 const CreateGroupModal = lazy(() => import('./components/CreateGroupModal'));
 const InstallAppModal = lazy(() => import('./components/InstallAppModal'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const WelcomeOnboardingModal = lazy(() => import('./components/WelcomeOnboardingModal'));
 
 const getBackendUrl = () => {
   if (import.meta.env?.VITE_BACKEND_URL) {
@@ -160,6 +161,16 @@ export default function App() {
 
   const [authToken, setAuthToken] = useState(() => {
     return localStorage.getItem('secure_chat_token') || null;
+  });
+
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      const user = localStorage.getItem('secure_chat_user');
+      const onboarded = localStorage.getItem('secret_bubble_onboarded');
+      return !user && !onboarded;
+    } catch {
+      return false;
+    }
   });
 
   const [users, setUsers] = useState([]);
@@ -819,6 +830,7 @@ export default function App() {
     return (
       <>
         <StealthMusicPlayer
+          currentUser={currentUser}
           secretPin={settings.stealthPin || '1234'}
           decoyPin={settings.decoyPin || '9999'}
           backendUrl={getBackendUrl()}
@@ -835,6 +847,15 @@ export default function App() {
           }}
         />
         <Suspense fallback={null}>
+          <WelcomeOnboardingModal
+            isOpen={showOnboarding}
+            onComplete={(user) => {
+              setCurrentUser(user);
+              setShowOnboarding(false);
+              fetchUsers();
+            }}
+            backendUrl={backendUrl}
+          />
           <InstallAppModal
             isOpen={showInstallModal}
             onClose={handleCloseInstallModal}
