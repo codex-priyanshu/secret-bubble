@@ -891,12 +891,21 @@ export default function App() {
           }}
           backendUrl={backendUrl}
           onOpenInstall={() => setShowInstallModal(true)}
+          onOpenAdmin={() => setShowAdminDashboard(true)}
         />
         <Suspense fallback={null}>
           <InstallAppModal
             isOpen={showInstallModal}
             onClose={handleCloseInstallModal}
             onInstalled={handleAppMarkedInstalled}
+          />
+          <AdminDashboard
+            isOpen={showAdminDashboard}
+            onClose={() => {
+              setShowAdminDashboard(false);
+              if (window.location.hash === '#admin') window.location.hash = '';
+            }}
+            backendUrl={backendUrl}
           />
         </Suspense>
       </>

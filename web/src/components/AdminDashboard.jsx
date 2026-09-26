@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Shield, Users, Activity, Music, MessageSquare, Radio, 
   Search, RefreshCw, X, Lock, CheckCircle2, AlertCircle, 
-  Clock, ArrowUpRight, TrendingUp, Sparkles, Filter, ShieldAlert
+  Clock, ArrowUpRight, TrendingUp, Sparkles, Filter, ShieldAlert,
+  Headphones
 } from 'lucide-react';
 
 export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
@@ -221,7 +222,7 @@ export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
                     type="password"
                     value={passkeyInput}
                     onChange={(e) => { setPasskeyInput(e.target.value); setAuthError(''); }}
-                    placeholder="Enter passkey (e.g. admin1234 or 0000)"
+                    placeholder="Enter master passkey"
                     autoFocus
                     className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-xl text-sm text-white placeholder-slate-500 text-center tracking-widest focus:outline-none transition shadow-inner font-mono"
                   />
@@ -241,18 +242,14 @@ export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
                   {authLoading ? 'Verifying...' : 'Unlock Admin Dashboard'}
                 </button>
               </form>
-
-              <p className="text-[10px] text-slate-500">
-                Default Master Passkey: <code className="text-slate-400 font-mono">admin1234</code> or <code className="text-slate-400 font-mono">0000</code>
-              </p>
             </div>
           </div>
         ) : (
           /* Dashboard Main View */
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
             
-            {/* Stat Cards Grid (5 core metrics) */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            {/* Stat Cards Grid (6 core metrics: Registered, Online, Active, Music, Guests, Chat) */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* Card 1: Total Users */}
               <div className="bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl relative overflow-hidden group hover:border-slate-700 transition">
                 <div className="flex items-center justify-between">
@@ -263,7 +260,7 @@ export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
                 </div>
                 <div className="mt-2.5">
                   <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                    {stats?.totalUsers ?? usersList.length}
+                    {stats?.totalUsers ?? usersList.filter(u => !u.isGuestSummary).length}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">Registered accounts</p>
                 </div>
@@ -298,34 +295,52 @@ export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
                 </div>
                 <div className="mt-2.5">
                   <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                    {stats?.activeToday ?? usersList.filter(u => u.status === 'active_today' || u.status === 'online').length}
+                    {(stats?.activeToday ?? 0) + (stats?.guestActiveToday ?? 0)}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    {stats?.inactiveUsers ?? Math.max(0, (stats?.totalUsers || usersList.length) - (stats?.activeToday || 0))} Inactive
+                    {stats?.activeToday ?? 0} reg + {stats?.guestActiveToday ?? 0} guests
                   </p>
                 </div>
               </div>
 
-              {/* Card 4: Daily Music Listeners */}
+              {/* Card 4: Daily Music Listeners (Registered) */}
               <div className="bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl relative overflow-hidden group hover:border-purple-500/40 transition">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">Music Users</span>
+                  <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">Reg. Music</span>
                   <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
                     <Music className="w-4 h-4" />
                   </div>
                 </div>
                 <div className="mt-2.5">
                   <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                    {stats?.dailyMusicUsers ?? usersList.filter(u => u.lastActivityType === 'music').length}
+                    {stats?.dailyMusicUsers ?? 0}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
-                    {stats?.dailyMusicPlays ?? 0} tracks played today
+                    {stats?.dailyMusicPlays ?? 0} tracks played
                   </p>
                 </div>
               </div>
 
-              {/* Card 5: Daily Chat Users */}
-              <div className="col-span-2 lg:col-span-1 bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl relative overflow-hidden group hover:border-indigo-500/40 transition">
+              {/* Card 5: Guest Listeners (Anonymous) */}
+              <div className="bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl relative overflow-hidden group hover:border-amber-500/40 transition">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Guest Music</span>
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                    <Headphones className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="mt-2.5">
+                  <p className="text-2xl sm:text-3xl font-extrabold text-amber-300 tracking-tight">
+                    {stats?.guestMusicUsers ?? 0}
+                  </p>
+                  <p className="text-[10px] text-amber-400/80 mt-0.5">
+                    {stats?.guestMusicPlays ?? 0} guest plays
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 6: Daily Chat Users */}
+              <div className="bg-slate-950/70 border border-slate-800/80 p-4 rounded-2xl relative overflow-hidden group hover:border-indigo-500/40 transition">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">Chat Users</span>
                   <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
@@ -334,7 +349,7 @@ export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
                 </div>
                 <div className="mt-2.5">
                   <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                    {stats?.dailyChatUsers ?? usersList.filter(u => u.lastActivityType === 'chat').length}
+                    {stats?.dailyChatUsers ?? 0}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">
                     {stats?.dailyMessages ?? 0} messages today
@@ -444,7 +459,11 @@ export default function AdminDashboard({ isOpen, onClose, backendUrl = '' }) {
                           {/* User Avatar & Name */}
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
-                              {u.avatarUrl ? (
+                              {u.isGuestSummary ? (
+                                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0 border border-amber-500/30 shadow">
+                                  <Headphones className="w-4 h-4" />
+                                </div>
+                              ) : u.avatarUrl ? (
                                 <img src={u.avatarUrl} alt={u.name} className="w-8 h-8 rounded-full object-cover shrink-0 border border-slate-700" />
                               ) : (
                                 <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${u.avatarColor || 'from-purple-600 to-indigo-500'} flex items-center justify-center font-bold text-white text-xs shrink-0 shadow`}>

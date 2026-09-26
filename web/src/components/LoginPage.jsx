@@ -9,7 +9,7 @@ const PRESET_AVATARS = [
   'https://api.dicebear.com/7.x/bottts/svg?seed=Sam'
 ];
 
-export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall }) {
+export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall, onOpenAdmin }) {
   const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState(() => {
     try {
@@ -121,6 +121,16 @@ export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall })
     setLoading(true);
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
 
+    // Stealth Admin Dashboard Trigger: if admin credentials are submitted in standard login
+    if (!isRegister && cleanUser === 'admin' && (password.trim() === 'admin1234' || password.trim() === '0000')) {
+      sessionStorage.setItem('secret_bubble_admin_auth', 'true');
+      if (onOpenAdmin) {
+        onOpenAdmin();
+        setLoading(false);
+        return;
+      }
+    }
+
     let savedAccount = null;
     try {
       const saved = localStorage.getItem('secret_bubble_saved_account');
@@ -138,6 +148,15 @@ export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall })
         body: JSON.stringify(payload)
       });
       const data = await res.json();
+
+      if (data.isAdmin) {
+        sessionStorage.setItem('secret_bubble_admin_auth', 'true');
+        if (onOpenAdmin) {
+          onOpenAdmin();
+          setLoading(false);
+          return;
+        }
+      }
 
       if (!res.ok || !data.success) {
         if (data.notFound) {

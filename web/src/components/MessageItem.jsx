@@ -267,7 +267,7 @@ export default function MessageItem({
               isMe ? 'text-purple-200/80' : 'text-slate-400'
             }`}>
               <span className="text-[9px] opacity-70">
-                {message.passcodeHint ? `💡 Hint: ${message.passcodeHint}` : '🔒 Password Protected'}
+                🔒 Passcode Protected
               </span>
               <div className="flex items-center gap-2">
                 {message.selfDestructSecs && (
@@ -326,11 +326,6 @@ export default function MessageItem({
                   </span>
                 )}
               </div>
-              {message.passcodeHint && (
-                <span className="text-[10px] text-amber-200/90 mt-1 font-mono">
-                  💡 Hint: {message.passcodeHint}
-                </span>
-              )}
             </div>
 
             {/* Sender Quick View & Footer */}
@@ -395,11 +390,6 @@ export default function MessageItem({
               <p className="text-slate-400">Enter the password set by the sender to read this message.</p>
             </div>
 
-            {message.passcodeHint && (
-              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-2">
-                <span>💡 <strong>Hint:</strong> {message.passcodeHint}</span>
-              </div>
-            )}
 
             {passcodeError && (
               <div className="p-2.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-2 animate-shake">

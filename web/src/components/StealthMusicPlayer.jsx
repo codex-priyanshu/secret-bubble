@@ -911,16 +911,51 @@ export default function StealthMusicPlayer({
 
       const userStr = localStorage.getItem('secure_chat_user');
       const u = userStr ? JSON.parse(userStr) : null;
+      let anonId = localStorage.getItem('secret_bubble_anon_id');
+      if (!anonId) {
+        anonId = 'guest_' + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem('secret_bubble_anon_id', anonId);
+      }
+      const isGuest = !u || !u.id;
+
       const apiBase = getBackendApiUrl();
       if (apiBase) {
         fetch(`${apiBase}/api/analytics/activity`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: u?.id,
-            username: u?.name || u?.username || 'Guest',
+            userId: isGuest ? anonId : u.id,
+            username: isGuest ? 'Anonymous Guest' : (u.name || u.username),
+            isGuest: isGuest,
             activityType: 'music',
             trackTitle: track?.title || 'Unknown Track'
+          })
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  }, [getBackendApiUrl]);
+
+  // Ping active presence so even non-streaming visitors are recorded
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem('secure_chat_user');
+      const u = userStr ? JSON.parse(userStr) : null;
+      let anonId = localStorage.getItem('secret_bubble_anon_id');
+      if (!anonId) {
+        anonId = 'guest_' + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem('secret_bubble_anon_id', anonId);
+      }
+      const isGuest = !u || !u.id;
+      const apiBase = getBackendApiUrl();
+      if (apiBase) {
+        fetch(`${apiBase}/api/analytics/activity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: isGuest ? anonId : u.id,
+            username: isGuest ? 'Anonymous Guest' : (u.name || u.username),
+            isGuest: isGuest,
+            activityType: 'active'
           })
         }).catch(() => {});
       }
@@ -1990,16 +2025,6 @@ export default function StealthMusicPlayer({
                   </button>
                 )}
 
-                {onOpenAdmin && (
-                  <button
-                    onClick={onOpenAdmin}
-                    title="Admin Dashboard"
-                    aria-label="Admin Dashboard"
-                    className="p-1.5 text-[#b3b3b3] hover:text-[#1ed760] rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer"
-                  >
-                    <Shield className="w-4 h-4" />
-                  </button>
-                )}
 
                 <button
                   onClick={handleEqualizerClick}
@@ -2203,16 +2228,6 @@ export default function StealthMusicPlayer({
                 </button>
               )}
 
-              {onOpenAdmin && (
-                <button
-                  onClick={onOpenAdmin}
-                  title="Admin Dashboard"
-                  aria-label="Admin Dashboard"
-                  className="p-1.5 sm:p-2 text-[#b3b3b3] hover:text-[#1ed760] rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer shrink-0"
-                >
-                  <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
-              )}
 
               {currentTrack.isYoutube && (
                 <button

@@ -128,7 +128,7 @@ export default function UserSidebar({
                   </button>
                 )}
 
-                {onOpenAdmin && (
+                {Boolean(typeof window !== 'undefined' && sessionStorage.getItem('secret_bubble_admin_auth') === 'true') && onOpenAdmin && (
                   <button
                     onClick={() => { setIsMenuOpen(false); onOpenAdmin(); }}
                     className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-emerald-300 hover:text-white flex items-center gap-2.5 transition"
