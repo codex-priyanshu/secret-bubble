@@ -104,28 +104,32 @@ export default function App() {
   const checkAppInstalledStatus = () => {
     try {
       if (typeof window === 'undefined') return false;
-      // 1. Stored installation / download flags
+      // 1. Native Capacitor / Android APK environment (Foolproof detection via native Android interface & custom user agent)
       if (
-        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
-        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
-        localStorage.getItem('secret_bubble_app_downloaded') === 'true'
-      ) {
-        return true;
-      }
-      // 2. Native Capacitor Android App environment
-      if (
+        Boolean(window.AndroidNativeMedia) ||
+        Boolean(window.SecretBubbleNative) ||
         Boolean(window.Capacitor?.isNativePlatform?.()) ||
         Boolean(window.Capacitor) ||
         window.location?.protocol === 'capacitor:' ||
         (window.location?.hostname === 'localhost' && !window.location?.port && !window.location?.host?.includes(':')) ||
         (window.navigator?.userAgent && (
-          window.navigator.userAgent.includes('Capacitor') ||
-          window.navigator.userAgent.includes('SecretBubbleApp')
+          window.navigator.userAgent.includes('SecretBubbleApp') ||
+          window.navigator.userAgent.includes('NativeAPK') ||
+          window.navigator.userAgent.includes('Capacitor')
         ))
       ) {
         try {
           localStorage.setItem('secret_bubble_app_installed', 'true');
+          localStorage.setItem('secret_bubble_apk_downloaded', 'true');
         } catch {}
+        return true;
+      }
+      // 2. Stored installation / download flags in localStorage
+      if (
+        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+        localStorage.getItem('secret_bubble_app_downloaded') === 'true'
+      ) {
         return true;
       }
       // 3. Standalone PWA / Web APK / Fullscreen display mode
@@ -141,6 +145,7 @@ export default function App() {
       ) {
         try {
           localStorage.setItem('secret_bubble_app_installed', 'true');
+          localStorage.setItem('secret_bubble_apk_downloaded', 'true');
         } catch {}
         return true;
       }
@@ -156,13 +161,21 @@ export default function App() {
   const [showInstallModal, setShowInstallModal] = useState(false);
 
   useEffect(() => {
-    // If detected as installed, persist flag
-    if (checkAppInstalledStatus()) {
-      setIsAppInstalled(true);
-      try {
-        localStorage.setItem('secret_bubble_app_installed', 'true');
-      } catch {}
-    }
+    // Multi-phase check to capture Android JS bridge even if injected slightly after initial render
+    const syncStatus = () => {
+      if (checkAppInstalledStatus()) {
+        setIsAppInstalled(true);
+        try {
+          localStorage.setItem('secret_bubble_app_installed', 'true');
+          localStorage.setItem('secret_bubble_apk_downloaded', 'true');
+        } catch {}
+      }
+    };
+
+    syncStatus();
+    const t1 = setTimeout(syncStatus, 150);
+    const t2 = setTimeout(syncStatus, 600);
+    const t3 = setTimeout(syncStatus, 1500);
 
     const handleAppInstalled = () => {
       try {
@@ -190,6 +203,9 @@ export default function App() {
     window.addEventListener('secret_bubble_installed', handleCustomInstallEvent);
 
     return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       window.removeEventListener('appinstalled', handleAppInstalled);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('secret_bubble_installed', handleCustomInstallEvent);

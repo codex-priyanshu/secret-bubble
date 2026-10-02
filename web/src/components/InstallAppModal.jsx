@@ -9,10 +9,18 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
     try {
       if (typeof window === 'undefined') return false;
       return (
-        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
-        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+        Boolean(window.AndroidNativeMedia) ||
+        Boolean(window.SecretBubbleNative) ||
         Boolean(window.Capacitor?.isNativePlatform?.()) ||
         Boolean(window.Capacitor) ||
+        (window.navigator?.userAgent && (
+          window.navigator.userAgent.includes('SecretBubbleApp') ||
+          window.navigator.userAgent.includes('NativeAPK') ||
+          window.navigator.userAgent.includes('Capacitor')
+        )) ||
+        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+        localStorage.getItem('secret_bubble_app_downloaded') === 'true' ||
         window.location?.protocol === 'capacitor:' ||
         (window.location?.hostname === 'localhost' && !window.location?.port && !window.location?.host?.includes(':')) ||
         (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -30,10 +38,18 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
     // Check if app is already running in standalone mode or marked installed
     try {
       const standalone =
-        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
-        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+        Boolean(window.AndroidNativeMedia) ||
+        Boolean(window.SecretBubbleNative) ||
         Boolean(window.Capacitor?.isNativePlatform?.()) ||
         Boolean(window.Capacitor) ||
+        (window.navigator?.userAgent && (
+          window.navigator.userAgent.includes('SecretBubbleApp') ||
+          window.navigator.userAgent.includes('NativeAPK') ||
+          window.navigator.userAgent.includes('Capacitor')
+        )) ||
+        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+        localStorage.getItem('secret_bubble_app_downloaded') === 'true' ||
         window.location?.protocol === 'capacitor:' ||
         (window.location?.hostname === 'localhost' && !window.location?.port && !window.location?.host?.includes(':')) ||
         (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
@@ -46,6 +62,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
         setIsInstalled(true);
         try {
           localStorage.setItem('secret_bubble_app_installed', 'true');
+          localStorage.setItem('secret_bubble_apk_downloaded', 'true');
         } catch {}
         return;
       }
@@ -83,7 +100,7 @@ export default function InstallAppModal({ isOpen, onClose, onInstalled }) {
     };
   }, [onClose, onInstalled]);
 
-  if (!isOpen) return null;
+  if (!isOpen || isInstalled) return null;
 
   const markAlreadyInstalled = () => {
     try {

@@ -25,6 +25,24 @@ export default function UserSidebar({
   const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'direct', 'channels', 'bots'
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Guard against showing install/download option if already running natively or installed
+  const isAppActuallyInstalled = typeof window !== 'undefined' && (
+    Boolean(window.AndroidNativeMedia) ||
+    Boolean(window.SecretBubbleNative) ||
+    Boolean(window.Capacitor?.isNativePlatform?.()) ||
+    Boolean(window.Capacitor) ||
+    (window.navigator?.userAgent && (
+      window.navigator.userAgent.includes('SecretBubbleApp') ||
+      window.navigator.userAgent.includes('NativeAPK') ||
+      window.navigator.userAgent.includes('Capacitor')
+    )) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    (window.navigator && window.navigator.standalone === true) ||
+    localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+    localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+    localStorage.getItem('secret_bubble_app_downloaded') === 'true'
+  );
+
   // Separate Meta AI Bot, Public Channel, and real users
   const metaAiBot = users.find(u => u.id === 'user-meta-ai' || u.isBot);
   const realUsers = users.filter(u => u.id !== currentUser?.id && u.id !== 'user-meta-ai' && !u.isBot);
@@ -118,7 +136,7 @@ export default function UserSidebar({
                   <span>Privacy & AI Shield</span>
                 </button>
 
-                {onOpenInstall && (
+                {onOpenInstall && !isAppActuallyInstalled && (
                   <button
                     onClick={() => { setIsMenuOpen(false); onOpenInstall(); }}
                     className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-emerald-300 hover:text-white flex items-center gap-2.5 transition"

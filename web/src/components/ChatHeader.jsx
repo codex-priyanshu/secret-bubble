@@ -19,6 +19,24 @@ export default function ChatHeader({
 }) {
   const isMetaAi = target?.id === 'user-meta-ai' || target?.isBot;
 
+  // Guard against showing install/download option if already running natively or installed
+  const isAppActuallyInstalled = typeof window !== 'undefined' && (
+    Boolean(window.AndroidNativeMedia) ||
+    Boolean(window.SecretBubbleNative) ||
+    Boolean(window.Capacitor?.isNativePlatform?.()) ||
+    Boolean(window.Capacitor) ||
+    (window.navigator?.userAgent && (
+      window.navigator.userAgent.includes('SecretBubbleApp') ||
+      window.navigator.userAgent.includes('NativeAPK') ||
+      window.navigator.userAgent.includes('Capacitor')
+    )) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    (window.navigator && window.navigator.standalone === true) ||
+    localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+    localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+    localStorage.getItem('secret_bubble_app_downloaded') === 'true'
+  );
+
   return (
     <header className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 bg-slate-900/95 border-b border-slate-800/80 flex items-center justify-between gap-3 sticky top-0 z-20 backdrop-blur-xl select-none font-sans">
       
@@ -146,7 +164,7 @@ export default function ChatHeader({
         )}
 
         {/* Install / Download App Button */}
-        {onOpenInstall && (
+        {onOpenInstall && !isAppActuallyInstalled && (
           <button
             onClick={onOpenInstall}
             className="p-2 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-emerald-200 border border-emerald-800/60 rounded-xl transition shadow-sm"

@@ -37,6 +37,24 @@ export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall, o
   const [notFoundUser, setNotFoundUser] = useState('');
   const fileInputRef = useRef(null);
 
+  // Guard against showing install/download option if already running natively or installed
+  const isAppActuallyInstalled = typeof window !== 'undefined' && (
+    Boolean(window.AndroidNativeMedia) ||
+    Boolean(window.SecretBubbleNative) ||
+    Boolean(window.Capacitor?.isNativePlatform?.()) ||
+    Boolean(window.Capacitor) ||
+    (window.navigator?.userAgent && (
+      window.navigator.userAgent.includes('SecretBubbleApp') ||
+      window.navigator.userAgent.includes('NativeAPK') ||
+      window.navigator.userAgent.includes('Capacitor')
+    )) ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    (window.navigator && window.navigator.standalone === true) ||
+    localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+    localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+    localStorage.getItem('secret_bubble_app_downloaded') === 'true'
+  );
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -408,7 +426,7 @@ export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall, o
         </form>
 
         {/* Download Android APK / Install App Button */}
-        {onOpenInstall && (
+        {onOpenInstall && !isAppActuallyInstalled && (
           <button
             type="button"
             onClick={onOpenInstall}

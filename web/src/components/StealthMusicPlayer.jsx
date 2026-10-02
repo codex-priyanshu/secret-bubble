@@ -526,6 +526,31 @@ export default function StealthMusicPlayer({
     }
   });
 
+  // Guard against showing install/download option if already running natively or installed
+  const isAppActuallyInstalled = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      Boolean(window.AndroidNativeMedia) ||
+      Boolean(window.SecretBubbleNative) ||
+      Boolean(window.Capacitor?.isNativePlatform?.()) ||
+      Boolean(window.Capacitor) ||
+      (window.navigator?.userAgent && (
+        window.navigator.userAgent.includes('SecretBubbleApp') ||
+        window.navigator.userAgent.includes('NativeAPK') ||
+        window.navigator.userAgent.includes('Capacitor')
+      )) ||
+      (window.matchMedia && (
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: minimal-ui)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches
+      )) ||
+      (window.navigator && window.navigator.standalone === true) ||
+      localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+      localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+      localStorage.getItem('secret_bubble_app_downloaded') === 'true'
+    );
+  }, []);
+
   const recordTrackToHistory = useCallback((track) => {
     if (!track || !track.title) return;
     setListeningHistory(prev => {
@@ -2782,7 +2807,7 @@ export default function StealthMusicPlayer({
                   </button>
                 )}
 
-                {onOpenInstall && (
+                {onOpenInstall && !isAppActuallyInstalled && (
                   <button
                     onClick={onOpenInstall}
                     title="Install Secret-Bubble App"
@@ -2985,7 +3010,7 @@ export default function StealthMusicPlayer({
                 </button>
               )}
 
-              {onOpenInstall && (
+              {onOpenInstall && !isAppActuallyInstalled && (
                 <button
                   onClick={onOpenInstall}
                   title="Install Secret-Bubble App"
