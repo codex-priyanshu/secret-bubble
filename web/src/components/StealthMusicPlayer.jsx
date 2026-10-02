@@ -420,14 +420,18 @@ export default function StealthMusicPlayer({
     return FEATURED_ONLINE_TRACKS;
   });
 
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(() => {
+  // Dedicated state for active / now playing track (strictly preserved across feed rotations & app restarts)
+  const [currentTrack, setCurrentTrack] = useState(() => {
     try {
       const rawTrack = localStorage.getItem('secret_bubble_last_track');
       if (rawTrack) {
-        return 0; // Last played track restored at top index
+        const parsed = JSON.parse(rawTrack);
+        if (parsed && (parsed.title || parsed.url || parsed.youtubeId)) {
+          return parsed;
+        }
       }
     } catch {}
-    return 0;
+    return FEATURED_ONLINE_TRACKS[0];
   });
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -739,7 +743,11 @@ export default function StealthMusicPlayer({
   const [canvasSlotRect, setCanvasSlotRect] = useState(null);
   const modalVideoIframeRef = useRef(null);
 
-  const currentTrack = tracks[currentTrackIndex] || tracks[0];
+  const currentTrackIndex = useMemo(() => {
+    if (!tracks || tracks.length === 0 || !currentTrack) return 0;
+    const idx = tracks.findIndex(t => t.id === currentTrack.id || (t.title === currentTrack.title && t.artist === currentTrack.artist));
+    return idx !== -1 ? idx : 0;
+  }, [tracks, currentTrack]);
 
   // Track bounding rectangle of center-stage video canvas slot for seamless YouTube positioning
   useEffect(() => {
@@ -797,41 +805,65 @@ export default function StealthMusicPlayer({
 
   // Helper for Next/Previous tracks
   const handleNextTrack = useCallback(() => {
+    if (!tracks || tracks.length === 0) return;
+    let nextIndex = 0;
+    const currentIdx = tracks.findIndex(t => t.id === currentTrack?.id || (t.title === currentTrack?.title && t.artist === currentTrack?.artist));
     if (isShuffle && tracks.length > 1) {
-      let nextIndex = Math.floor(Math.random() * tracks.length);
-      while (nextIndex === currentTrackIndex) {
+      nextIndex = Math.floor(Math.random() * tracks.length);
+      while (nextIndex === currentIdx && tracks.length > 1) {
         nextIndex = Math.floor(Math.random() * tracks.length);
       }
-      setCurrentTrackIndex(nextIndex);
+    } else if (currentIdx !== -1) {
+      nextIndex = (currentIdx + 1) % tracks.length;
     } else {
-      setCurrentTrackIndex(i => (i + 1) % tracks.length);
+      nextIndex = 0;
     }
-    setCurrentTime(0);
-  }, [isShuffle, tracks.length, currentTrackIndex]);
+    const nextTrack = tracks[nextIndex] || tracks[0];
+    if (nextTrack) {
+      setCurrentTrack(nextTrack);
+      setCurrentTime(0);
+      setIsPlaying(true);
+    }
+  }, [tracks, currentTrack, isShuffle]);
 
   const handlePrevTrack = useCallback(() => {
-    setCurrentTrackIndex(i => (i - 1 + tracks.length) % tracks.length);
-    setCurrentTime(0);
-  }, [tracks.length]);
+    if (!tracks || tracks.length === 0) return;
+    const currentIdx = tracks.findIndex(t => t.id === currentTrack?.id || (t.title === currentTrack?.title && t.artist === currentTrack?.artist));
+    let prevIndex = 0;
+    if (currentIdx !== -1) {
+      prevIndex = (currentIdx - 1 + tracks.length) % tracks.length;
+    } else {
+      prevIndex = tracks.length - 1;
+    }
+    const prevTrack = tracks[prevIndex] || tracks[0];
+    if (prevTrack) {
+      setCurrentTrack(prevTrack);
+      setCurrentTime(0);
+      setIsPlaying(true);
+    }
+  }, [tracks, currentTrack]);
 
   // Update track duration when switching (preserve initial session timestamp on first mount)
   useEffect(() => {
     if (isFirstMountRef.current) {
       isFirstMountRef.current = false;
-      setDuration(currentTrack.duration || 220);
+      setDuration(currentTrack?.duration || 220);
       return;
     }
     setCurrentTime(0);
-    setDuration(currentTrack.duration || 220);
-  }, [currentTrackIndex, currentTrack]);
-
-  // Persist current track to local storage
-  useEffect(() => {
-    if (!currentTrack) return;
-    try {
-      localStorage.setItem('secret_bubble_last_track', JSON.stringify(currentTrack));
-    } catch {}
+    setDuration(currentTrack?.duration || 220);
   }, [currentTrack]);
+
+  // Persist current track to local storage whenever a track is selected or played
+  useEffect(() => {
+    if (!currentTrack || !currentTrack.title) return;
+    const hadPrevious = Boolean(localStorage.getItem('secret_bubble_last_track'));
+    if (isPlaying || hadPrevious) {
+      try {
+        localStorage.setItem('secret_bubble_last_track', JSON.stringify(currentTrack));
+      } catch {}
+    }
+  }, [currentTrack, isPlaying]);
 
   // Record playing track to listening history
   useEffect(() => {
@@ -1528,6 +1560,9 @@ export default function StealthMusicPlayer({
     setIsPlaying(nextPlay);
     if (nextPlay) {
       logMusicTelemetry(currentTrack);
+      if (currentTime > 0 && audioRef.current && audioRef.current.currentTime === 0) {
+        audioRef.current.currentTime = currentTime;
+      }
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission().catch(() => {});
       }
@@ -1890,14 +1925,12 @@ export default function StealthMusicPlayer({
   };
 
   const playTrackNow = (track) => {
+    if (!track) return;
     logMusicTelemetry(track);
+    setCurrentTrack(track);
     setTracks(prev => {
-      const idx = prev.findIndex(t => t.id === track.id);
-      if (idx !== -1) {
-        setCurrentTrackIndex(idx);
-        return prev;
-      }
-      setCurrentTrackIndex(0);
+      const idx = prev.findIndex(t => t.id === track.id || (t.title === track.title && t.artist === track.artist));
+      if (idx !== -1) return prev;
       return [track, ...prev];
     });
     setIsPlaying(true);
@@ -1909,13 +1942,10 @@ export default function StealthMusicPlayer({
     const seekSeconds = savedSession.time || 0;
 
     logMusicTelemetry(t);
+    setCurrentTrack(t);
     setTracks(prev => {
-      const idx = prev.findIndex(x => x.id === t.id);
-      if (idx !== -1) {
-        setCurrentTrackIndex(idx);
-        return prev;
-      }
-      setCurrentTrackIndex(0);
+      const idx = prev.findIndex(x => x.id === t.id || (x.title === t.title && x.artist === t.artist));
+      if (idx !== -1) return prev;
       return [t, ...prev];
     });
 
@@ -1944,13 +1974,10 @@ export default function StealthMusicPlayer({
     if (!savedSession?.track) return;
     const t = savedSession.track;
     logMusicTelemetry(t);
+    setCurrentTrack(t);
     setTracks(prev => {
-      const idx = prev.findIndex(x => x.id === t.id);
-      if (idx !== -1) {
-        setCurrentTrackIndex(idx);
-        return prev;
-      }
-      setCurrentTrackIndex(0);
+      const idx = prev.findIndex(x => x.id === t.id || (x.title === t.title && x.artist === t.artist));
+      if (idx !== -1) return prev;
       return [t, ...prev];
     });
 
@@ -1997,7 +2024,10 @@ export default function StealthMusicPlayer({
     });
 
     setTracks(prev => [...newTracks, ...prev]);
-    setCurrentTrackIndex(0);
+    if (newTracks[0]) {
+      setCurrentTrack(newTracks[0]);
+      setCurrentTime(0);
+    }
     setIsPlaying(true);
   };
 
@@ -2116,8 +2146,12 @@ export default function StealthMusicPlayer({
     if (!playlistSongs || playlistSongs.length === 0) return;
 
     setTracks(playlistSongs);
-    setCurrentTrackIndex(0);
-    setIsPlaying(true);
+    if (playlistSongs[0]) {
+      logMusicTelemetry(playlistSongs[0]);
+      setCurrentTrack(playlistSongs[0]);
+      setCurrentTime(0);
+      setIsPlaying(true);
+    }
   };
 
   // Handle YouTube Playlist Import
@@ -2209,9 +2243,15 @@ export default function StealthMusicPlayer({
             const newOnly = fresh.filter(t => !existingIds.has(t.id));
             return newOnly.length > 0 ? [...newOnly, ...prev] : prev;
           });
-          if (replace) {
-            setCurrentTrackIndex(0);
-          }
+
+          // Only default currentTrack to first item on very first install when user has NEVER played any track
+          try {
+            const hasSavedTrack = localStorage.getItem('secret_bubble_last_track');
+            if (!hasSavedTrack && fresh[0]) {
+              setCurrentTrack(fresh[0]);
+            }
+          } catch {}
+
           setFeedPage(1);
         }
       }
@@ -3531,15 +3571,14 @@ export default function StealthMusicPlayer({
                   {/* Track Rows */}
                   <div className="divide-y divide-transparent mt-1 space-y-0.5">
                     {tracks.map((track, idx) => {
-                      const isCurrent = idx === currentTrackIndex;
+                      const isCurrent = currentTrack && (track.id === currentTrack.id || (track.title === currentTrack.title && track.artist === currentTrack.artist));
                       const isTrackLiked = likedSongIds.includes(track.id);
 
                       return (
                         <div
                           key={track.id || idx}
                           onClick={() => {
-                            setCurrentTrackIndex(idx);
-                            setIsPlaying(true);
+                            playTrackNow(track);
                           }}
                           className={`grid grid-cols-12 items-center px-3 py-2 rounded-md transition cursor-pointer group ${
                             isCurrent
