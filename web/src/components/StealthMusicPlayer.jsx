@@ -2847,6 +2847,17 @@ export default function StealthMusicPlayer({
                   </button>
                 )}
 
+                {onOpenAdmin && (
+                  <button
+                    onClick={onOpenAdmin}
+                    title="Admin Dashboard & Growth Reports"
+                    aria-label="Admin Dashboard"
+                    className="p-1 text-emerald-400 hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer flex items-center justify-center"
+                  >
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                  </button>
+                )}
+
                 {onOpenInstall && !isAppActuallyInstalled && (
                   <button
                     onClick={onOpenInstall}
@@ -3047,6 +3058,17 @@ export default function StealthMusicPlayer({
                   ) : (
                     <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1ed760]" />
                   )}
+                </button>
+              )}
+
+              {onOpenAdmin && (
+                <button
+                  onClick={onOpenAdmin}
+                  title="Admin Dashboard & Growth Reports"
+                  aria-label="Admin Dashboard"
+                  className="p-1 sm:p-1.5 text-emerald-400 hover:text-white rounded-full hover:bg-[#242424] transition active:scale-95 cursor-pointer shrink-0 flex items-center justify-center"
+                >
+                  <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
                 </button>
               )}
 

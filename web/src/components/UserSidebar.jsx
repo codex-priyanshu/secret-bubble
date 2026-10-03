@@ -148,10 +148,10 @@ export default function UserSidebar({
                   </button>
                 )}
 
-                {Boolean(typeof window !== 'undefined' && sessionStorage.getItem('secret_bubble_admin_auth') === 'true') && onOpenAdmin && (
+                {onOpenAdmin && (
                   <button
                     onClick={() => { setIsMenuOpen(false); onOpenAdmin(); }}
-                    className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-emerald-300 hover:text-white flex items-center gap-2.5 transition"
+                    className="w-full p-2 text-left rounded-xl hover:bg-slate-800 text-emerald-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer"
                   >
                     <Shield className="w-4 h-4 text-emerald-400" />
                     <span className="font-semibold">Admin Dashboard</span>

@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { Shield, Lock, Globe, EyeOff, Bot, Sparkles } from 'lucide-react';
 import StealthMusicPlayer from './components/StealthMusicPlayer';
 import LoginPage from './components/LoginPage';
+import AdminDashboard from './components/AdminDashboard';
 import { useBiometrics } from './hooks/useBiometrics';
 import { decryptE2EE, isE2EEEncrypted } from './utils/e2eeCrypto';
 
@@ -18,7 +19,6 @@ const AppLockModal = lazy(() => import('./components/AppLockModal'));
 const AiTrainingModal = lazy(() => import('./components/AiTrainingModal'));
 const CreateGroupModal = lazy(() => import('./components/CreateGroupModal'));
 const InstallAppModal = lazy(() => import('./components/InstallAppModal'));
-const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const WelcomeOnboardingModal = lazy(() => import('./components/WelcomeOnboardingModal'));
 
 const getBackendUrl = () => {
@@ -317,20 +317,49 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(() => {
     try {
-      return typeof window !== 'undefined' && window.location.hash === '#admin';
+      if (typeof window === 'undefined') return false;
+      return (
+        window.location.hash === '#admin' ||
+        window.location.pathname === '/admin' ||
+        window.location.pathname === '/admin/' ||
+        window.location.search.includes('admin=true')
+      );
     } catch {
       return false;
     }
   });
 
-  useEffect(() => {
-    const handleHash = () => {
+  const handleCloseAdminDashboard = useCallback(() => {
+    setShowAdminDashboard(false);
+    try {
       if (window.location.hash === '#admin') {
-        setShowAdminDashboard(true);
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
+      if (window.location.pathname === '/admin' || window.location.pathname === '/admin/') {
+        window.history.replaceState(null, '', '/' + window.location.search);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handleUrlCheck = () => {
+      try {
+        if (
+          window.location.hash === '#admin' ||
+          window.location.pathname === '/admin' ||
+          window.location.pathname === '/admin/' ||
+          window.location.search.includes('admin=true')
+        ) {
+          setShowAdminDashboard(true);
+        }
+      } catch {}
     };
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+    window.addEventListener('hashchange', handleUrlCheck);
+    window.addEventListener('popstate', handleUrlCheck);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlCheck);
+      window.removeEventListener('popstate', handleUrlCheck);
+    };
   }, []);
 
   const [isAiTrainingOpen, setIsAiTrainingOpen] = useState(false);
@@ -1060,13 +1089,11 @@ export default function App() {
             currentUser={currentUser || { name: 'Music Guest', username: 'guest', id: 'guest' }}
             onUpdateProfile={handleUpdateProfile}
             backendUrl={backendUrl}
+            onOpenAdmin={() => setShowAdminDashboard(true)}
           />
           <AdminDashboard
             isOpen={showAdminDashboard}
-            onClose={() => {
-              setShowAdminDashboard(false);
-              if (window.location.hash === '#admin') window.location.hash = '';
-            }}
+            onClose={handleCloseAdminDashboard}
             backendUrl={backendUrl}
           />
         </Suspense>
@@ -1094,10 +1121,7 @@ export default function App() {
           />
           <AdminDashboard
             isOpen={showAdminDashboard}
-            onClose={() => {
-              setShowAdminDashboard(false);
-              if (window.location.hash === '#admin') window.location.hash = '';
-            }}
+            onClose={handleCloseAdminDashboard}
             backendUrl={backendUrl}
           />
         </Suspense>
@@ -1194,6 +1218,7 @@ export default function App() {
             onOpenAiTraining={() => setIsAiTrainingOpen(true)}
             onLockApp={() => setIsAppLocked(true)}
             onOpenInstall={openInstallHandler}
+            onOpenAdmin={() => setShowAdminDashboard(true)}
             onToggleStealth={() => {
               setIsStealthMode(true);
               try {
@@ -1291,6 +1316,7 @@ export default function App() {
         currentUser={currentUser}
         onUpdateProfile={handleUpdateProfile}
         backendUrl={backendUrl}
+        onOpenAdmin={() => setShowAdminDashboard(true)}
       />
 
       {/* Privacy Settings Modal */}
@@ -1329,10 +1355,7 @@ export default function App() {
         {/* Admin Telemetry & Real-Time Dashboard */}
         <AdminDashboard
           isOpen={showAdminDashboard}
-          onClose={() => {
-            setShowAdminDashboard(false);
-            if (window.location.hash === '#admin') window.location.hash = '';
-          }}
+          onClose={handleCloseAdminDashboard}
           backendUrl={backendUrl}
         />
       </Suspense>

@@ -443,6 +443,19 @@ export default function LoginPage({ onLoginSuccess, backendUrl, onOpenInstall, o
           <span>Biometric Protection • No Phone Number Required</span>
         </div>
 
+        {onOpenAdmin && (
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={onOpenAdmin}
+              className="text-[11px] text-slate-500 hover:text-emerald-400 transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+            >
+              <Shield className="w-3 h-3 text-emerald-500/70" />
+              <span>Admin Portal & Growth Stats</span>
+            </button>
+          </div>
+        )}
+
       </div>
     </div>
   );

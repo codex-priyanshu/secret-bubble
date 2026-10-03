@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Headphones, Download } from 'lucide-react';
+import { ShieldCheck, Shield, Lock, Settings, Menu, Globe, User, Bot, Sparkles, CheckCheck, MoreVertical, Flame, Brain, Users, Headphones, Download } from 'lucide-react';
 
 export default function ChatHeader({
   target,
@@ -15,7 +15,8 @@ export default function ChatHeader({
   onToggleStealth,
   isDecoyActive,
   onExitDecoy,
-  onOpenInstall
+  onOpenInstall,
+  onOpenAdmin
 }) {
   const isMetaAi = target?.id === 'user-meta-ai' || target?.isBot;
 
@@ -171,6 +172,17 @@ export default function ChatHeader({
             title="Download / Install App on Phone"
           >
             <Download className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Admin Dashboard Quick Access */}
+        {onOpenAdmin && (
+          <button
+            onClick={onOpenAdmin}
+            className="p-2 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-emerald-200 border border-emerald-800/60 rounded-xl transition shadow-sm cursor-pointer"
+            title="Admin & Traffic Analytics Dashboard"
+          >
+            <Shield className="w-4 h-4 text-emerald-400" />
           </button>
         )}
 

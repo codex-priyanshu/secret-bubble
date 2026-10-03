@@ -14,7 +14,7 @@ const PRESET_AVATARS = [
   'https://api.dicebear.com/7.x/bottts/svg?seed=Cyber'
 ];
 
-export default function ProfileModal({ isOpen, onClose, currentUser, onUpdateProfile, backendUrl }) {
+export default function ProfileModal({ isOpen, onClose, currentUser, onUpdateProfile, backendUrl, onOpenAdmin }) {
   if (!isOpen) return null;
 
   const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'stats' | 'security'
@@ -619,6 +619,27 @@ export default function ProfileModal({ isOpen, onClose, currentUser, onUpdatePro
                 <span>Clear Cache</span>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Enterprise Admin Dashboard Access */}
+        {onOpenAdmin && (
+          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between bg-slate-950/40 p-3 rounded-2xl">
+            <div>
+              <span className="text-xs font-bold text-emerald-400 block">Admin & Growth Analytics</span>
+              <span className="text-[10px] text-slate-400">Daily, monthly & yearly user traffic reports</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenAdmin();
+              }}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-md shadow-emerald-900/30 cursor-pointer active:scale-95"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Open Admin</span>
+            </button>
           </div>
         )}
 
