@@ -60,6 +60,73 @@ export default function MessageItem({
 
   const viewsCount = message.viewers ? message.viewers.length : 1;
 
+  // WhatsApp / Telegram Status Ticks (Sent: 1 gray check, Delivered: 2 gray checks, Read/Seen: 2 cyan checks)
+  const renderStatusTicks = (msg = message) => {
+    if (!isMe) return null;
+
+    if (msg.recipientId) {
+      const isRead = msg.status === 'read' || 
+                     msg.status === 'seen' || 
+                     (Array.isArray(msg.viewers) && msg.viewers.includes(msg.recipientId));
+
+      if (isRead) {
+        return (
+          <span className="flex items-center text-cyan-300" title="Read / Seen (Recipient has opened and viewed)">
+            <CheckCheck className="w-3.5 h-3.5 stroke-[2.2]" />
+          </span>
+        );
+      }
+
+      const isDelivered = msg.status === 'delivered';
+      if (isDelivered) {
+        return (
+          <span className="flex items-center text-slate-300/80" title="Delivered to recipient device">
+            <CheckCheck className="w-3.5 h-3.5 stroke-[1.8]" />
+          </span>
+        );
+      }
+
+      // Default: Sent to server, recipient device offline
+      return (
+        <span className="flex items-center text-slate-400/80" title="Sent to server (Waiting for recipient to come online)">
+          <Check className="w-3.5 h-3.5 stroke-[2]" />
+        </span>
+      );
+    }
+
+    return (
+      <span className="flex items-center text-cyan-300/80" title="Sent to channel">
+        <CheckCheck className="w-3.5 h-3.5 stroke-[2]" />
+      </span>
+    );
+  };
+
+  const renderSelfDestruct = () => {
+    if (!message.selfDestructSecs) return null;
+    const isDirect = Boolean(message.recipientId);
+    const isUnseen = isDirect && (!message.readAt && (!message.viewers || !message.viewers.includes(message.recipientId)));
+    
+    if (isUnseen) {
+      return (
+        <span className="flex items-center gap-0.5 text-amber-400 font-bold" title="Message stays until seen. Self-destruct starts when read.">
+          <Flame className="w-3 h-3" />
+          <span>{message.selfDestructSecs}s (on seen)</span>
+        </span>
+      );
+    }
+
+    const liveSecs = message.expiresAt 
+      ? Math.max(0, Math.ceil((message.expiresAt - Date.now()) / 1000)) 
+      : (remainingSeconds || message.selfDestructSecs);
+
+    return (
+      <span className="flex items-center gap-0.5 text-rose-400 font-bold animate-pulse" title="Disappearing message countdown active">
+        <Flame className="w-3 h-3" />
+        <span>{liveSecs}s</span>
+      </span>
+    );
+  };
+
   const handleUnlockSubmit = async (e) => {
     e.preventDefault();
     if (!inputPasscode.trim()) return;
@@ -206,12 +273,7 @@ export default function MessageItem({
                 <div className={`text-[10px] mt-1.5 flex items-center justify-end gap-2 select-none ${
                   isMe ? 'text-purple-200' : 'text-slate-400'
                 }`}>
-                  {message.selfDestructSecs && (
-                    <span className="flex items-center gap-0.5 text-amber-400 font-bold" title="Self-destruct message">
-                      <Flame className="w-3 h-3" />
-                      <span>{message.selfDestructSecs}s</span>
-                    </span>
-                  )}
+                  {renderSelfDestruct()}
                   {message.isEdited && <span className="italic text-[9px]">edited</span>}
                   <span>{formattedTime}</span>
                   
@@ -221,10 +283,8 @@ export default function MessageItem({
                     <span>{viewsCount}</span>
                   </span>
 
-                  {/* Telegram Double Checks for sender */}
-                  {isMe && (
-                    <CheckCheck className="w-3.5 h-3.5 text-cyan-300" />
-                  )}
+                  {/* Dynamic Status Ticks for sender */}
+                  {renderStatusTicks(message)}
                 </div>
               </>
             )}
@@ -270,18 +330,13 @@ export default function MessageItem({
                 🔒 Passcode Protected
               </span>
               <div className="flex items-center gap-2">
-                {message.selfDestructSecs && (
-                  <span className="flex items-center gap-0.5 text-amber-400 font-bold">
-                    <Flame className="w-3 h-3" />
-                    <span>{message.selfDestructSecs}s</span>
-                  </span>
-                )}
+                {renderSelfDestruct()}
                 <span>{formattedTime}</span>
                 <span className="flex items-center gap-0.5 opacity-80">
                   <Eye className="w-3 h-3" />
                   <span>{viewsCount}</span>
                 </span>
-                {isMe && <CheckCheck className="w-3.5 h-3.5 text-cyan-300" />}
+                {renderStatusTicks(message)}
               </div>
             </div>
           </div>
@@ -340,8 +395,9 @@ export default function MessageItem({
                   <span>Quick View (You sent this)</span>
                 </button>
                 <div className="flex items-center gap-2">
+                  {renderSelfDestruct()}
                   <span>{formattedTime}</span>
-                  <CheckCheck className="w-3.5 h-3.5 text-cyan-300" />
+                  {renderStatusTicks(message)}
                 </div>
               </div>
             ) : (

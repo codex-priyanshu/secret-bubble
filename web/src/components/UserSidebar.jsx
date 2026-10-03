@@ -64,6 +64,8 @@ export default function UserSidebar({
            (g.description || '').toLowerCase().includes(cleanSearch);
   });
 
+  const totalDirectUnreads = Object.values(unreadCounts || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+
   return (
     <div className="w-full md:w-80 bg-slate-900 border-r border-slate-800/90 flex flex-col h-full select-none relative font-sans">
       
@@ -223,13 +225,18 @@ export default function UserSidebar({
           </button>
           <button
             onClick={() => setActiveFilter('direct')}
-            className={`px-3 py-1 rounded-full transition shrink-0 ${
+            className={`px-3 py-1 rounded-full transition shrink-0 flex items-center gap-1.5 ${
               activeFilter === 'direct'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
             }`}
           >
-            Direct ({realUsers.length})
+            <span>Direct ({realUsers.length})</span>
+            {totalDirectUnreads > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-white text-[9px] font-bold shadow-sm animate-pulse">
+                {totalDirectUnreads}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveFilter('groups')}

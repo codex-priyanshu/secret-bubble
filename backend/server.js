@@ -592,10 +592,15 @@ function saveGroups(groupsList) {
 let groups = loadGroups();
 
 // Periodic cleanup of expired disappearing messages (only strictly valid positive future timestamps)
+// CRITICAL: Unread direct messages are never purged before the recipient sees them!
 setInterval(() => {
   const now = Date.now();
   const initialCount = messages.length;
   messages = messages.filter(m => {
+    // If it's a direct message with self-destruct that hasn't been seen/read yet by the recipient, protect it
+    if (m.recipientId && m.selfDestructSecs && (!m.readAt && (!m.viewers || !m.viewers.includes(m.recipientId)))) {
+      return true;
+    }
     if (!m.expiresAt || typeof m.expiresAt !== 'number' || m.expiresAt <= 0) return true;
     return now < m.expiresAt;
   });
@@ -1266,6 +1271,25 @@ app.get('/api/users/search', (req, res) => {
   res.json({ success: true, users: matched });
 });
 
+// Unread message counts endpoint (Instant summary for sidebar badges upon login / reconnect)
+app.get('/api/messages/unreads', (req, res) => {
+  const { userId } = req.query;
+  if (!userId) return res.status(400).json({ success: false, message: 'userId required' });
+
+  messages = loadMessages();
+  const unreadCounts = {};
+  let totalUnread = 0;
+
+  messages.forEach(m => {
+    if (m.recipientId === userId && (!m.viewers || !m.viewers.includes(userId)) && m.status !== 'read') {
+      unreadCounts[m.senderId] = (unreadCounts[m.senderId] || 0) + 1;
+      totalUnread++;
+    }
+  });
+
+  res.json({ success: true, unreadCounts, totalUnread });
+});
+
 app.get('/api/messages', (req, res) => {
   // Always reload fresh messages from disk so no messages are lost across restarts/instances
   messages = loadMessages();
@@ -1285,6 +1309,51 @@ app.get('/api/messages', (req, res) => {
         (m.senderId === targetId && m.recipientId === userId)
       )
     );
+
+    // WHATSAPP/TELEGRAM SEEN STATUS & MESSAGE RETENTION:
+    // When recipient opens chat with sender, mark unread messages as read/seen
+    let statusUpdated = false;
+    const readMessageIds = [];
+    const now = Date.now();
+
+    filtered.forEach(m => {
+      if (m.senderId === targetId && m.recipientId === userId) {
+        let changed = false;
+        if (!m.viewers) m.viewers = [];
+        if (!m.viewers.includes(userId)) {
+          m.viewers.push(userId);
+          changed = true;
+        }
+        if (m.status !== 'read') {
+          m.status = 'read';
+          m.readAt = m.readAt || now;
+          changed = true;
+          readMessageIds.push(m.id);
+        }
+        // Self-destruct countdown timer only starts once seen!
+        if (m.selfDestructSecs > 0 && !m.expiresAt) {
+          m.expiresAt = now + (m.selfDestructSecs * 1000);
+          changed = true;
+        }
+        if (changed) statusUpdated = true;
+      }
+    });
+
+    if (statusUpdated) {
+      saveMessages(messages);
+      // Notify sender in real-time that messages are now seen (Double Blue/Cyan Ticks)
+      const senderSockets = onlineUsers.get(targetId);
+      if (senderSockets && readMessageIds.length > 0) {
+        senderSockets.forEach(sId => {
+          io.to(sId).emit('message_status_update', {
+            messageIds: readMessageIds,
+            status: 'read',
+            readAt: now,
+            recipientId: userId
+          });
+        });
+      }
+    }
   } else {
     // If no filter specified, return global messages by default
     filtered = messages.filter(m => !m.recipientId && (m.roomId === 'global' || !m.roomId));
@@ -1337,8 +1406,21 @@ app.post('/api/messages/send', (req, res) => {
   const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
 
   const isDirect = Boolean(msgData.recipientId);
+  const isToMetaAi = msgData.recipientId === 'user-meta-ai';
   const selfDestructSecs = msgData.selfDestructSecs ? parseInt(msgData.selfDestructSecs, 10) : 0;
-  const expiresAt = selfDestructSecs > 0 ? Date.now() + (selfDestructSecs * 1000) : null;
+  
+  // For direct messages, expiresAt ONLY starts when recipient actually opens/reads the message!
+  // For public rooms, expiresAt can start immediately.
+  const expiresAt = (!isDirect && selfDestructSecs > 0) ? Date.now() + (selfDestructSecs * 1000) : null;
+
+  const isRecipientOnline = isDirect && (
+    isToMetaAi ||
+    (onlineUsers.has(msgData.recipientId) && onlineUsers.get(msgData.recipientId).size > 0)
+  );
+
+  const initialStatus = isToMetaAi ? 'read' : (isRecipientOnline ? 'delivered' : 'sent');
+  const deliveredAt = (isRecipientOnline || isToMetaAi) ? Date.now() : null;
+  const readAt = isToMetaAi ? Date.now() : null;
 
   const newMsg = {
     id: msgData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4)),
@@ -1357,19 +1439,32 @@ app.post('/api/messages/send', (req, res) => {
     isEdited: false,
     selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
     expiresAt: expiresAt,
-    viewers: [senderId],
+    viewers: isToMetaAi ? [senderId, 'user-meta-ai'] : [senderId],
+    status: initialStatus,
+    deliveredAt: deliveredAt,
+    readAt: readAt,
     e2eeEnvelope: msgData.e2eeEnvelope || null,
     timestamp: msgData.timestamp || new Date().toISOString()
   };
 
   messages = loadMessages();
-  if (!messages.some(m => m.id === newMsg.id)) {
+  const existingIdx = messages.findIndex(m => m.id === newMsg.id);
+  if (existingIdx !== -1) {
+    messages[existingIdx] = newMsg;
+  } else {
     messages.push(newMsg);
-    saveMessages(messages);
   }
+  saveMessages(messages);
 
-  // Broadcast via socket if available
-  io.emit('new_message', newMsg);
+  // Broadcast via socket if recipient is online
+  if (newMsg.recipientId) {
+    const recipientSockets = onlineUsers.get(newMsg.recipientId);
+    if (recipientSockets) {
+      recipientSockets.forEach(sId => io.to(sId).emit('new_message', newMsg));
+    }
+  } else {
+    io.emit('new_message', newMsg);
+  }
 
   res.json({ success: true, message: newMsg });
 });
@@ -2700,6 +2795,52 @@ io.on('connection', (socket) => {
     onlineUsers.get(targetUserId).add(socket.id);
     io.emit('online_users_update', Array.from(onlineUsers.keys()));
     recordUserActivity({ userId: targetUserId, username: socket.data.username || user?.username, activityType: 'active' });
+
+    // WHATSAPP/TELEGRAM OFFLINE MESSAGE DELIVERY:
+    // When this recipient reconnects / opens app, deliver pending messages and transition 'sent' -> 'delivered'
+    messages = loadMessages();
+    let statusChanged = false;
+    const deliveredIdsBySender = {};
+    const unreadCounts = {};
+
+    messages.forEach(m => {
+      if (m.recipientId === targetUserId) {
+        if (m.status === 'sent' || !m.status) {
+          m.status = 'delivered';
+          m.deliveredAt = m.deliveredAt || Date.now();
+          statusChanged = true;
+          if (!deliveredIdsBySender[m.senderId]) deliveredIdsBySender[m.senderId] = [];
+          deliveredIdsBySender[m.senderId].push(m.id);
+        }
+        if (!m.viewers || !m.viewers.includes(targetUserId)) {
+          unreadCounts[m.senderId] = (unreadCounts[m.senderId] || 0) + 1;
+        }
+      }
+    });
+
+    if (statusChanged) {
+      saveMessages(messages);
+      // Notify senders in real-time that messages have reached recipient's device (Double Gray Checks)
+      Object.keys(deliveredIdsBySender).forEach(senderId => {
+        const senderSockets = onlineUsers.get(senderId);
+        if (senderSockets) {
+          senderSockets.forEach(sId => {
+            io.to(sId).emit('message_status_update', {
+              messageIds: deliveredIdsBySender[senderId],
+              status: 'delivered',
+              deliveredAt: Date.now(),
+              recipientId: targetUserId
+            });
+          });
+        }
+      });
+    }
+
+    // Deliver unread summary directly to the user who just came online
+    socket.emit('offline_sync', {
+      unreadCounts,
+      totalUnread: Object.values(unreadCounts).reduce((a, b) => a + b, 0)
+    });
   });
 
   // Send Message (Protected against spoofing)
@@ -2738,7 +2879,18 @@ io.on('connection', (socket) => {
     const isToMetaAi = msgData.recipientId === 'user-meta-ai';
 
     const selfDestructSecs = msgData.selfDestructSecs ? parseInt(msgData.selfDestructSecs, 10) : 0;
-    const expiresAt = selfDestructSecs > 0 ? Date.now() + (selfDestructSecs * 1000) : null;
+    // For direct messages, expiresAt ONLY starts when recipient actually opens/reads the message!
+    // For public rooms, expiresAt can start immediately.
+    const expiresAt = (!isDirect && selfDestructSecs > 0) ? Date.now() + (selfDestructSecs * 1000) : null;
+
+    const isRecipientOnline = isDirect && (
+      isToMetaAi ||
+      (onlineUsers.has(msgData.recipientId) && onlineUsers.get(msgData.recipientId).size > 0)
+    );
+
+    const initialStatus = isToMetaAi ? 'read' : (isRecipientOnline ? 'delivered' : 'sent');
+    const deliveredAt = (isRecipientOnline || isToMetaAi) ? Date.now() : null;
+    const readAt = isToMetaAi ? Date.now() : null;
 
     const msgId = msgData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4));
 
@@ -2759,7 +2911,10 @@ io.on('connection', (socket) => {
       isEdited: false,
       selfDestructSecs: selfDestructSecs > 0 ? selfDestructSecs : null,
       expiresAt: expiresAt,
-      viewers: [senderId],
+      viewers: isToMetaAi ? [senderId, 'user-meta-ai'] : [senderId],
+      status: initialStatus,
+      deliveredAt: deliveredAt,
+      readAt: readAt,
       e2eeEnvelope: msgData.e2eeEnvelope || null,
       timestamp: msgData.timestamp || new Date().toISOString()
     };
@@ -2926,24 +3081,101 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Mark Viewed
-  socket.on('mark_viewed', ({ messageIds, viewerId }) => {
-    if (!messageIds || !viewerId) return;
+  // Mark Chat Read (When recipient opens chat with a specific user)
+  socket.on('mark_chat_read', ({ senderId, viewerId }) => {
+    const verifiedViewerId = socket.data.authenticated ? socket.data.userId : viewerId;
+    if (!senderId || !verifiedViewerId) return;
+
+    messages = loadMessages();
     let changed = false;
+    const readIds = [];
+    const now = Date.now();
+
+    messages.forEach(m => {
+      if (m.senderId === senderId && m.recipientId === verifiedViewerId) {
+        if (!m.viewers) m.viewers = [];
+        if (!m.viewers.includes(verifiedViewerId)) {
+          m.viewers.push(verifiedViewerId);
+          changed = true;
+        }
+        if (m.status !== 'read') {
+          m.status = 'read';
+          m.readAt = m.readAt || now;
+          changed = true;
+          readIds.push(m.id);
+        }
+        // Self destruct begins only after seen!
+        if (m.selfDestructSecs > 0 && !m.expiresAt) {
+          m.expiresAt = now + (m.selfDestructSecs * 1000);
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      saveMessages(messages);
+      const senderSockets = onlineUsers.get(senderId);
+      if (senderSockets && readIds.length > 0) {
+        senderSockets.forEach(sId => {
+          io.to(sId).emit('message_status_update', {
+            messageIds: readIds,
+            status: 'read',
+            readAt: now,
+            recipientId: verifiedViewerId
+          });
+        });
+      }
+    }
+  });
+
+  // Mark Viewed & Read Receipts (WhatsApp / Telegram Double Blue/Cyan Ticks)
+  socket.on('mark_viewed', ({ messageIds, viewerId }) => {
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0 || !viewerId) return;
+    const verifiedViewerId = socket.data.authenticated ? socket.data.userId : viewerId;
+    let changed = false;
+    const readIdsBySender = {};
+    const now = Date.now();
 
     messageIds.forEach(id => {
       const msg = messages.find(m => m.id === id);
       if (msg) {
         if (!msg.viewers) msg.viewers = [];
-        if (!msg.viewers.includes(viewerId)) {
-          msg.viewers.push(viewerId);
+        if (!msg.viewers.includes(verifiedViewerId)) {
+          msg.viewers.push(verifiedViewerId);
           changed = true;
           io.emit('views_updated', { messageId: id, viewers: msg.viewers, viewsCount: msg.viewers.length });
+        }
+        // If this user is the recipient of a direct message, mark as read
+        if (msg.recipientId === verifiedViewerId && msg.status !== 'read') {
+          msg.status = 'read';
+          msg.readAt = msg.readAt || now;
+          changed = true;
+          if (!readIdsBySender[msg.senderId]) readIdsBySender[msg.senderId] = [];
+          readIdsBySender[msg.senderId].push(msg.id);
+        }
+        if (msg.recipientId === verifiedViewerId && msg.selfDestructSecs > 0 && !msg.expiresAt) {
+          msg.expiresAt = now + (msg.selfDestructSecs * 1000);
+          changed = true;
         }
       }
     });
 
-    if (changed) saveMessages(messages);
+    if (changed) {
+      saveMessages(messages);
+      Object.keys(readIdsBySender).forEach(senderId => {
+        const senderSockets = onlineUsers.get(senderId);
+        if (senderSockets) {
+          senderSockets.forEach(sId => {
+            io.to(sId).emit('message_status_update', {
+              messageIds: readIdsBySender[senderId],
+              status: 'read',
+              readAt: now,
+              recipientId: verifiedViewerId
+            });
+          });
+        }
+      });
+    }
   });
 
   socket.on('typing', (data) => {

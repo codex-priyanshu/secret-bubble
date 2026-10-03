@@ -88,6 +88,41 @@ function deduplicateMessages(msgList) {
   return result;
 }
 
+// Lightweight Web Audio API synthesizer for instant incoming message chimes (works offline, zero mp3 assets)
+function playMessageChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    
+    // Pleasant two-tone Telegram / WhatsApp style bubble chime
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now); // D5
+    osc1.frequency.exponentialRampToValueAtTime(880, now + 0.1); // A5
+
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(880, now + 0.1);
+    osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.2); // D6
+
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(now);
+    osc1.stop(now + 0.15);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.35);
+  } catch (e) {}
+}
+
 export default function App() {
   const [isStealthMode, setIsStealthMode] = useState(() => {
     try {
@@ -459,13 +494,23 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch Users List
+  // Fetch Users List & Offline Unread Sync
   const fetchUsers = useCallback(async () => {
     try {
       const res = await fetch(`${backendUrl}/api/users`);
       const data = await res.json();
       if (data.success) {
         setUsers(data.users);
+      }
+      // Instant offline unread count sync for sidebar badges
+      if (currentUserRef.current) {
+        try {
+          const unreadRes = await fetch(`${backendUrl}/api/messages/unreads?userId=${currentUserRef.current.id}`);
+          const unreadData = await unreadRes.json();
+          if (unreadData.success && unreadData.unreadCounts) {
+            setUnreadCounts(prev => ({ ...prev, ...unreadData.unreadCounts }));
+          }
+        } catch {}
       }
     } catch (e) {
       // Offline fallback: Meta AI Bot
@@ -530,13 +575,17 @@ export default function App() {
           localStorage.setItem(key, JSON.stringify(deduped.slice(-100)));
         } catch {}
         
-        // Mark viewed
+        // Mark viewed & read (WhatsApp/Telegram Double Blue/Cyan Ticks)
         if (socket && data.messages.length > 0) {
           const unviewedIds = data.messages
             .filter(m => !m.viewers || !m.viewers.includes(currentUserRef.current.id))
             .map(m => m.id);
           if (unviewedIds.length > 0) {
             socket.emit('mark_viewed', { messageIds: unviewedIds, viewerId: currentUserRef.current.id });
+          }
+          if (currentTarget.type === 'user') {
+            socket.emit('mark_chat_read', { senderId: currentTarget.id, viewerId: currentUserRef.current.id });
+            setUnreadCounts(prev => ({ ...prev, [currentTarget.id]: 0 }));
           }
         }
       }
@@ -568,6 +617,49 @@ export default function App() {
       s.emit('user_online', currentUser);
       fetchUsers();
       fetchGroups();
+    });
+
+    // Offline unread sync from server upon reconnecting
+    s.on('offline_sync', ({ unreadCounts }) => {
+      if (unreadCounts && typeof unreadCounts === 'object') {
+        setUnreadCounts(prev => ({ ...prev, ...unreadCounts }));
+      }
+    });
+
+    // Real-time status tick updates (Sent -> Delivered -> Read/Seen)
+    s.on('message_status_update', ({ messageIds, status, readAt, deliveredAt, recipientId }) => {
+      if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+      const idSet = new Set(messageIds);
+
+      setMessages(prev => {
+        let changed = false;
+        const updated = prev.map(m => {
+          if (idSet.has(m.id)) {
+            changed = true;
+            const viewers = (status === 'read' && recipientId && (!m.viewers || !m.viewers.includes(recipientId)))
+              ? [...(m.viewers || []), recipientId]
+              : m.viewers;
+            return {
+              ...m,
+              status,
+              readAt: readAt || m.readAt,
+              deliveredAt: deliveredAt || m.deliveredAt || Date.now(),
+              viewers
+            };
+          }
+          return m;
+        });
+
+        if (changed) {
+          try {
+            const currentTarget = selectedTargetRef.current;
+            const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
+            localStorage.setItem(key, JSON.stringify(updated.slice(-100)));
+          } catch {}
+          return updated;
+        }
+        return prev;
+      });
     });
 
     s.on('online_users_update', (onlineIds) => {
@@ -648,14 +740,23 @@ export default function App() {
           return updated;
         });
 
-        // Auto mark as viewed
+        // Auto mark as viewed & seen
         s.emit('mark_viewed', { messageIds: [msg.id], viewerId: user.id });
+        if (currentTarget.type === 'user') {
+          s.emit('mark_chat_read', { senderId: currentTarget.id, viewerId: user.id });
+        }
       } else if (msg.recipientId === user.id && msg.senderId !== user.id) {
         const fromId = msg.senderId;
         setUnreadCounts(prev => ({
           ...prev,
           [fromId]: (prev[fromId] || 0) + 1
         }));
+        playMessageChime();
+        try {
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        } catch {}
       }
     });
 
@@ -720,6 +821,9 @@ export default function App() {
     if (!currentUser) return;
 
     const isDirect = selectedTarget.type === 'user';
+    const isTargetOnline = isDirect && Boolean(selectedTarget.isOnline || selectedTarget.id === 'user-meta-ai');
+    const initialStatus = isDirect ? (isTargetOnline ? 'delivered' : 'sent') : 'sent';
+
     const payload = {
       ...msgData,
       id: msgData.id || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4)),
@@ -728,6 +832,8 @@ export default function App() {
       senderAvatar: currentUser.avatarUrl || null,
       recipientId: isDirect ? selectedTarget.id : null,
       roomId: isDirect ? null : (selectedTarget.id || 'global'),
+      status: initialStatus,
+      deliveredAt: isTargetOnline ? Date.now() : null,
       timestamp: new Date().toISOString()
     };
 
@@ -772,6 +878,7 @@ export default function App() {
             isAiShielded: false,
             isEdited: false,
             viewers: ['user-meta-ai'],
+            status: 'read',
             timestamp: new Date().toISOString()
           };
           setMessages(prev => {
@@ -823,6 +930,9 @@ export default function App() {
     relockAll();
     if (target.id) {
       setUnreadCounts(prev => ({ ...prev, [target.id]: 0 }));
+      if (target.type === 'user' && socket && connectionStatus === 'connected' && currentUser) {
+        socket.emit('mark_chat_read', { senderId: target.id, viewerId: currentUser.id });
+      }
     }
   };
 
