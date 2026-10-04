@@ -1091,12 +1091,12 @@ export default function App() {
             backendUrl={backendUrl}
             onOpenAdmin={() => setShowAdminDashboard(true)}
           />
-          <AdminDashboard
-            isOpen={showAdminDashboard}
-            onClose={handleCloseAdminDashboard}
-            backendUrl={backendUrl}
-          />
         </Suspense>
+        <AdminDashboard
+          isOpen={showAdminDashboard}
+          onClose={handleCloseAdminDashboard}
+          backendUrl={backendUrl}
+        />
       </>
     );
   }
@@ -1119,12 +1119,12 @@ export default function App() {
             onClose={handleCloseInstallModal}
             onInstalled={handleAppMarkedInstalled}
           />
-          <AdminDashboard
-            isOpen={showAdminDashboard}
-            onClose={handleCloseAdminDashboard}
-            backendUrl={backendUrl}
-          />
         </Suspense>
+        <AdminDashboard
+          isOpen={showAdminDashboard}
+          onClose={handleCloseAdminDashboard}
+          backendUrl={backendUrl}
+        />
       </>
     );
   }
@@ -1351,14 +1351,14 @@ export default function App() {
           onClose={handleCloseInstallModal}
           onInstalled={handleAppMarkedInstalled}
         />
-
-        {/* Admin Telemetry & Real-Time Dashboard */}
-        <AdminDashboard
-          isOpen={showAdminDashboard}
-          onClose={handleCloseAdminDashboard}
-          backendUrl={backendUrl}
-        />
       </Suspense>
+
+      {/* Admin Telemetry & Real-Time Dashboard */}
+      <AdminDashboard
+        isOpen={showAdminDashboard}
+        onClose={handleCloseAdminDashboard}
+        backendUrl={backendUrl}
+      />
 
     </div>
   );
