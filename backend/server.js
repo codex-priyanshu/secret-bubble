@@ -1760,7 +1760,64 @@ const GENRE_FEED_TOPICS = {
 app.get('/api/music/feed', async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
   const genre = (req.query.genre || 'all').trim().toLowerCase();
-  const topics = GENRE_FEED_TOPICS[genre] || GENRE_FEED_TOPICS.all;
+
+  // User Taste & Preference Parameters
+  const likedGenres = (req.query.likedGenres || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+  const skippedGenres = (req.query.skippedGenres || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+  const topArtists = (req.query.topArtists || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+  const skippedArtists = (req.query.skippedArtists || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+
+  let topics = GENRE_FEED_TOPICS[genre] || GENRE_FEED_TOPICS.all;
+
+  // If user requested 'for_you' or 'all', dynamically compose tailored topics
+  if (genre === 'for_you' || genre === 'all') {
+    let customTopics = [];
+
+    // 1. Add top artist searches if available
+    topArtists.slice(0, 4).forEach(artist => {
+      customTopics.push(`${artist} Hits`);
+      customTopics.push(`${artist} Best Songs`);
+    });
+
+    // 2. Add liked genre topics
+    likedGenres.forEach(g => {
+      if (GENRE_FEED_TOPICS[g]) {
+        customTopics.push(...GENRE_FEED_TOPICS[g]);
+      }
+    });
+
+    // Fallback if no specific liked genres yet
+    if (customTopics.length === 0) {
+      customTopics = [...GENRE_FEED_TOPICS.all];
+    }
+
+    // 3. Strongly exclude any topic matching skipped genres or skipped artists
+    if (skippedGenres.length > 0 || skippedArtists.length > 0) {
+      const filtered = customTopics.filter(t => {
+        const lower = t.toLowerCase();
+        const matchesSkippedGenre = skippedGenres.some(sg => lower.includes(sg));
+        const matchesSkippedArtist = skippedArtists.some(sa => lower.includes(sa));
+        return !matchesSkippedGenre && !matchesSkippedArtist;
+      });
+      if (filtered.length > 0) {
+        customTopics = filtered;
+      }
+    }
+
+    topics = customTopics;
+  }
 
   // YouTube-like Fresh Dynamic Feed:
   // On page 1, pick a randomized seed topic so reopening or refreshing the app ALWAYS presents new, rotating songs!
@@ -1813,8 +1870,53 @@ app.get('/api/music/feed', async (req, res) => {
       }
     }
 
-    // Shuffle fresh results slightly on page 1 so track order is varied
-    const finalResults = (page === 1) ? results.sort(() => Math.random() - 0.5) : results;
+    // Score and rank songs based on user affinities
+    const scoredResults = results.map(item => {
+      let score = 0;
+      const titleLower = (item.title || '').toLowerCase();
+      const artistLower = (item.artist || '').toLowerCase();
+      const albumLower = (item.album || '').toLowerCase();
+      const combined = `${titleLower} ${artistLower} ${albumLower}`;
+
+      // Liked artists boost
+      topArtists.forEach((ta, idx) => {
+        if (artistLower.includes(ta) || titleLower.includes(ta)) {
+          score += 40 - (idx * 5);
+        }
+      });
+
+      // Liked genres boost
+      likedGenres.forEach((lg, idx) => {
+        if (combined.includes(lg)) {
+          score += 25 - (idx * 3);
+        }
+      });
+
+      // Skipped artists heavy penalty
+      skippedArtists.forEach(sa => {
+        if (artistLower.includes(sa) || titleLower.includes(sa)) {
+          score -= 80;
+        }
+      });
+
+      // Skipped genres penalty
+      skippedGenres.forEach(sg => {
+        if (combined.includes(sg)) {
+          score -= 50;
+        }
+      });
+
+      return { item, score };
+    });
+
+    // Filter out heavily penalized songs (skipped artists/genres)
+    // and sort the rest so high-affinity songs appear first
+    const sorted = scoredResults
+      .filter(r => r.score > -45)
+      .sort((a, b) => b.score - a.score)
+      .map(r => r.item);
+
+    const finalResults = sorted.length > 0 ? sorted : results;
 
     return res.json({
       success: true,
