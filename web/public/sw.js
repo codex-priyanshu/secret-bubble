@@ -1,5 +1,5 @@
 // Service Worker for automatic updates, offline fallback, PWA installation, and lock-screen media notifications
-const CACHE_NAME = 'secret-bubble-v3';
+const CACHE_NAME = 'secret-bubble-v4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

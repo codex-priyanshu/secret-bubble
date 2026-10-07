@@ -561,26 +561,30 @@ export default function StealthMusicPlayer({
   // Guard against showing install/download option if already running natively or installed
   const isAppActuallyInstalled = useMemo(() => {
     if (typeof window === 'undefined') return false;
-    return (
-      Boolean(window.AndroidNativeMedia) ||
-      Boolean(window.SecretBubbleNative) ||
-      Boolean(window.Capacitor?.isNativePlatform?.()) ||
-      Boolean(window.Capacitor) ||
-      (window.navigator?.userAgent && (
-        window.navigator.userAgent.includes('SecretBubbleApp') ||
-        window.navigator.userAgent.includes('NativeAPK') ||
-        window.navigator.userAgent.includes('Capacitor')
-      )) ||
-      (window.matchMedia && (
-        window.matchMedia('(display-mode: standalone)').matches ||
-        window.matchMedia('(display-mode: minimal-ui)').matches ||
-        window.matchMedia('(display-mode: fullscreen)').matches
-      )) ||
-      (window.navigator && window.navigator.standalone === true) ||
-      localStorage.getItem('secret_bubble_app_installed') === 'true' ||
-      localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
-      localStorage.getItem('secret_bubble_app_downloaded') === 'true'
-    );
+    try {
+      return (
+        Boolean(window.AndroidNativeMedia) ||
+        Boolean(window.SecretBubbleNative) ||
+        Boolean(window.Capacitor?.isNativePlatform?.()) ||
+        Boolean(window.Capacitor) ||
+        Boolean(window.navigator?.userAgent && (
+          window.navigator.userAgent.includes('SecretBubbleApp') ||
+          window.navigator.userAgent.includes('NativeAPK') ||
+          window.navigator.userAgent.includes('Capacitor')
+        )) ||
+        Boolean(window.matchMedia && (
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.matchMedia('(display-mode: minimal-ui)').matches ||
+          window.matchMedia('(display-mode: fullscreen)').matches
+        )) ||
+        Boolean(window.navigator && window.navigator.standalone === true) ||
+        localStorage.getItem('secret_bubble_app_installed') === 'true' ||
+        localStorage.getItem('secret_bubble_apk_downloaded') === 'true' ||
+        localStorage.getItem('secret_bubble_app_downloaded') === 'true'
+      );
+    } catch {
+      return false;
+    }
   }, []);
 
   const recordTrackToHistory = useCallback((track) => {
@@ -606,6 +610,290 @@ export default function StealthMusicPlayer({
     } catch {}
     setSelectedPlaylistView(prev => prev?.id === 'pl-history' ? { ...prev, songs: [] } : prev);
   }, []);
+
+  const getBackendApiUrl = useCallback(() => {
+    if (backendUrl) return backendUrl.replace(/\/$/, '');
+    if (import.meta.env?.VITE_BACKEND_URL) return import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '');
+    
+    const isNativeApp = typeof window !== 'undefined' && (
+      Boolean(window.Capacitor?.isNativePlatform?.()) ||
+      Boolean(window.Capacitor) ||
+      window.location?.protocol === 'capacitor:' ||
+      (window.location?.hostname === 'localhost' && !window.location?.port && !import.meta.env.DEV)
+    );
+
+    if (isNativeApp) {
+      return 'https://secret-bubble-backend.onrender.com';
+    }
+
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const hostname = window.location.hostname || 'localhost';
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
+        return `http://${hostname}:5000`;
+      }
+    }
+    return 'https://secret-bubble-backend.onrender.com';
+  }, [backendUrl]);
+
+  // Helper to extract genres, artists, and normalized key for any track
+  const classifyTrack = useCallback((track) => {
+    if (!track) return { genres: [], artists: [], key: '' };
+    const title = (track.title || '').toLowerCase();
+    const artist = (track.artist || '').toLowerCase();
+    const album = (track.album || '').toLowerCase();
+    const text = `${title} ${artist} ${album}`;
+    const key = (track.id || `${title}_${artist}`).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
+    const genres = [];
+    if (text.includes('bollywood') || text.includes('hindi') || text.includes('arijit') || text.includes('pritam') || text.includes('shreya') || text.includes('sonu') || text.includes('kk') || text.includes('jubin') || text.includes('neha') || text.includes('darshan') || text.includes('t-series')) {
+      genres.push('bollywood');
+      genres.push('hindi');
+    }
+    if (text.includes('punjabi') || text.includes('diljit') || text.includes('sidhu') || text.includes('karan aujla') || text.includes('ap dhillon') || text.includes('shubh') || text.includes('badshah') || text.includes('honey singh') || text.includes('b praak') || text.includes('jordan')) {
+      genres.push('punjabi');
+    }
+    if (text.includes('english') || text.includes('pop') || text.includes('billboard') || text.includes('sheeran') || text.includes('swift') || text.includes('weeknd') || text.includes('dua lipa') || text.includes('coldplay') || text.includes('post malone') || text.includes('bieber') || text.includes('charlie puth')) {
+      genres.push('english');
+    }
+    if (text.includes('lofi') || text.includes('chill') || text.includes('slowed') || text.includes('reverb') || text.includes('relax') || text.includes('sleep') || text.includes('study beats') || text.includes('midnight')) {
+      genres.push('lofi');
+    }
+    if (text.includes('romantic') || text.includes('love') || text.includes('tum') || text.includes('dil') || text.includes('ishq') || text.includes('mohabbat') || text.includes('pyaar') || text.includes('hawaale') || text.includes('shayad') || text.includes('kesariya') || text.includes('ve kamleya')) {
+      genres.push('romantic');
+    }
+    if (text.includes('party') || text.includes('dance') || text.includes('remix') || text.includes('dj') || text.includes('banger') || text.includes('dhol')) {
+      genres.push('party');
+    }
+
+    const artists = [];
+    const knownArtists = [
+      'arijit singh', 'pritam', 'shreya ghoshal', 'diljit dosanjh', 'sidhu moose wala',
+      'karan aujla', 'ap dhillon', 'kk', 'atif aslam', 'sonu nigam', 'jubin nautiyal',
+      'badshah', 'honey singh', 'shubh', 'ed sheeran', 'taylor swift', 'the weeknd',
+      'dua lipa', 'coldplay', 'justin bieber', 'anirudh ravichander', 'a.r. rahman',
+      'darshan raval', 'mohit chauhan', 'sachin-jigar', 'vishal mishra', 'b praak'
+    ];
+    for (const ka of knownArtists) {
+      if (text.includes(ka)) {
+        artists.push(ka);
+      }
+    }
+    if (artists.length === 0 && track.artist && track.artist !== 'Online Music') {
+      const firstArtist = track.artist.toLowerCase().split(/[,&]/)[0].trim();
+      if (firstArtist.length > 2) {
+        artists.push(firstArtist);
+      }
+    }
+
+    return { genres, artists, key };
+  }, []);
+
+  // Compute recommendation affinity relevance score for any track
+  const calculateTrackRelevance = useCallback((track, profile, likedIds = []) => {
+    if (!track || !profile) return 0;
+    const { genres, artists, key } = classifyTrack(track);
+
+    // If this specific song was skipped, heavily penalize it
+    if (profile.skippedTrackKeys?.includes(key)) {
+      return -100;
+    }
+
+    let score = 0;
+
+    // Genre affinity (+ for liked, - for skipped)
+    genres.forEach(g => {
+      const gScore = profile.genres?.[g] ?? 0;
+      score += gScore * 3;
+    });
+
+    // Artist affinity (+ for liked, - for skipped)
+    artists.forEach(a => {
+      const aScore = profile.artists?.[a] ?? 0;
+      score += aScore * 4;
+    });
+
+    // Liked song bonus
+    if (likedIds && likedIds.includes(track.id)) {
+      score += 15;
+    }
+
+    // Frequent listen count bonus
+    const listenCount = profile.listenCounts?.[key] || 0;
+    score += Math.min(12, listenCount * 2);
+
+    // Skip count penalty
+    const skipCount = profile.skipCounts?.[key] || 0;
+    score -= skipCount * 18;
+
+    return score;
+  }, [classifyTrack]);
+
+  // Record positive user interest when a track is listened to or liked
+  const recordTrackListen = useCallback((track, isLiked = false) => {
+    if (!track) return;
+    const { genres, artists, key } = classifyTrack(track);
+
+    setTasteProfile(prev => {
+      const next = {
+        ...prev,
+        genres: { ...prev.genres },
+        artists: { ...prev.artists },
+        listenCounts: { ...prev.listenCounts },
+        skipCounts: { ...prev.skipCounts },
+        skippedTrackKeys: [...(prev.skippedTrackKeys || [])]
+      };
+
+      const boost = isLiked ? 5 : 3;
+
+      // Positive boost for genres
+      genres.forEach(g => {
+        next.genres[g] = (next.genres[g] || 0) + boost;
+      });
+
+      // Positive boost for artists
+      artists.forEach(a => {
+        next.artists[a] = (next.artists[a] || 0) + (boost + 1);
+      });
+
+      // Increase listen count for this track
+      next.listenCounts[key] = (next.listenCounts[key] || 0) + 1;
+
+      // Clear from skipped list if user now completed or listened to it
+      if (next.skippedTrackKeys.includes(key)) {
+        next.skippedTrackKeys = next.skippedTrackKeys.filter(k => k !== key);
+      }
+
+      try {
+        localStorage.setItem('secret_bubble_taste_profile', JSON.stringify(next));
+        localStorage.setItem('secret_bubble_user_tastes', JSON.stringify(next.genres));
+      } catch {}
+
+      return next;
+    });
+
+    setUserTastes(prev => {
+      const next = { ...prev };
+      genres.forEach(g => {
+        next[g] = (next[g] || 0) + (isLiked ? 5 : 3);
+      });
+      return next;
+    });
+
+    setTasteFeedback({
+      type: 'listen',
+      message: isLiked ? 'Liked! Recommending more like this' : 'Tuned: More songs like this will appear in your feed'
+    });
+    setTimeout(() => setTasteFeedback(null), 3200);
+  }, [classifyTrack]);
+
+  // Record negative affinity when user skips a track or marks dislike
+  const recordTrackSkip = useCallback((track, reason = 'skip') => {
+    if (!track) return;
+    const { genres, artists, key } = classifyTrack(track);
+
+    setTasteProfile(prev => {
+      const next = {
+        ...prev,
+        genres: { ...prev.genres },
+        artists: { ...prev.artists },
+        listenCounts: { ...prev.listenCounts },
+        skipCounts: { ...prev.skipCounts },
+        skippedTrackKeys: [...(prev.skippedTrackKeys || [])]
+      };
+
+      const penalty = reason === 'explicit_dislike' ? 4 : 2;
+
+      // Decrease affinity for skipped genres
+      genres.forEach(g => {
+        next.genres[g] = (next.genres[g] || 0) - penalty;
+      });
+
+      // Decrease affinity for skipped artists
+      artists.forEach(a => {
+        next.artists[a] = (next.artists[a] || 0) - (penalty + 1);
+      });
+
+      // Record skip for this specific song
+      next.skipCounts[key] = (next.skipCounts[key] || 0) + 1;
+      if (!next.skippedTrackKeys.includes(key)) {
+        next.skippedTrackKeys.push(key);
+      }
+
+      try {
+        localStorage.setItem('secret_bubble_taste_profile', JSON.stringify(next));
+        localStorage.setItem('secret_bubble_user_tastes', JSON.stringify(next.genres));
+      } catch {}
+
+      return next;
+    });
+
+    setUserTastes(prev => {
+      const next = { ...prev };
+      genres.forEach(g => {
+        next[g] = (next[g] || 0) - (reason === 'explicit_dislike' ? 4 : 2);
+      });
+      return next;
+    });
+
+    // In real-time: Demote/filter remaining tracks in the current feed matching the skipped genre or artist!
+    setTracks(prev => {
+      return prev.filter(t => {
+        if (t.id === track.id) return false; // remove the skipped song itself from upcoming
+        const tClass = classifyTrack(t);
+        const hasMatchingArtist = tClass.artists.some(a => artists.includes(a));
+        if (hasMatchingArtist && reason === 'explicit_dislike') {
+          return false;
+        }
+        return true;
+      });
+    });
+
+    setTasteFeedback({
+      type: 'skip',
+      message: 'Tuned: Showing fewer songs of this type in your feed'
+    });
+    setTimeout(() => setTasteFeedback(null), 3200);
+  }, [classifyTrack]);
+
+  // Backward compatible alias
+  const recordTrackTaste = useCallback((track) => {
+    recordTrackListen(track, false);
+  }, [recordTrackListen]);
+
+  // Log music play activity to local counters and backend admin telemetry
+  const logMusicTelemetry = useCallback((track) => {
+    if (!track) return;
+    recordTrackTaste(track);
+    recordTrackToHistory(track);
+    try {
+      const cur = parseInt(localStorage.getItem('secret_bubble_music_play_count') || '0', 10);
+      localStorage.setItem('secret_bubble_music_play_count', String(cur + 1));
+
+      const userStr = localStorage.getItem('secure_chat_user');
+      const u = userStr ? JSON.parse(userStr) : null;
+      let anonId = localStorage.getItem('secret_bubble_anon_id');
+      if (!anonId) {
+        anonId = 'guest_' + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem('secret_bubble_anon_id', anonId);
+      }
+      const isGuest = !u || !u.id;
+
+      const apiBase = getBackendApiUrl();
+      if (apiBase) {
+        fetch(`${apiBase}/api/analytics/activity`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: isGuest ? anonId : u.id,
+            username: isGuest ? 'Anonymous Guest' : (u.name || u.username),
+            isGuest: isGuest,
+            activityType: 'music',
+            trackTitle: track?.title || 'Unknown Track'
+          })
+        }).catch(() => {});
+      }
+    } catch (e) {}
+  }, [getBackendApiUrl, recordTrackTaste, recordTrackToHistory]);
 
   // Online Search states
   const [activeTab, setActiveTab] = useState('playlist'); // 'playlist' | 'playlists' | 'search' | 'trending' | 'phone'
@@ -904,12 +1192,12 @@ export default function StealthMusicPlayer({
   // Persist current track to local storage whenever a track is selected or played
   useEffect(() => {
     if (!currentTrack || !currentTrack.title) return;
-    const hadPrevious = Boolean(localStorage.getItem('secret_bubble_last_track'));
-    if (isPlaying || hadPrevious) {
-      try {
+    try {
+      const hadPrevious = Boolean(localStorage.getItem('secret_bubble_last_track'));
+      if (isPlaying || hadPrevious) {
         localStorage.setItem('secret_bubble_last_track', JSON.stringify(currentTrack));
-      } catch {}
-    }
+      }
+    } catch {}
   }, [currentTrack, isPlaying]);
 
   // Record playing track to listening history
@@ -1287,289 +1575,6 @@ export default function StealthMusicPlayer({
   }, [isPlaying, currentTrack]);
 
 
-  const getBackendApiUrl = useCallback(() => {
-    if (backendUrl) return backendUrl.replace(/\/$/, '');
-    if (import.meta.env?.VITE_BACKEND_URL) return import.meta.env.VITE_BACKEND_URL.replace(/\/$/, '');
-    
-    const isNativeApp = typeof window !== 'undefined' && (
-      Boolean(window.Capacitor?.isNativePlatform?.()) ||
-      Boolean(window.Capacitor) ||
-      window.location?.protocol === 'capacitor:' ||
-      (window.location?.hostname === 'localhost' && !window.location?.port && !import.meta.env.DEV)
-    );
-
-    if (isNativeApp) {
-      return 'https://secret-bubble-backend.onrender.com';
-    }
-
-    if (import.meta.env.DEV && typeof window !== 'undefined') {
-      const hostname = window.location.hostname || 'localhost';
-      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) {
-        return `http://${hostname}:5000`;
-      }
-    }
-    return 'https://secret-bubble-backend.onrender.com';
-  }, [backendUrl]);
-
-  // Helper to extract genres, artists, and normalized key for any track
-  const classifyTrack = useCallback((track) => {
-    if (!track) return { genres: [], artists: [], key: '' };
-    const title = (track.title || '').toLowerCase();
-    const artist = (track.artist || '').toLowerCase();
-    const album = (track.album || '').toLowerCase();
-    const text = `${title} ${artist} ${album}`;
-    const key = (track.id || `${title}_${artist}`).toLowerCase().replace(/[^a-z0-9_-]/g, '');
-
-    const genres = [];
-    if (text.includes('bollywood') || text.includes('hindi') || text.includes('arijit') || text.includes('pritam') || text.includes('shreya') || text.includes('sonu') || text.includes('kk') || text.includes('jubin') || text.includes('neha') || text.includes('darshan') || text.includes('t-series')) {
-      genres.push('bollywood');
-      genres.push('hindi');
-    }
-    if (text.includes('punjabi') || text.includes('diljit') || text.includes('sidhu') || text.includes('karan aujla') || text.includes('ap dhillon') || text.includes('shubh') || text.includes('badshah') || text.includes('honey singh') || text.includes('b praak') || text.includes('jordan')) {
-      genres.push('punjabi');
-    }
-    if (text.includes('english') || text.includes('pop') || text.includes('billboard') || text.includes('sheeran') || text.includes('swift') || text.includes('weeknd') || text.includes('dua lipa') || text.includes('coldplay') || text.includes('post malone') || text.includes('bieber') || text.includes('charlie puth')) {
-      genres.push('english');
-    }
-    if (text.includes('lofi') || text.includes('chill') || text.includes('slowed') || text.includes('reverb') || text.includes('relax') || text.includes('sleep') || text.includes('study beats') || text.includes('midnight')) {
-      genres.push('lofi');
-    }
-    if (text.includes('romantic') || text.includes('love') || text.includes('tum') || text.includes('dil') || text.includes('ishq') || text.includes('mohabbat') || text.includes('pyaar') || text.includes('hawaale') || text.includes('shayad') || text.includes('kesariya') || text.includes('ve kamleya')) {
-      genres.push('romantic');
-    }
-    if (text.includes('party') || text.includes('dance') || text.includes('remix') || text.includes('dj') || text.includes('banger') || text.includes('dhol')) {
-      genres.push('party');
-    }
-
-    const artists = [];
-    const knownArtists = [
-      'arijit singh', 'pritam', 'shreya ghoshal', 'diljit dosanjh', 'sidhu moose wala',
-      'karan aujla', 'ap dhillon', 'kk', 'atif aslam', 'sonu nigam', 'jubin nautiyal',
-      'badshah', 'honey singh', 'shubh', 'ed sheeran', 'taylor swift', 'the weeknd',
-      'dua lipa', 'coldplay', 'justin bieber', 'anirudh ravichander', 'a.r. rahman',
-      'darshan raval', 'mohit chauhan', 'sachin-jigar', 'vishal mishra', 'b praak'
-    ];
-    for (const ka of knownArtists) {
-      if (text.includes(ka)) {
-        artists.push(ka);
-      }
-    }
-    if (artists.length === 0 && track.artist && track.artist !== 'Online Music') {
-      const firstArtist = track.artist.toLowerCase().split(/[,&]/)[0].trim();
-      if (firstArtist.length > 2) {
-        artists.push(firstArtist);
-      }
-    }
-
-    return { genres, artists, key };
-  }, []);
-
-  // Compute recommendation affinity relevance score for any track
-  const calculateTrackRelevance = useCallback((track, profile, likedIds = []) => {
-    if (!track || !profile) return 0;
-    const { genres, artists, key } = classifyTrack(track);
-
-    // If this specific song was skipped, heavily penalize it
-    if (profile.skippedTrackKeys?.includes(key)) {
-      return -100;
-    }
-
-    let score = 0;
-
-    // Genre affinity (+ for liked, - for skipped)
-    genres.forEach(g => {
-      const gScore = profile.genres?.[g] ?? 0;
-      score += gScore * 3;
-    });
-
-    // Artist affinity (+ for liked, - for skipped)
-    artists.forEach(a => {
-      const aScore = profile.artists?.[a] ?? 0;
-      score += aScore * 4;
-    });
-
-    // Liked song bonus
-    if (likedIds && likedIds.includes(track.id)) {
-      score += 15;
-    }
-
-    // Frequent listen count bonus
-    const listenCount = profile.listenCounts?.[key] || 0;
-    score += Math.min(12, listenCount * 2);
-
-    // Skip count penalty
-    const skipCount = profile.skipCounts?.[key] || 0;
-    score -= skipCount * 18;
-
-    return score;
-  }, [classifyTrack]);
-
-  // Record positive user interest when a track is listened to or liked
-  const recordTrackListen = useCallback((track, isLiked = false) => {
-    if (!track) return;
-    const { genres, artists, key } = classifyTrack(track);
-
-    setTasteProfile(prev => {
-      const next = {
-        ...prev,
-        genres: { ...prev.genres },
-        artists: { ...prev.artists },
-        listenCounts: { ...prev.listenCounts },
-        skipCounts: { ...prev.skipCounts },
-        skippedTrackKeys: [...(prev.skippedTrackKeys || [])]
-      };
-
-      const boost = isLiked ? 5 : 3;
-
-      // Positive boost for genres
-      genres.forEach(g => {
-        next.genres[g] = (next.genres[g] || 0) + boost;
-      });
-
-      // Positive boost for artists
-      artists.forEach(a => {
-        next.artists[a] = (next.artists[a] || 0) + (boost + 1);
-      });
-
-      // Increase listen count for this track
-      next.listenCounts[key] = (next.listenCounts[key] || 0) + 1;
-
-      // Clear from skipped list if user now completed or listened to it
-      if (next.skippedTrackKeys.includes(key)) {
-        next.skippedTrackKeys = next.skippedTrackKeys.filter(k => k !== key);
-      }
-
-      try {
-        localStorage.setItem('secret_bubble_taste_profile', JSON.stringify(next));
-        localStorage.setItem('secret_bubble_user_tastes', JSON.stringify(next.genres));
-      } catch {}
-
-      return next;
-    });
-
-    setUserTastes(prev => {
-      const next = { ...prev };
-      genres.forEach(g => {
-        next[g] = (next[g] || 0) + (isLiked ? 5 : 3);
-      });
-      return next;
-    });
-
-    setTasteFeedback({
-      type: 'listen',
-      message: isLiked ? 'Liked! Recommending more like this' : 'Tuned: More songs like this will appear in your feed'
-    });
-    setTimeout(() => setTasteFeedback(null), 3200);
-  }, [classifyTrack]);
-
-  // Record negative affinity when user skips a track or marks dislike
-  const recordTrackSkip = useCallback((track, reason = 'skip') => {
-    if (!track) return;
-    const { genres, artists, key } = classifyTrack(track);
-
-    setTasteProfile(prev => {
-      const next = {
-        ...prev,
-        genres: { ...prev.genres },
-        artists: { ...prev.artists },
-        listenCounts: { ...prev.listenCounts },
-        skipCounts: { ...prev.skipCounts },
-        skippedTrackKeys: [...(prev.skippedTrackKeys || [])]
-      };
-
-      const penalty = reason === 'explicit_dislike' ? 4 : 2;
-
-      // Decrease affinity for skipped genres
-      genres.forEach(g => {
-        next.genres[g] = (next.genres[g] || 0) - penalty;
-      });
-
-      // Decrease affinity for skipped artists
-      artists.forEach(a => {
-        next.artists[a] = (next.artists[a] || 0) - (penalty + 1);
-      });
-
-      // Record skip for this specific song
-      next.skipCounts[key] = (next.skipCounts[key] || 0) + 1;
-      if (!next.skippedTrackKeys.includes(key)) {
-        next.skippedTrackKeys.push(key);
-      }
-
-      try {
-        localStorage.setItem('secret_bubble_taste_profile', JSON.stringify(next));
-        localStorage.setItem('secret_bubble_user_tastes', JSON.stringify(next.genres));
-      } catch {}
-
-      return next;
-    });
-
-    setUserTastes(prev => {
-      const next = { ...prev };
-      genres.forEach(g => {
-        next[g] = (next[g] || 0) - (reason === 'explicit_dislike' ? 4 : 2);
-      });
-      return next;
-    });
-
-    // In real-time: Demote/filter remaining tracks in the current feed matching the skipped genre or artist!
-    setTracks(prev => {
-      return prev.filter(t => {
-        if (t.id === track.id) return false; // remove the skipped song itself from upcoming
-        const tClass = classifyTrack(t);
-        const hasMatchingArtist = tClass.artists.some(a => artists.includes(a));
-        if (hasMatchingArtist && reason === 'explicit_dislike') {
-          return false;
-        }
-        return true;
-      });
-    });
-
-    setTasteFeedback({
-      type: 'skip',
-      message: 'Tuned: Showing fewer songs of this type in your feed'
-    });
-    setTimeout(() => setTasteFeedback(null), 3200);
-  }, [classifyTrack]);
-
-  // Backward compatible alias
-  const recordTrackTaste = useCallback((track) => {
-    recordTrackListen(track, false);
-  }, [recordTrackListen]);
-
-  // Log music play activity to local counters and backend admin telemetry
-  const logMusicTelemetry = useCallback((track) => {
-    if (!track) return;
-    recordTrackTaste(track);
-    recordTrackToHistory(track);
-    try {
-      const cur = parseInt(localStorage.getItem('secret_bubble_music_play_count') || '0', 10);
-      localStorage.setItem('secret_bubble_music_play_count', String(cur + 1));
-
-      const userStr = localStorage.getItem('secure_chat_user');
-      const u = userStr ? JSON.parse(userStr) : null;
-      let anonId = localStorage.getItem('secret_bubble_anon_id');
-      if (!anonId) {
-        anonId = 'guest_' + Math.random().toString(36).substring(2, 9);
-        localStorage.setItem('secret_bubble_anon_id', anonId);
-      }
-      const isGuest = !u || !u.id;
-
-      const apiBase = getBackendApiUrl();
-      if (apiBase) {
-        fetch(`${apiBase}/api/analytics/activity`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: isGuest ? anonId : u.id,
-            username: isGuest ? 'Anonymous Guest' : (u.name || u.username),
-            isGuest: isGuest,
-            activityType: 'music',
-            trackTitle: track?.title || 'Unknown Track'
-          })
-        }).catch(() => {});
-      }
-    } catch (e) {}
-  }, [getBackendApiUrl, recordTrackTaste, recordTrackToHistory]);
 
   // Ping active presence so even non-streaming visitors are recorded
   useEffect(() => {
