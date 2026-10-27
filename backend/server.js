@@ -1728,6 +1728,46 @@ function setMusicFeedCache(key, data) {
   MUSIC_FEED_CACHE.set(key, { data, ts: Date.now() });
 }
 
+// Fast iTunes Direct Audio Search (Apple 256kbps AAC previews)
+async function searchItunesTracks(query, limit = 25) {
+  if (!query) return [];
+  try {
+    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=music&entity=song&limit=${limit}`;
+    const itRes = await fetch(itunesUrl, {
+      signal: AbortSignal.timeout ? AbortSignal.timeout(3500) : undefined
+    });
+    if (!itRes.ok) return [];
+    const itData = await itRes.json();
+    if (!itData?.results || !Array.isArray(itData.results)) return [];
+    const results = [];
+    for (const item of itData.results) {
+      if (item.previewUrl) {
+        const durSecs = item.trackTimeMillis ? Math.round(item.trackTimeMillis / 1000) : 240;
+        const min = Math.floor(durSecs / 60);
+        const sec = durSecs % 60;
+        const art = (item.artworkUrl100 || '').replace('100x100bb.jpg', '600x600bb.jpg').replace('100x100bb.png', '600x600bb.png');
+        const releaseYear = item.releaseDate ? parseInt(item.releaseDate.slice(0, 4), 10) : 0;
+        results.push({
+          id: `itunes-${item.trackId}`,
+          title: cleanHtml(item.trackName),
+          artist: cleanHtml(item.artistName),
+          album: cleanHtml(item.collectionName || 'Single'),
+          duration: durSecs,
+          durationText: `${min}:${sec < 10 ? '0' : ''}${sec}`,
+          artwork: art || item.artworkUrl100,
+          url: item.previewUrl,
+          year: releaseYear || undefined,
+          releaseDate: item.releaseDate || '',
+          isAudioStream: true
+        });
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
 // Reusable YouTube Video Search Scraper (Fast fallback with oEmbed and rich recency ranking)
 async function searchYouTubeVideos(q, limit = 25) {
   if (!q) return [];
@@ -1994,6 +2034,14 @@ app.get('/api/music/search', async (req, res) => {
         return res.json(payload);
       }
 
+      // Fallback to iTunes direct audio streams before YouTube
+      const itunesResults = await searchItunesTracks(q, limit);
+      if (itunesResults.length > 0) {
+        const payload = { success: true, page: 1, total: itunesResults.length, results: itunesResults, hasMore: false, source: 'itunes-audio' };
+        setMusicSearchCache(cacheKey, payload);
+        return res.json(payload);
+      }
+
       // Fallback directly to YouTube scraper on page 1 without 302 redirect
       const ytResults = await searchYouTubeVideos(q, limit);
       const payload = { success: true, page: 1, total: ytResults.length, results: ytResults, hasMore: false, source: 'youtube-fallback' };
@@ -2007,6 +2055,11 @@ app.get('/api/music/search', async (req, res) => {
     console.error('Unified audio search error:', err.message);
     if (page === 1) {
       try {
+        const itunesResults = await searchItunesTracks(q, limit);
+        if (itunesResults.length > 0) {
+          const payload = { success: true, page: 1, total: itunesResults.length, results: itunesResults, hasMore: false, source: 'itunes-audio' };
+          return res.json(payload);
+        }
         const ytResults = await searchYouTubeVideos(q, limit);
         if (ytResults.length > 0) {
           const payload = { success: true, page: 1, total: ytResults.length, results: ytResults, hasMore: false, source: 'youtube-fallback' };

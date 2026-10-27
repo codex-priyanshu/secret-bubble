@@ -685,6 +685,7 @@ export default function StealthMusicPlayer({
   const [tasteFeedback, setTasteFeedback] = useState(null); // { type: 'listen' | 'skip', message: string } | null
   const currentTrackStartTimeRef = useRef(Date.now());
   const hasLoggedListenRef = useRef(false);
+  const isYtActuallyPlayingRef = useRef(false);
   const [selectedGenre, setSelectedGenre] = useState('for_you'); // 'for_you' | 'hindi' | 'bollywood' | 'punjabi' | 'english' | 'lofi' | 'romantic'
   const [isFeedRefreshing, setIsFeedRefreshing] = useState(false);
 
@@ -1337,7 +1338,8 @@ export default function StealthMusicPlayer({
 
       if (nextTrack.url && audioRef.current) {
         audioRef.current.src = nextTrack.url;
-        audioRef.current.load();
+        audioRef.current.muted = isMuted;
+        audioRef.current.volume = isMuted ? 0 : volume / 100;
         audioRef.current.play().catch(err => console.warn('Next track direct play notice:', err));
         if (iframeRef.current?.contentWindow) {
           try {
@@ -1347,13 +1349,30 @@ export default function StealthMusicPlayer({
             );
           } catch (e) {}
         }
+      } else if (nextTrack.isYoutube && nextTrack.youtubeId) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.removeAttribute('src');
+        }
+        [300, 800, 1500].forEach(delay => {
+          setTimeout(() => {
+            if (iframeRef.current?.contentWindow) {
+              try {
+                if (!isMuted) {
+                  iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                  iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                }
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              } catch (e) {}
+            }
+          }, delay);
+        });
       } else if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.removeAttribute('src');
-        audioRef.current.load();
       }
     }
-  }, [tracks, currentTrack, isShuffle, duration, currentTime, recordTrackSkip]);
+  }, [tracks, currentTrack, isShuffle, duration, currentTime, recordTrackSkip, isMuted, volume]);
 
   const handlePrevTrack = useCallback(() => {
     if (!tracks || tracks.length === 0) return;
@@ -1375,7 +1394,8 @@ export default function StealthMusicPlayer({
 
       if (prevTrack.url && audioRef.current) {
         audioRef.current.src = prevTrack.url;
-        audioRef.current.load();
+        audioRef.current.muted = isMuted;
+        audioRef.current.volume = isMuted ? 0 : volume / 100;
         audioRef.current.play().catch(err => console.warn('Prev track direct play notice:', err));
         if (iframeRef.current?.contentWindow) {
           try {
@@ -1385,10 +1405,27 @@ export default function StealthMusicPlayer({
             );
           } catch (e) {}
         }
+      } else if (prevTrack.isYoutube && prevTrack.youtubeId) {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.removeAttribute('src');
+        }
+        [300, 800, 1500].forEach(delay => {
+          setTimeout(() => {
+            if (iframeRef.current?.contentWindow) {
+              try {
+                if (!isMuted) {
+                  iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                  iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                }
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              } catch (e) {}
+            }
+          }, delay);
+        });
       } else if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.removeAttribute('src');
-        audioRef.current.load();
       }
     }
   }, [tracks, currentTrack]);
@@ -1950,6 +1987,31 @@ export default function StealthMusicPlayer({
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (!data) return;
 
+        // Auto-unmute and volume sync on initialization or delivery
+        if (data.event === 'onReady' || data.event === 'initialDelivery') {
+          if (iframeRef.current?.contentWindow) {
+            try {
+              if (!isMuted) {
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+              }
+              if (isPlaying) {
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              }
+            } catch (e) {}
+          }
+        }
+
+        // Auto-unmute if YouTube autoplays muted while user has not muted
+        if (data.info && typeof data.info.muted === 'boolean' && data.info.muted && !isMuted) {
+          if (iframeRef.current?.contentWindow) {
+            try {
+              iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+              iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+            } catch (e) {}
+          }
+        }
+
         // Synchronize duration & current time from real YouTube player
         if (data.event === 'infoDelivery' && data.info) {
           if (typeof data.info.currentTime === 'number') {
@@ -1968,6 +2030,7 @@ export default function StealthMusicPlayer({
         // Handle video playback states: 0 = ENDED, 1 = PLAYING, 2 = PAUSED
         if (data.event === 'onStateChange') {
           if (data.info === 0) {
+            isYtActuallyPlayingRef.current = false;
             // Full song ended -> smoothly play next track (natural end, not manual skip)
             if (!hasLoggedListenRef.current && currentTrack) {
               hasLoggedListenRef.current = true;
@@ -1975,8 +2038,16 @@ export default function StealthMusicPlayer({
             }
             handleNextTrack(false);
           } else if (data.info === 1) {
+            isYtActuallyPlayingRef.current = true;
             setIsPlaying(true);
+            if (!isMuted && iframeRef.current?.contentWindow) {
+              try {
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+              } catch (e) {}
+            }
           } else if (data.info === 2) {
+            isYtActuallyPlayingRef.current = false;
             setIsPlaying(false);
           }
         }
@@ -1984,6 +2055,7 @@ export default function StealthMusicPlayer({
         // Catch YouTube embed errors (100 = deleted/private, 101/150 = owner disabled embed)
         if (data.event === 'onError') {
           console.warn('[YouTube Playback] Error code reported by embed:', data.info);
+          isYtActuallyPlayingRef.current = false;
           handleNextTrack(false);
         }
       } catch (e) {}
@@ -1991,7 +2063,7 @@ export default function StealthMusicPlayer({
 
     window.addEventListener('message', handleYtMessage);
     return () => window.removeEventListener('message', handleYtMessage);
-  }, [handleNextTrack, currentTrack, duration, recordTrackListen]);
+  }, [handleNextTrack, currentTrack, duration, recordTrackListen, isMuted, volume, isPlaying]);
 
   // Time progression for HTML5 audio
   const handleTimeUpdate = () => {
@@ -2033,7 +2105,8 @@ export default function StealthMusicPlayer({
       const fallback160 = originalUrl.replace('_320.mp4', '_160.mp4');
       setCurrentTrack(prev => ({ ...prev, url: fallback160, originalUrl }));
       audio.src = fallback160;
-      audio.load();
+      audio.muted = isMuted;
+      audio.volume = isMuted ? 0 : volume / 100;
       if (isPlaying) audio.play().catch(() => {});
       return;
     }
@@ -2043,7 +2116,8 @@ export default function StealthMusicPlayer({
       const fallback96 = originalUrl.replace(/_(?:320|160)\.mp4/, '_96.mp4');
       setCurrentTrack(prev => ({ ...prev, url: fallback96, originalUrl }));
       audio.src = fallback96;
-      audio.load();
+      audio.muted = isMuted;
+      audio.volume = isMuted ? 0 : volume / 100;
       if (isPlaying) audio.play().catch(() => {});
       return;
     }
@@ -2055,7 +2129,8 @@ export default function StealthMusicPlayer({
         const proxyStreamUrl = `${apiBase}/api/music/proxy-stream?url=${encodeURIComponent(originalUrl)}`;
         setCurrentTrack(prev => ({ ...prev, url: proxyStreamUrl, originalUrl }));
         audio.src = proxyStreamUrl;
-        audio.load();
+        audio.muted = isMuted;
+        audio.volume = isMuted ? 0 : volume / 100;
         if (isPlaying) audio.play().catch(() => {});
         return;
       }
@@ -2090,7 +2165,6 @@ export default function StealthMusicPlayer({
           if (audio) {
             audio.pause();
             audio.removeAttribute('src');
-            audio.load();
           }
           setCurrentTrack(prev => ({
             ...prev,
@@ -2100,6 +2174,19 @@ export default function StealthMusicPlayer({
             isAudioStream: false
           }));
           setIsPlaying(true);
+          [300, 800, 1500, 2500].forEach(delay => {
+            setTimeout(() => {
+              if (iframeRef.current?.contentWindow) {
+                try {
+                  if (!isMuted) {
+                    iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                    iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                  }
+                  iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                } catch (e) {}
+              }
+            }, delay);
+          });
           return;
         }
       } catch (healingErr) {
@@ -2150,6 +2237,7 @@ export default function StealthMusicPlayer({
     let timer = null;
     if (isPlaying && currentTrack?.isYoutube) {
       timer = setInterval(() => {
+        if (!isYtActuallyPlayingRef.current) return;
         setCurrentTime(prev => {
           const next = prev + 1;
           if (!hasLoggedListenRef.current && (next >= 20 || (duration > 0 && next >= duration * 0.25))) {
@@ -2185,6 +2273,8 @@ export default function StealthMusicPlayer({
     // Direct synchronous play/pause on audio element for instant user-gesture compliance
     if (currentTrack?.url && audioRef.current) {
       if (nextPlay) {
+        audioRef.current.muted = isMuted;
+        audioRef.current.volume = isMuted ? 0 : volume / 100;
         audioRef.current.play().catch(err => console.warn('Audio play toggle caught:', err));
       } else {
         audioRef.current.pause();
@@ -2198,6 +2288,16 @@ export default function StealthMusicPlayer({
           JSON.stringify({ event: 'command', func: cmd, args: [] }),
           '*'
         );
+        if (nextPlay && !isMuted) {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+            '*'
+          );
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }),
+            '*'
+          );
+        }
       } catch (e) {}
     }
     if (canvasIframeRef.current?.contentWindow) {
@@ -2665,12 +2765,14 @@ export default function StealthMusicPlayer({
 
     // Direct synchronous user-gesture playback to bypass mobile autoplay blocks
     if (track.url && audioRef.current) {
-      audioRef.current.src = track.url;
+      if (audioRef.current.src !== track.url) {
+        audioRef.current.src = track.url;
+      }
       audioRef.current.muted = isMuted;
       audioRef.current.volume = isMuted ? 0 : volume / 100;
-      audioRef.current.load();
       audioRef.current.play().catch(err => {
         console.warn('Direct user gesture play caught:', err);
+        handleAudioError(err);
       });
       if (iframeRef.current?.contentWindow) {
         try {
@@ -2699,25 +2801,29 @@ export default function StealthMusicPlayer({
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.removeAttribute('src');
-        audioRef.current.load();
       }
-      setShowVideoMode(true);
-      if (iframeRef.current?.contentWindow) {
-        try {
-          iframeRef.current.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
-            '*'
-          );
-          iframeRef.current.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }),
-            '*'
-          );
-          iframeRef.current.contentWindow.postMessage(
-            JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
-            '*'
-          );
-        } catch (e) {}
-      }
+      [200, 600, 1200, 2200].forEach(delay => {
+        setTimeout(() => {
+          if (iframeRef.current?.contentWindow) {
+            try {
+              if (!isMuted) {
+                iframeRef.current.contentWindow.postMessage(
+                  JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+                  '*'
+                );
+                iframeRef.current.contentWindow.postMessage(
+                  JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }),
+                  '*'
+                );
+              }
+              iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+                '*'
+              );
+            } catch (e) {}
+          }
+        }, delay);
+      });
 
       // Background auto-upgrade to 320kbps direct studio audio if song is in streaming catalog
       const cleanSearchTitle = (track.title || '')
@@ -2742,8 +2848,15 @@ export default function StealthMusicPlayer({
                 ...prev,
                 url: bestAudio.url,
                 artwork: bestAudio.artwork || prev.artwork,
-                isAudioStream: true
+                isAudioStream: true,
+                isYoutube: false
               } : prev));
+              if (audioRef.current) {
+                audioRef.current.src = bestAudio.url;
+                audioRef.current.muted = isMuted;
+                audioRef.current.volume = isMuted ? 0 : volume / 100;
+                audioRef.current.play().catch(() => {});
+              }
             }
           })
           .catch(() => {});
@@ -3613,81 +3726,127 @@ export default function StealthMusicPlayer({
       )}
 
       {/* Persistent YouTube Audio/Video Frame for YouTube stream tracks */}
-      {currentTrack.isYoutube && currentTrack.youtubeId && (
-        <div 
-          style={
-            showVideoMode
-              ? undefined
-              : (viewMode === 'nowPlaying' && canvasMode === 'canvas' && canvasSlotRect)
-                ? {
-                    position: 'fixed',
-                    top: `${canvasSlotRect.top}px`,
-                    left: `${canvasSlotRect.left}px`,
-                    width: `${canvasSlotRect.width}px`,
-                    height: `${canvasSlotRect.height}px`,
-                    zIndex: 20
-                  }
-                : {
-                    position: 'fixed',
-                    bottom: '12px',
-                    right: '12px',
-                    width: '160px',
-                    height: '90px',
-                    opacity: 0.001,
-                    pointerEvents: 'none',
-                    zIndex: 1
-                  }
-          }
-          className={
-            showVideoMode 
-              ? "fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200" 
-              : (viewMode === 'nowPlaying' && canvasMode === 'canvas' && canvasSlotRect)
-                ? "rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black group"
-                : "fixed pointer-events-none overflow-hidden"
-          }
-        >
-          {showVideoMode ? (
-            <div className="w-full max-w-2xl flex flex-col gap-3">
-              {/* Modal Top Bar */}
-              <div className="flex items-center justify-between text-white px-1">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="p-2 rounded-full bg-[#1ed760]/20 text-[#1ed760]">
-                    <Video className="w-4 h-4" />
+      {currentTrack.isYoutube && currentTrack.youtubeId && (() => {
+        const safeOrigin = typeof window !== 'undefined' && window.location.origin && !window.location.origin.startsWith('capacitor:') && !window.location.origin.startsWith('file:') && !window.location.origin.includes('localhost') ? window.location.origin : '';
+        const originParam = safeOrigin ? `&origin=${encodeURIComponent(safeOrigin)}` : '';
+        const ytEmbedUrl = `https://www.youtube.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1${originParam}`;
+
+        return (
+          <div 
+            style={
+              showVideoMode
+                ? undefined
+                : (viewMode === 'nowPlaying' && canvasMode === 'canvas' && canvasSlotRect)
+                  ? {
+                      position: 'fixed',
+                      top: `${canvasSlotRect.top}px`,
+                      left: `${canvasSlotRect.left}px`,
+                      width: `${canvasSlotRect.width}px`,
+                      height: `${canvasSlotRect.height}px`,
+                      zIndex: 20
+                    }
+                  : {
+                      position: 'fixed',
+                      bottom: '84px',
+                      right: '12px',
+                      width: '200px',
+                      height: '112px',
+                      opacity: 1,
+                      pointerEvents: 'auto',
+                      zIndex: 40
+                    }
+            }
+            className={
+              showVideoMode 
+                ? "fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200" 
+                : (viewMode === 'nowPlaying' && canvasMode === 'canvas' && canvasSlotRect)
+                  ? "rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black group"
+                  : "rounded-xl overflow-hidden shadow-2xl border border-white/20 bg-black group relative animate-in fade-in duration-200"
+            }
+          >
+            {showVideoMode ? (
+              <div className="w-full max-w-2xl flex flex-col gap-3">
+                {/* Modal Top Bar */}
+                <div className="flex items-center justify-between text-white px-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="p-2 rounded-full bg-[#1ed760]/20 text-[#1ed760]">
+                      <Video className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-sm sm:text-base truncate">{currentTrack.title}</h3>
+                      <p className="text-xs text-[#b3b3b3] truncate">{currentTrack.artist} • Official Music Video</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-sm sm:text-base truncate">{currentTrack.title}</h3>
-                    <p className="text-xs text-[#b3b3b3] truncate">{currentTrack.artist} • Official Music Video</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {currentTrack.youtubeId && (
+                      <a
+                        href={`https://www.youtube.com/watch?v=${currentTrack.youtubeId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 rounded-full bg-[#282828] hover:bg-[#333] text-xs font-medium text-white flex items-center gap-1.5 transition border border-white/10"
+                        title="Watch directly on YouTube"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-[#1ed760]" />
+                        <span className="hidden sm:inline">YouTube</span>
+                      </a>
+                    )}
+                    <button
+                      onClick={() => setShowVideoMode(false)}
+                      className="p-2 rounded-full bg-[#282828] hover:bg-[#383838] text-white transition active:scale-95 cursor-pointer"
+                      title="Close Video"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+
+                {/* 16:9 Video Player Container */}
+                <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black">
+                  <iframe
+                    ref={iframeRef}
+                    key={currentTrack.youtubeId}
+                    src={ytEmbedUrl}
+                    title={currentTrack.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    className="w-full h-full"
+                    onLoad={(e) => {
+                      try {
+                        const win = e.target.contentWindow;
+                        if (win) {
+                          if (!isMuted) {
+                            win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                            win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                          }
+                          win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                        }
+                      } catch (err) {}
+                    }}
+                  />
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between text-[11px] text-[#b3b3b3] px-1">
+                  <span>Direct audio stream synced</span>
                   {currentTrack.youtubeId && (
                     <a
                       href={`https://www.youtube.com/watch?v=${currentTrack.youtubeId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-2.5 py-1 rounded-full bg-[#282828] hover:bg-[#333] text-xs font-medium text-white flex items-center gap-1.5 transition border border-white/10"
-                      title="Watch directly on YouTube"
+                      className="text-[#1ed760] hover:underline flex items-center gap-1"
                     >
-                      <ExternalLink className="w-3.5 h-3.5 text-[#1ed760]" />
-                      <span className="hidden sm:inline">YouTube</span>
+                      Open on YouTube <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
-                  <button
-                    onClick={() => setShowVideoMode(false)}
-                    className="p-2 rounded-full bg-[#282828] hover:bg-[#383838] text-white transition active:scale-95 cursor-pointer"
-                    title="Close Video"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
               </div>
-
-              {/* 16:9 Video Player Container */}
-              <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black">
+            ) : (
+              <div className="relative w-full h-full">
                 <iframe
                   ref={iframeRef}
                   key={currentTrack.youtubeId}
-                  src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+                  src={ytEmbedUrl}
                   title={currentTrack.title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   referrerPolicy="strict-origin-when-cross-origin"
@@ -3697,69 +3856,31 @@ export default function StealthMusicPlayer({
                     try {
                       const win = e.target.contentWindow;
                       if (win) {
-                        win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-                        win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
-                        win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                        if (!isMuted) {
+                          win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                          win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                        }
+                        if (isPlaying) {
+                          win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                        }
                       }
                     } catch (err) {}
                   }}
                 />
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-between text-[11px] text-[#b3b3b3] px-1">
-                <span>Direct audio stream synced</span>
-                {currentTrack.youtubeId && (
-                  <a
-                    href={`https://www.youtube.com/watch?v=${currentTrack.youtubeId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#1ed760] hover:underline flex items-center gap-1"
-                  >
-                    Open on YouTube <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="relative w-full h-full">
-              <iframe
-                ref={iframeRef}
-                key={currentTrack.youtubeId}
-                src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
-                title={currentTrack.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-                className="w-full h-full"
-                onLoad={(e) => {
-                  try {
-                    const win = e.target.contentWindow;
-                    if (win) {
-                      win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-                      win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
-                      if (isPlaying) {
-                        win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-                      }
-                    }
-                  } catch (err) {}
-                }}
-              />
-              {viewMode === 'nowPlaying' && canvasMode === 'canvas' && (
                 <button
                   type="button"
                   onClick={() => setShowVideoMode(true)}
-                  className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-black/70 hover:bg-black text-white hover:text-[#1ed760] transition shadow-lg z-30 cursor-pointer"
-                  title="Watch Full Video"
-                  aria-label="Watch Full Video"
+                  className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/75 hover:bg-black text-white hover:text-[#1ed760] transition shadow-lg z-30 cursor-pointer"
+                  title="Expand Full Video"
+                  aria-label="Expand Full Video"
                 >
-                  <Maximize2 className="w-4 h-4" />
+                  <Maximize2 className="w-3.5 h-3.5" />
                 </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Full Video Modal for Direct Audio Tracks with Video Canvas */}
       {showVideoMode && !currentTrack.isYoutube && currentTrack.youtubeId && (
@@ -3799,16 +3920,22 @@ export default function StealthMusicPlayer({
 
             {/* 16:9 Video Player Container */}
             <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/20 bg-black">
-              <iframe
-                ref={modalVideoIframeRef}
-                key={`modal-video-${currentTrack.youtubeId}`}
-                src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1&start=${Math.floor(currentTime)}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
-                title={currentTrack.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-                className="w-full h-full"
-              />
+              {(() => {
+                const safeOrigin = typeof window !== 'undefined' && window.location.origin && !window.location.origin.startsWith('capacitor:') && !window.location.origin.startsWith('file:') && !window.location.origin.includes('localhost') ? window.location.origin : '';
+                const originParam = safeOrigin ? `&origin=${encodeURIComponent(safeOrigin)}` : '';
+                return (
+                  <iframe
+                    ref={modalVideoIframeRef}
+                    key={`modal-video-${currentTrack.youtubeId}`}
+                    src={`https://www.youtube.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1&start=${Math.floor(currentTime)}${originParam}`}
+                    title={currentTrack.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                );
+              })()}
             </div>
 
             {/* Modal Footer */}
@@ -5764,7 +5891,7 @@ export default function StealthMusicPlayer({
                     <iframe
                       ref={canvasIframeRef}
                       key={`canvas-${currentTrack.youtubeId}`}
-                      src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=${isPlaying ? 1 : 0}&mute=1&controls=0&loop=1&playlist=${currentTrack.youtubeId}&playsinline=1&modestbranding=1&rel=0&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+                      src={`https://www.youtube.com/embed/${currentTrack.youtubeId}?autoplay=${isPlaying ? 1 : 0}&mute=1&controls=0&loop=1&playlist=${currentTrack.youtubeId}&playsinline=1&modestbranding=1&rel=0&enablejsapi=1`}
                       title="Spotify Looping Video Canvas"
                       className="w-full h-full object-cover scale-110 pointer-events-none"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
