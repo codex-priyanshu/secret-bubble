@@ -2701,13 +2701,52 @@ export default function StealthMusicPlayer({
         audioRef.current.removeAttribute('src');
         audioRef.current.load();
       }
+      setShowVideoMode(true);
       if (iframeRef.current?.contentWindow) {
         try {
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+            '*'
+          );
+          iframeRef.current.contentWindow.postMessage(
+            JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }),
+            '*'
+          );
           iframeRef.current.contentWindow.postMessage(
             JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
             '*'
           );
         } catch (e) {}
+      }
+
+      // Background auto-upgrade to 320kbps direct studio audio if song is in streaming catalog
+      const cleanSearchTitle = (track.title || '')
+        .replace(/\|.*$/g, '')
+        .replace(/\(.*?\)/g, '')
+        .replace(/\[.*?\]/g, '')
+        .replace(/official\s*(video|audio|music|lyrical)/gi, '')
+        .replace(/full\s*song/gi, '')
+        .replace(/new\s*song/gi, '')
+        .replace(/hd\s*video/gi, '')
+        .replace(/#\w+/g, '')
+        .trim();
+      const apiBase = getBackendApiUrl();
+      if (cleanSearchTitle && apiBase) {
+        fetch(`${apiBase}/api/music/search?q=${encodeURIComponent(cleanSearchTitle)}&page=1`)
+          .then(r => r.json())
+          .then(data => {
+            if (data?.results?.[0]?.url) {
+              const bestAudio = data.results[0];
+              console.log(`[Audio Upgrade] Upgraded YouTube song "${track.title}" to direct 320kbps audio: ${bestAudio.title}`);
+              setCurrentTrack(prev => (prev?.id === track.id ? {
+                ...prev,
+                url: bestAudio.url,
+                artwork: bestAudio.artwork || prev.artwork,
+                isAudioStream: true
+              } : prev));
+            }
+          })
+          .catch(() => {});
       }
     } else if (!track.url && !track.youtubeId) {
       // Auto-heal songs missing stream URL and youtubeId
@@ -3590,13 +3629,13 @@ export default function StealthMusicPlayer({
                   }
                 : {
                     position: 'fixed',
-                    left: '-9999px',
-                    top: '0px',
-                    width: '320px',
-                    height: '180px',
-                    opacity: 1,
+                    bottom: '12px',
+                    right: '12px',
+                    width: '160px',
+                    height: '90px',
+                    opacity: 0.001,
                     pointerEvents: 'none',
-                    zIndex: -50
+                    zIndex: 1
                   }
           }
           className={
@@ -3648,12 +3687,22 @@ export default function StealthMusicPlayer({
                 <iframe
                   ref={iframeRef}
                   key={currentTrack.youtubeId}
-                  src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+                  src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&controls=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                   title={currentTrack.title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                   className="w-full h-full"
+                  onLoad={(e) => {
+                    try {
+                      const win = e.target.contentWindow;
+                      if (win) {
+                        win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                        win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                        win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                      }
+                    } catch (err) {}
+                  }}
                 />
               </div>
 
@@ -3677,12 +3726,24 @@ export default function StealthMusicPlayer({
               <iframe
                 ref={iframeRef}
                 key={currentTrack.youtubeId}
-                src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=${isPlaying ? 1 : 0}&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+                src={`https://www.youtube-nocookie.com/embed/${currentTrack.youtubeId}?autoplay=1&enablejsapi=1&playsinline=1&rel=0&modestbranding=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                 title={currentTrack.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen
                 className="w-full h-full"
+                onLoad={(e) => {
+                  try {
+                    const win = e.target.contentWindow;
+                    if (win) {
+                      win.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
+                      win.postMessage(JSON.stringify({ event: 'command', func: 'setVolume', args: [volume || 90] }), '*');
+                      if (isPlaying) {
+                        win.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                      }
+                    }
+                  } catch (err) {}
+                }}
               />
               {viewMode === 'nowPlaying' && canvasMode === 'canvas' && (
                 <button
