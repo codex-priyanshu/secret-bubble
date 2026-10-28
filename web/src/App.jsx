@@ -471,7 +471,25 @@ export default function App() {
   const [isAppLocked, setIsAppLocked] = useState(false);
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
-  const [unreadCounts, setUnreadCounts] = useState({});
+  const [unreadCounts, setUnreadCounts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('secure_chat_unread_counts');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const updateUnreadCounts = useCallback((updater) => {
+    setUnreadCounts(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try {
+        localStorage.setItem('secure_chat_unread_counts', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
   const [unlockedPasscodeTexts, setUnlockedPasscodeTexts] = useState({});
 
   const selectedTargetRef = useRef(selectedTarget);
@@ -486,37 +504,84 @@ export default function App() {
 
   const backendUrl = useMemo(() => getBackendUrl(), []);
 
-  // Session token verification against backend on startup
+  // Session token verification against backend on startup (Guaranteed never to wipe local user)
   useEffect(() => {
     const token = localStorage.getItem('secure_chat_token');
-    if (!token) {
-      if (currentUser) {
-        setCurrentUser(null);
-        localStorage.removeItem('secure_chat_user');
-      }
+    const localUser = currentUserRef.current;
+
+    // Auto-create/restore token if missing but local user exists
+    if (!token && localUser) {
+      fetch(`${backendUrl}/api/auth/quick-onboard`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: localUser.name,
+          username: localUser.username,
+          avatarUrl: localUser.avatarUrl,
+          favoriteVibes: localUser.favoriteVibes || []
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.token) {
+            localStorage.setItem('secure_chat_token', data.token);
+            setAuthToken(data.token);
+          }
+        })
+        .catch(() => {});
       return;
     }
 
-    fetch(`${backendUrl}/api/auth/me`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.user) {
-          setCurrentUser(data.user);
-          localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
-        } else {
-          // If server is cold-booting or restarted, do not immediately erase user
-          console.warn('Session verification notice:', data?.message);
+    if (token) {
+      fetch(`${backendUrl}/api/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
       })
-      .catch((err) => {
-        // Offline / network failure / cold boot - retain state for offline usage
-        console.warn('Backend connection notice:', err?.message || err);
-      });
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.user) {
+            setCurrentUser(data.user);
+            localStorage.setItem('secure_chat_user', JSON.stringify(data.user));
+          } else {
+            console.warn('Session verification notice:', data?.message);
+          }
+        })
+        .catch((err) => {
+          console.warn('Backend connection notice:', err?.message || err);
+        });
+    }
   }, [backendUrl]);
+
+  // Restore all cached messages across all chats to the server upon boot/startup
+  const restoreAllLocalCachesToServer = useCallback(() => {
+    try {
+      const allMsgs = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('secure_chat_cache_')) {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              allMsgs.push(...parsed);
+            }
+          }
+        }
+      }
+      if (allMsgs.length > 0) {
+        fetch(`${backendUrl}/api/messages/restore-cache`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: allMsgs.slice(-1000) })
+        }).catch(() => {});
+      }
+    } catch {}
+  }, [backendUrl]);
+
+  useEffect(() => {
+    restoreAllLocalCachesToServer();
+  }, [restoreAllLocalCachesToServer]);
 
   const [settings, setSettings] = useState(() => {
     try {
@@ -695,7 +760,7 @@ export default function App() {
         const unreadData = await unreadRes.json();
         if (unreadData.success) {
           if (unreadData.unreadCounts) {
-            setUnreadCounts(prev => ({ ...prev, ...unreadData.unreadCounts }));
+            updateUnreadCounts(prev => ({ ...prev, ...unreadData.unreadCounts }));
           }
           if (Array.isArray(unreadData.pendingMessages) && unreadData.pendingMessages.length > 0) {
             const currentUserId = currentUserRef.current.id;
@@ -751,7 +816,7 @@ export default function App() {
     } catch {
       setMessages([]);
     }
-  }, [selectedTarget.type, selectedTarget.id]);
+  }, [selectedTarget.type, selectedTarget.id, isStealthMode]);
 
   // Fetch Messages for current selected target
   const fetchMessages = useCallback(async () => {
@@ -806,20 +871,20 @@ export default function App() {
           }
           if (currentTarget.type === 'user') {
             socket.emit('mark_chat_read', { senderId: currentTarget.id, viewerId: currentUserRef.current.id });
-            setUnreadCounts(prev => ({ ...prev, [currentTarget.id]: 0 }));
+            updateUnreadCounts(prev => ({ ...prev, [currentTarget.id]: 0 }));
           }
         }
       }
     } catch (e) {}
-  }, [backendUrl, socket]);
+  }, [backendUrl, socket, updateUnreadCounts]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && !isStealthMode) {
       fetchUsers();
       fetchGroups();
       fetchMessages();
     }
-  }, [currentUser, selectedTarget, fetchUsers, fetchGroups, fetchMessages]);
+  }, [currentUser, selectedTarget, fetchUsers, fetchGroups, fetchMessages, isStealthMode]);
 
   // Socket.io Connection Setup with Cryptographic Token
   useEffect(() => {
@@ -843,7 +908,7 @@ export default function App() {
     // Offline unread sync & pending message delivery from server upon reconnecting
     s.on('offline_sync', ({ unreadCounts, pendingMessages }) => {
       if (unreadCounts && typeof unreadCounts === 'object') {
-        setUnreadCounts(prev => ({ ...prev, ...unreadCounts }));
+        updateUnreadCounts(prev => ({ ...prev, ...unreadCounts }));
       }
       if (Array.isArray(pendingMessages) && pendingMessages.length > 0) {
         const currentTarget = selectedTargetRef.current;
@@ -864,7 +929,7 @@ export default function App() {
             const existingRaw = localStorage.getItem(key);
             const existing = existingRaw ? JSON.parse(existingRaw) : [];
             const merged = deduplicateMessages([...existing, ...newMsgs]);
-            localStorage.setItem(key, JSON.stringify(merged.slice(-200)));
+            localStorage.setItem(key, JSON.stringify(merged.slice(-500)));
           } catch {}
         });
 
@@ -872,7 +937,7 @@ export default function App() {
         if (currentTarget.type === 'user' && byChat[currentTarget.id]) {
           setMessages(prev => deduplicateMessages([...prev, ...byChat[currentTarget.id]]));
           s.emit('mark_chat_read', { senderId: currentTarget.id, viewerId: currentUserId });
-          setUnreadCounts(prev => ({ ...prev, [currentTarget.id]: 0 }));
+          updateUnreadCounts(prev => ({ ...prev, [currentTarget.id]: 0 }));
         }
 
         playMessageChime();
@@ -1269,7 +1334,7 @@ export default function App() {
     setIsSidebarOpen(false);
     relockAll();
     if (target.id) {
-      setUnreadCounts(prev => ({ ...prev, [target.id]: 0 }));
+      updateUnreadCounts(prev => ({ ...prev, [target.id]: 0 }));
       if (target.type === 'user' && socket && connectionStatus === 'connected' && currentUser) {
         socket.emit('mark_chat_read', { senderId: target.id, viewerId: currentUser.id });
       }
@@ -1380,6 +1445,38 @@ export default function App() {
               sessionStorage.setItem('secret_bubble_session_unlocked', 'true');
               localStorage.setItem('secret_bubble_stealth_active', 'false');
             } catch {}
+
+            // 1. Immediately hydrate messages from local cache for current target
+            const currentTarget = selectedTargetRef.current;
+            if (currentTarget) {
+              try {
+                const key = `secure_chat_cache_${currentTarget.type}_${currentTarget.id}`;
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    setMessages(deduplicateMessages(parsed));
+                  }
+                }
+              } catch {}
+            }
+
+            // 2. Sync / restore all local messages to server
+            restoreAllLocalCachesToServer();
+
+            // 3. Re-fetch fresh users, groups, messages, and unread counts
+            fetchUsers();
+            fetchGroups();
+            fetchMessages();
+
+            // 4. Ensure socket is connected and user online status emitted
+            if (socket) {
+              if (!socket.connected) {
+                socket.connect();
+              } else if (currentUserRef.current) {
+                socket.emit('user_online', currentUserRef.current);
+              }
+            }
           }}
         />
         <Suspense fallback={null}>

@@ -504,23 +504,17 @@ function loadMessages() {
           const roomId = (!m.recipientId && !m.roomId) ? 'global' : (m.roomId || null);
           const finalText = text || m.text || '';
           const sensitivity = analyzeSensitivity(finalText);
-          const shouldBeLocked = Boolean(m.isLocked || m.hasPasscode || sensitivity.isSensitive);
-          let hasPasscode = Boolean(m.hasPasscode || shouldBeLocked);
-          let passcodeHash = m.passcodeHash;
-          let passcodeHint = m.passcodeHint;
-          if (shouldBeLocked && !passcodeHash) {
-            passcodeHash = crypto.createHash('sha256').update('1234').digest('hex');
-            passcodeHint = '';
-          }
+          const hasExplicitPasscode = Boolean(m.hasPasscode && m.passcodeHash);
+          const shouldBeLocked = Boolean(m.isLocked || hasExplicitPasscode);
 
           return {
             ...m,
             text: finalText,
             roomId: roomId,
             isLocked: shouldBeLocked,
-            hasPasscode: hasPasscode,
-            passcodeHash: passcodeHash,
-            passcodeHint: passcodeHint,
+            hasPasscode: hasExplicitPasscode,
+            passcodeHash: hasExplicitPasscode ? m.passcodeHash : null,
+            passcodeHint: hasExplicitPasscode ? (m.passcodeHint || '') : '',
             category: m.category || (sensitivity.isSensitive ? sensitivity.category : 'General'),
             e2eeEnvelope: m.e2eeEnvelope || null
           };
@@ -1332,7 +1326,8 @@ app.get('/api/messages/unreads', (req, res) => {
       }
       // Include in pendingMessages if unread or delivered recently so client local store has full history
       if (isUnread || (m.deliveredAt && Date.now() - m.deliveredAt < 7 * 24 * 3600 * 1000)) {
-        const safeMsg = (m.hasPasscode && m.senderId !== userId) ? {
+        const isSecretLocked = Boolean(m.hasPasscode && m.passcodeHash && m.senderId !== userId);
+        const safeMsg = isSecretLocked ? {
           ...m,
           text: '[🔒 Passcode Protected Secret Message]',
           attachment: m.attachment ? {
@@ -1450,7 +1445,7 @@ app.get('/api/messages', (req, res) => {
 
   // Mask passcode-protected messages for non-senders
   const safeMessages = filtered.map(m => {
-    if (m.hasPasscode && m.senderId !== userId) {
+    if (m.hasPasscode && m.passcodeHash && m.senderId !== userId) {
       return {
         ...m,
         text: '[🔒 Passcode Protected Secret Message]',
@@ -1483,23 +1478,18 @@ app.post('/api/messages/send', (req, res) => {
   } : null;
 
   const aiAnalysis = analyzeSensitivity(sanitizedText);
-  const shouldLock = Boolean(msgData.isLocked || msgData.hasPasscode || aiAnalysis.isSensitive);
-  let hasPasscode = Boolean(msgData.hasPasscode && msgData.passcode);
+  const passcode = (msgData.passcode || '').trim();
+  const hasPasscode = Boolean(msgData.hasPasscode && passcode.length > 0);
+  const shouldLock = Boolean(msgData.isLocked || hasPasscode);
   let passcodeHash = null;
   let passcodeHint = '';
 
   if (hasPasscode) {
-    passcodeHash = crypto.createHash('sha256').update(msgData.passcode.trim()).digest('hex');
+    passcodeHash = crypto.createHash('sha256').update(passcode).digest('hex');
     passcodeHint = sanitizeText(msgData.passcodeHint ? msgData.passcodeHint.trim() : '');
-  } else if (shouldLock) {
-    hasPasscode = true;
-    passcodeHash = crypto.createHash('sha256').update('1234').digest('hex');
-    passcodeHint = '';
   }
 
-  const category = shouldLock
-    ? (msgData.category || (hasPasscode ? 'Secret 🔒' : 'Private Message'))
-    : 'General';
+  const category = msgData.category || (hasPasscode ? 'Secret 🔒' : (aiAnalysis.isSensitive ? aiAnalysis.category : 'General'));
   const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
 
   const isDirect = Boolean(msgData.recipientId);
@@ -3387,8 +3377,9 @@ io.on('connection', (socket) => {
         if (isUnread) {
           unreadCounts[m.senderId] = (unreadCounts[m.senderId] || 0) + 1;
         }
+        const isSecretLocked = Boolean(m.hasPasscode && m.passcodeHash && m.senderId !== targetUserId);
         if (isUnread || (m.deliveredAt && Date.now() - m.deliveredAt < 7 * 24 * 3600 * 1000)) {
-          const safeMsg = (m.hasPasscode && m.senderId !== targetUserId) ? {
+          const safeMsg = isSecretLocked ? {
             ...m,
             text: '[🔒 Passcode Protected Secret Message]',
             attachment: m.attachment ? {
@@ -3460,15 +3451,8 @@ io.on('connection', (socket) => {
     }
 
     const aiAnalysis = analyzeSensitivity(sanitizedText);
-    const shouldLock = Boolean(msgData.isLocked || hasPasscode || aiAnalysis.isSensitive);
-    if (shouldLock && !hasPasscode) {
-      hasPasscode = true;
-      passcodeHash = crypto.createHash('sha256').update('1234').digest('hex');
-      passcodeHint = '';
-    }
-    const category = shouldLock
-      ? (msgData.category || (hasPasscode ? 'Secret 🔒' : 'Private Message'))
-      : 'General';
+    const shouldLock = Boolean(msgData.isLocked || (hasPasscode && passcode.length > 0));
+    const category = msgData.category || (hasPasscode ? 'Secret 🔒' : (aiAnalysis.isSensitive ? aiAnalysis.category : 'General'));
     const isAiShielded = Boolean(msgData.isAiShielded || aiAnalysis.isSensitive);
 
     const isDirect = Boolean(msgData.recipientId);
@@ -3525,7 +3509,7 @@ io.on('connection', (socket) => {
     }
     saveMessages(messages);
 
-    if (newMsg.hasPasscode) {
+    if (newMsg.hasPasscode && newMsg.passcodeHash) {
       const maskedMsg = {
         ...newMsg,
         text: '[🔒 Passcode Protected Secret Message]',

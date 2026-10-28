@@ -157,22 +157,21 @@ export default function ChatInput({
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
     try {
-      let finalLocked = isLocked;
       let finalCategory = selectedCategory;
       let autoShielded = false;
 
       if (settings?.aiEnabled && currentText) {
         const analysis = analyzeMessageSensitivity(currentText, settings.categories);
         if (analysis.isSensitive) {
-          finalLocked = true;
           finalCategory = analysis.category;
           autoShielded = true;
         }
       }
 
-      const shouldLock = Boolean(finalLocked || enablePasscodeLock || autoShielded || aiDetection.isSensitive);
-      const finalPasscode = shouldLock ? (passToUse || '1234') : null;
-      const finalHint = shouldLock ? (hintToUse || (passToUse ? '' : '1234')) : null;
+      const explicitPasscode = (passToUse || passcode.trim());
+      const shouldLock = Boolean(enablePasscodeLock && explicitPasscode);
+      const finalPasscode = shouldLock ? explicitPasscode : null;
+      const finalHint = shouldLock ? hintToUse : null;
 
       let e2eeEnvelope = null;
       if (shouldLock && finalPasscode && currentText) {

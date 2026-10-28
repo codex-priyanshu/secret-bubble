@@ -54,10 +54,11 @@ export default function MessageItem({
   const isMe = message.senderId === currentUser.id;
   const isMetaAi = message.senderId === 'user-meta-ai';
 
-  // AI Sensitivity scanning fallback: Ensures sensitive words (sex, love, intimate, etc.) are always locked
+  // Sensitivity detection for categories and privacy tagging
   const sensitivity = analyzeMessageSensitivity(message.text);
   const isSensitive = sensitivity.isSensitive;
-  const isLockedMsg = Boolean(message.isLocked || message.hasPasscode || isSensitive);
+  // Message is locked ONLY if explicitly password protected or locked by sender
+  const isLockedMsg = Boolean(message.hasPasscode || message.isLocked);
 
   const [senderRevealed, setSenderRevealed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
