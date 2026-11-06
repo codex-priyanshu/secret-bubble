@@ -7,6 +7,7 @@ import AdminDashboard from './components/AdminDashboard';
 import { useBiometrics } from './hooks/useBiometrics';
 import { decryptE2EE, isE2EEEncrypted } from './utils/e2eeCrypto';
 import { subscribeDevToolsDetection } from './utils/antiInspectShield';
+import { subscribeUserToPush, showLocalNotification } from './utils/pushNotifications';
 
 // Code-split heavy modals and chat components for fast initial load
 const ChatHeader = lazy(() => import('./components/ChatHeader'));
@@ -680,6 +681,36 @@ export default function App() {
     };
   }, [settings.idleLockMinutes, isAppLocked, currentUser]);
 
+  // Auto-subscribe to Web Push background alerts if permission already granted
+  useEffect(() => {
+    if (currentUser?.id && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      subscribeUserToPush(currentUser.id, backendUrl).catch(() => {});
+    }
+  }, [currentUser?.id, backendUrl]);
+
+  // Handle incoming notification navigation messages from Service Worker
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+    const handleSwMessage = (e) => {
+      if (e.data?.type === 'NAVIGATE_TO_CHAT') {
+        const { senderId, roomId } = e.data;
+        if (senderId) {
+          setSelectedTarget({ type: 'user', id: senderId });
+          setIsStealthMode(false);
+          setIsAppLocked(false);
+        } else if (roomId) {
+          setSelectedTarget({ type: 'room', id: roomId });
+          setIsStealthMode(false);
+          setIsAppLocked(false);
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, []);
+
   // Disappearing messages local cleanup
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1078,6 +1109,23 @@ export default function App() {
         if (currentTarget.type === 'user') {
           s.emit('mark_chat_read', { senderId: currentTarget.id, viewerId: user.id });
         }
+
+        if (typeof document !== 'undefined' && document.hidden) {
+          playMessageChime();
+          const bodySnippet = msg.hasPasscode
+            ? '🔒 Secret passcode-protected message'
+            : (msg.attachment ? `📎 ${msg.attachment.name || 'File attachment'}` : (msg.text ? msg.text.slice(0, 100) : 'New message'));
+
+          showLocalNotification(
+            msg.sender || 'Secret-Bubble',
+            bodySnippet,
+            {
+              icon: msg.senderAvatar || '/app-logo.png',
+              tag: `chat-${msg.senderId}`,
+              data: { senderId: msg.senderId }
+            }
+          );
+        }
       } else if (msg.recipientId === user.id && msg.senderId !== user.id) {
         const fromId = msg.senderId;
         setUnreadCounts(prev => ({
@@ -1116,6 +1164,23 @@ export default function App() {
             navigator.vibrate([100, 50, 100]);
           }
         } catch {}
+
+        // Trigger local notification when in background or stealth mode
+        if (typeof document !== 'undefined' && (document.hidden || isStealthMode || isAppLocked)) {
+          const bodySnippet = msg.hasPasscode
+            ? '🔒 Secret passcode-protected message'
+            : (msg.attachment ? `📎 ${msg.attachment.name || 'File attachment'}` : (msg.text ? msg.text.slice(0, 100) : 'New message'));
+
+          showLocalNotification(
+            msg.sender || 'Secret-Bubble',
+            bodySnippet,
+            {
+              icon: msg.senderAvatar || '/app-logo.png',
+              tag: `chat-${msg.senderId}`,
+              data: { senderId: msg.senderId }
+            }
+          );
+        }
       } else if (msg.roomId && !msg.recipientId) {
         // Background room/group message - persist to room cache
         try {
@@ -1768,6 +1833,8 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+        currentUser={currentUser}
+        backendUrl={backendUrl}
       />
 
       {/* AI Training & Knowledge Studio Modal */}

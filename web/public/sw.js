@@ -1,5 +1,5 @@
-// Service Worker for automatic updates, offline fallback, PWA installation, and lock-screen media notifications
-const CACHE_NAME = 'secret-bubble-v4';
+// Service Worker for automatic updates, offline fallback, PWA installation, lock-screen media, and background Web Push notifications
+const CACHE_NAME = 'secret-bubble-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -20,6 +20,43 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
+});
+
+// Background Web Push Notification Receiver
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'Secret-Bubble',
+    body: 'New private message received',
+    icon: '/app-logo.png',
+    badge: '/favicon.png',
+    data: { url: '/' }
+  };
+
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (err) {
+      data.body = event.data.text();
+    }
+  }
+
+  const title = data.title || 'Secret-Bubble';
+  const tag = data.tag || (data.data?.senderId ? `chat-${data.data.senderId}` : 'secret-bubble-chat');
+  const options = {
+    body: data.body || 'You received a new message',
+    icon: data.icon || '/app-logo.png',
+    badge: data.badge || '/favicon.png',
+    tag: tag,
+    renotify: true,
+    vibrate: [150, 60, 150],
+    data: data.data || { url: '/' },
+    actions: [
+      { action: 'open', title: '💬 Open Chat' },
+      { action: 'dismiss', title: '✖ Dismiss' }
+    ]
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // Lock Screen and Notification Tray Media Controls
@@ -54,21 +91,34 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   const action = event.action;
+  const notification = event.notification;
+  notification.close();
+
+  if (action === 'dismiss') return;
+
+  const urlToOpen = notification.data?.url || '/';
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if ('focus' in client) {
-          if (action) {
+          if (action === 'prev' || action === 'play' || action === 'pause' || action === 'next') {
             client.postMessage({ type: 'MEDIA_NOTIFICATION_ACTION', action });
           } else {
             client.focus();
+            if (notification.data?.senderId || notification.data?.roomId) {
+              client.postMessage({
+                type: 'NAVIGATE_TO_CHAT',
+                senderId: notification.data.senderId,
+                roomId: notification.data.roomId
+              });
+            }
           }
           return;
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
+        return self.clients.openWindow(urlToOpen);
       }
     })
   );

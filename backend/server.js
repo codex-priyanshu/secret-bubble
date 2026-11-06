@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
+const webpush = require('web-push');
 
 const app = express();
 
@@ -97,6 +98,136 @@ const DB_USERS_BACKUP_FILE = path.join(__dirname, 'users_backup.json');
 const DB_AI_TRAINING_FILE = path.join(__dirname, 'ai_training_data.json');
 const DB_GROUPS_FILE = path.join(__dirname, 'groups.json');
 const DB_ANALYTICS_FILE = path.join(__dirname, 'analytics_daily.json');
+const DB_VAPID_FILE = path.join(__dirname, 'vapid_keys.json');
+const DB_PUSH_SUBS_FILE = path.join(__dirname, 'push_subscriptions.json');
+
+// =========================================================================
+// Web Push VAPID Notification Engine
+// =========================================================================
+let vapidKeys = null;
+function loadVapidKeys() {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    return {
+      publicKey: process.env.VAPID_PUBLIC_KEY,
+      privateKey: process.env.VAPID_PRIVATE_KEY
+    };
+  }
+  try {
+    if (fs.existsSync(DB_VAPID_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(DB_VAPID_FILE, 'utf8'));
+      if (parsed.publicKey && parsed.privateKey) return parsed;
+    }
+  } catch (e) {}
+
+  const generated = webpush.generateVAPIDKeys();
+  try {
+    fs.writeFileSync(DB_VAPID_FILE, JSON.stringify(generated, null, 2), 'utf8');
+  } catch (e) {}
+  return generated;
+}
+
+vapidKeys = loadVapidKeys();
+try {
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL || 'mailto:notifications@secretbubble.app',
+    vapidKeys.publicKey,
+    vapidKeys.privateKey
+  );
+  console.log('[Push] ✅ VAPID Web Push active. Public key:', vapidKeys.publicKey.slice(0, 16) + '...');
+} catch (err) {
+  console.warn('[Push] VAPID configuration error:', err?.message);
+}
+
+// In-Memory Push Subscriptions: userId -> Map<endpoint, subscriptionObject>
+let pushSubscriptions = new Map();
+
+function loadPushSubscriptionsFromDisk() {
+  try {
+    if (fs.existsSync(DB_PUSH_SUBS_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(DB_PUSH_SUBS_FILE, 'utf8'));
+      const map = new Map();
+      if (raw && typeof raw === 'object') {
+        Object.entries(raw).forEach(([uId, subs]) => {
+          if (Array.isArray(subs)) {
+            const subMap = new Map();
+            subs.forEach(s => {
+              if (s && s.endpoint) subMap.set(s.endpoint, s);
+            });
+            if (subMap.size > 0) map.set(uId, subMap);
+          }
+        });
+      }
+      return map;
+    }
+  } catch (e) {}
+  return new Map();
+}
+
+function savePushSubscriptionsToDisk() {
+  try {
+    const obj = {};
+    pushSubscriptions.forEach((subMap, uId) => {
+      obj[uId] = Array.from(subMap.values());
+    });
+    fs.writeFileSync(DB_PUSH_SUBS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (e) {}
+}
+
+function savePushSubscriptions() {
+  savePushSubscriptionsToDisk();
+  if (isMongoConnected && mongoDb) {
+    try {
+      const obj = {};
+      pushSubscriptions.forEach((subMap, uId) => {
+        obj[uId] = Array.from(subMap.values());
+      });
+      mongoDb.collection('push_subscriptions').updateOne(
+        { id: 'all_push_subscriptions' },
+        { $set: { id: 'all_push_subscriptions', data: obj, updatedAt: new Date().toISOString() } },
+        { upsert: true }
+      ).catch(() => {});
+    } catch (e) {}
+  }
+}
+
+pushSubscriptions = loadPushSubscriptionsFromDisk();
+
+async function sendPushNotification(userId, { title, body, icon, badge, tag, data }) {
+  if (!userId || !pushSubscriptions.has(userId)) return 0;
+  const userSubs = pushSubscriptions.get(userId);
+  if (!userSubs || userSubs.size === 0) return 0;
+
+  const payload = JSON.stringify({
+    title: title || 'Secret-Bubble',
+    body: body || 'New message received',
+    icon: icon || '/app-logo.png',
+    badge: badge || '/favicon.png',
+    tag: tag || `chat-${data?.senderId || 'incoming'}`,
+    data: data || { url: '/' }
+  });
+
+  let sentCount = 0;
+  const deadEndpoints = [];
+
+  for (const [endpoint, sub] of userSubs.entries()) {
+    try {
+      await webpush.sendNotification(sub, payload);
+      sentCount++;
+    } catch (err) {
+      if (err.statusCode === 404 || err.statusCode === 410) {
+        deadEndpoints.push(endpoint);
+      }
+    }
+  }
+
+  if (deadEndpoints.length > 0) {
+    deadEndpoints.forEach(ep => userSubs.delete(ep));
+    if (userSubs.size === 0) pushSubscriptions.delete(userId);
+    savePushSubscriptions();
+  }
+
+  return sentCount;
+}
 
 // =========================================================================
 // MongoDB Atlas Cloud Database Engine (Hybrid Cloud + Local Disk Fallback)
@@ -263,6 +394,22 @@ async function initMongoDB() {
         { $set: { id: 'daily_analytics_data', data: analyticsData, updatedAt: new Date().toISOString() } },
         { upsert: true }
       ).catch(() => {});
+    }
+
+    // 6. Push Subscriptions:
+    const pushCol = mongoDb.collection('push_subscriptions');
+    const cloudSubs = await pushCol.findOne({ id: 'all_push_subscriptions' }).catch(() => null);
+    if (cloudSubs && cloudSubs.data) {
+      Object.entries(cloudSubs.data).forEach(([uId, subs]) => {
+        if (Array.isArray(subs)) {
+          const subMap = pushSubscriptions.get(uId) || new Map();
+          subs.forEach(s => { if (s && s.endpoint) subMap.set(s.endpoint, s); });
+          if (subMap.size > 0) pushSubscriptions.set(uId, subMap);
+        }
+      });
+      savePushSubscriptionsToDisk();
+    } else if (pushSubscriptions.size > 0) {
+      savePushSubscriptions();
     }
 
     mongoClient.on('close', () => {
@@ -1524,6 +1671,67 @@ app.get('/api/database/status', (req, res) => {
       usersCount: users.length,
       groupsCount: groups.length
     }
+  });
+});
+
+// Web Push VAPID Public Key
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({
+    success: true,
+    publicKey: vapidKeys ? vapidKeys.publicKey : null
+  });
+});
+
+// Register Push Subscription
+app.post('/api/push/subscribe', (req, res) => {
+  const { userId, subscription } = req.body;
+  if (!userId || !subscription || !subscription.endpoint) {
+    return res.status(400).json({ success: false, message: 'Missing userId or subscription endpoint' });
+  }
+
+  if (!pushSubscriptions.has(userId)) {
+    pushSubscriptions.set(userId, new Map());
+  }
+  const userSubs = pushSubscriptions.get(userId);
+  userSubs.set(subscription.endpoint, subscription);
+  savePushSubscriptions();
+
+  res.json({ success: true, message: 'Push subscription registered successfully' });
+});
+
+// Unsubscribe Push Subscription
+app.post('/api/push/unsubscribe', (req, res) => {
+  const { userId, endpoint } = req.body;
+  if (userId && pushSubscriptions.has(userId)) {
+    const userSubs = pushSubscriptions.get(userId);
+    if (endpoint) {
+      userSubs.delete(endpoint);
+    } else {
+      pushSubscriptions.delete(userId);
+    }
+    savePushSubscriptions();
+  }
+  res.json({ success: true });
+});
+
+// Send Test Push Notification
+app.post('/api/push/test', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ success: false, message: 'Missing userId' });
+  }
+
+  const sent = await sendPushNotification(userId, {
+    title: '🛡️ Secret-Bubble Shield Alert',
+    body: 'Push notifications are active! You will receive background alerts when messages arrive.',
+    icon: '/app-logo.png',
+    data: { url: '/', test: true }
+  });
+
+  res.json({
+    success: true,
+    sentCount: sent,
+    message: sent > 0 ? `Notification delivered to ${sent} device(s)` : 'No active push subscriptions found for this user'
   });
 });
 
@@ -3860,6 +4068,28 @@ io.on('connection', (socket) => {
       } else {
         io.emit('new_message', newMsg);
       }
+    }
+
+    // Dispatch Background Web Push Notification to recipient
+    if (newMsg.recipientId && newMsg.recipientId !== 'user-meta-ai' && newMsg.recipientId !== newMsg.senderId) {
+      const snippet = newMsg.hasPasscode
+        ? '🔒 Sent you a secret passcode-protected message'
+        : (attachment ? `📎 Sent a file: ${attachment.name}` : (sanitizedText ? sanitizedText.slice(0, 120) : 'Sent you a message'));
+
+      sendPushNotification(newMsg.recipientId, {
+        title: senderName || 'Secret-Bubble',
+        body: snippet,
+        icon: newMsg.senderAvatar || '/app-logo.png',
+        badge: '/favicon.png',
+        tag: `chat-${newMsg.senderId}`,
+        data: {
+          senderId: newMsg.senderId,
+          messageId: newMsg.id,
+          url: `/?chat=${newMsg.senderId}`
+        }
+      }).catch(err => {
+        console.warn('[Push] Background dispatch notice:', err?.message);
+      });
     }
 
     if (typeof callback === 'function') {

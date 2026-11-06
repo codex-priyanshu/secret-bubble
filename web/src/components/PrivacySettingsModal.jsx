@@ -1,16 +1,67 @@
 import React, { useState } from 'react';
 import { 
   X, Bot, Shield, Clock, Flame, Heart, Lock, Key, CheckCircle, EyeOff, 
-  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2, Headphones, Music 
+  Sparkles, ShieldCheck, Cpu, Database, Timer, CheckCircle2, Headphones, Music,
+  Bell, BellRing, Send, Volume2
 } from 'lucide-react';
+import {
+  subscribeUserToPush,
+  sendTestPush,
+  getNotificationPermission,
+  playNotificationTone
+} from '../utils/pushNotifications';
 
 export default function PrivacySettingsModal({
   isOpen,
   onClose,
   settings,
-  onUpdateSettings
+  onUpdateSettings,
+  currentUser,
+  backendUrl
 }) {
   if (!isOpen) return null;
+
+  const [pushStatus, setPushStatus] = useState(() => getNotificationPermission());
+  const [isPushLoading, setIsPushLoading] = useState(false);
+  const [testStatus, setTestStatus] = useState('');
+
+  const handleTogglePush = async () => {
+    if (!currentUser?.id) return;
+    setIsPushLoading(true);
+    setTestStatus('Requesting push permissions...');
+    try {
+      const res = await subscribeUserToPush(currentUser.id, backendUrl);
+      setPushStatus(getNotificationPermission());
+      if (res.success) {
+        setTestStatus('✅ Push notifications activated for this device.');
+      } else if (res.reason === 'permission_denied') {
+        setTestStatus('⚠️ Notification permission was denied in browser settings.');
+      } else {
+        setTestStatus(`Push notice: ${res.error || 'Check notification permissions'}`);
+      }
+      setTimeout(() => setTestStatus(''), 5000);
+    } catch (err) {
+      setTestStatus(`Error: ${err.message}`);
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (!currentUser?.id) return;
+    setTestStatus('Sending test notification to your device...');
+    try {
+      const res = await sendTestPush(currentUser.id, backendUrl);
+      if (res.success) {
+        setTestStatus(`🚀 ${res.message || 'Notification sent!'}`);
+      } else {
+        setTestStatus(`Notice: ${res.message || 'Subscribe to push first'}`);
+      }
+      setTimeout(() => setTestStatus(''), 5000);
+    } catch (err) {
+      setTestStatus(`Error: ${err.message}`);
+    }
+  };
 
   const toggleMasterAI = () => {
     onUpdateSettings({ ...settings, aiEnabled: !settings.aiEnabled });
@@ -254,6 +305,75 @@ export default function PrivacySettingsModal({
             <p className="text-[11px] text-slate-500 mt-1">
               Automatically locks screen with your passcode if inactive.
             </p>
+          </div>
+
+          {/* Push & Background Notifications */}
+          <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-800/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+                  <BellRing className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Push & Background Alerts</p>
+                  <p className="text-[11px] text-indigo-300/70">Receive alerts when offline, screen is locked, or in background</p>
+                </div>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                pushStatus === 'granted'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : pushStatus === 'denied'
+                  ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+              }`}>
+                {pushStatus === 'granted' ? 'Active' : pushStatus === 'denied' ? 'Blocked' : 'Enable'}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              When enabled, your device receives real-time system alerts with sound when new messages or files arrive, even if your browser or app is closed.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                disabled={isPushLoading}
+                onClick={handleTogglePush}
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
+                  pushStatus === 'granted'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30'
+                }`}
+              >
+                <Bell className="w-3.5 h-3.5" />
+                {isPushLoading ? 'Connecting...' : (pushStatus === 'granted' ? 'Re-Sync Push Notifications' : 'Enable Push Notifications')}
+              </button>
+
+              <button
+                type="button"
+                disabled={isPushLoading || !currentUser}
+                onClick={handleTestNotification}
+                className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition"
+              >
+                <Send className="w-3.5 h-3.5 text-indigo-400" />
+                Send Test Alert
+              </button>
+
+              <button
+                type="button"
+                onClick={playNotificationTone}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition"
+                title="Play Notification Sound Chime"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {testStatus && (
+              <p className="text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 rounded-xl px-2.5 py-1.5 animate-in fade-in">
+                {testStatus}
+              </p>
+            )}
           </div>
 
           {/* 6. Stealth Lo-Fi Music Player Camouflage Disguise */}
